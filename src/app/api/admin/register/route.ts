@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
     await sendQrEmail({
       toEmail: attendee.email,
       fullName: attendee.full_name,
+      role: attendee.role,
       qrPngBuffer,
     });
 

@@ -25,6 +25,11 @@ create table if not exists attendees (
   created_at timestamptz not null default now()
 );
 
+-- The live table has jotform_submission_id as NOT NULL, which blocks
+-- walk-in registrations (they have no Jotform submission by definition).
+-- Relaxing this doesn't affect the Jotform webhook path, which always sets it.
+alter table attendees alter column jotform_submission_id drop not null;
+
 -- Columns the app additionally needs, added without disturbing the existing shape.
 alter table attendees add column if not exists jotform_form_id text;
 alter table attendees add column if not exists organization text;
