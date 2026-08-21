@@ -43,8 +43,8 @@ QR code to the attendee, and gives event staff a camera-based scanner
    - `JOTFORM_WEBHOOK_SECRET` — optional, appended as `?secret=...` to the
      webhook URL so random internet POSTs can't create fake attendees.
 
-2. Run the schema in `supabase/schema.sql` against your Supabase project
-   (SQL Editor, or `supabase db push` if you use the CLI).
+2. The `attendees` table already exists in Supabase — see the "Attendee
+   schema" section below for its columns.
 
 3. `npm run dev` and open `/checkin` to try the scanner (camera permission
    required — use `https://` or `localhost`, browsers block camera access on
@@ -53,6 +53,34 @@ QR code to the attendee, and gives event staff a camera-based scanner
 4. Deploy (e.g. Vercel), then in Jotform: **Settings → Integrations →
    Webhooks**, add:
    `https://your-domain.com/api/jotform-webhook?secret=YOUR_JOTFORM_WEBHOOK_SECRET`
+
+## Attendee schema
+
+The `attendees` table in Supabase (managed directly in the dashboard, not
+via a checked-in migration file):
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | uuid | primary key |
+| `jotform_submission_id` | text, unique | null for walk-in registrations |
+| `jotform_form_id` | text | |
+| `full_name` | text | |
+| `email` | text | |
+| `phone` | text | |
+| `organization` | text | |
+| `role` | text | free text, e.g. `speaker`/`delegate`/`host`/`staff`/`sponsor` |
+| `unique_code` | text, unique | the value encoded in the attendee's QR |
+| `checked_in` | boolean | |
+| `checked_in_at` | timestamptz | |
+| `checked_in_station` | text | which station name checked them in |
+| `badge_printed_at` | timestamptz | |
+| `badge_print_count` | int | |
+| `qr_email_sent_at` | timestamptz | |
+| `raw_payload` | jsonb | full raw Jotform submission, for debugging |
+| `created_at` / `updated_at` | timestamptz | |
+
+RLS is enabled with no public policies — everything goes through the
+service-role-backed API routes.
 
 ## Jotform field mapping
 
