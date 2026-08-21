@@ -1,26 +1,158 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Brand palette */
+  --navy: #0a1a31;
+  --blue-mid: #0a4a7a;
+  --blue-1: #1c4f82;
+  --blue-2: #123a63;
+  --blue-3: #050d1a;
+  --gold: #f09f07;
+  --gold-light: #f7c15c;
+  --offwhite: #fafaf8;
+
+  --background: var(--offwhite);
+  --foreground: var(--navy);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  --color-navy: #0a1a31;
+  --color-blue-mid: #0a4a7a;
+  --color-blue-1: #1c4f82;
+  --color-blue-2: #123a63;
+  --color-blue-3: #050d1a;
+  --color-gold: #f09f07;
+  --color-gold-light: #f7c15c;
+  --color-offwhite: #fafaf8;
+
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-space-grotesk);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* This is a deliberately single, branded theme (navy / gold / off-white) —
+   it does not follow the system light/dark preference. */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-display), Arial, Helvetica, sans-serif;
+}
+
+/* Subtle brand backdrop: a soft navy/gold glow on the off-white base,
+   used behind hero/marketing sections. */
+.brand-glow {
+  background-image:
+    radial-gradient(60% 50% at 15% 0%, rgba(240, 159, 7, 0.08), transparent 60%),
+    radial-gradient(50% 45% at 100% 20%, rgba(10, 74, 122, 0.10), transparent 60%);
+}
+
+/* --- Badge printing ---
+   Badge size defaults to a common 3.5in x 5.5in portrait conference badge.
+   Adjust --badge-width / --badge-height to match your badge stock/printer. */
+.badge-print {
+  display: none;
+}
+
+.badge-card {
+  --badge-width: 3.5in;
+  --badge-height: 5.5in;
+  width: var(--badge-width);
+  height: var(--badge-height);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: linear-gradient(160deg, var(--navy) 0%, var(--blue-2) 55%, var(--blue-3) 100%);
+  color: #fff;
+  overflow: hidden;
+  position: relative;
+}
+
+.badge-accent-bar {
+  height: 0.14in;
+  width: 100%;
+}
+
+.badge-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.22in;
+  padding: 0.35in 0.3in;
+  text-align: center;
+}
+
+.badge-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold-light);
+}
+
+.badge-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.08in;
+  color: var(--navy);
+  background: var(--gold-light);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.1in 0.28in;
+  border-radius: 999px;
+  font-size: 15px;
+}
+
+.badge-name {
+  font-family: var(--font-display), Arial, Helvetica, sans-serif;
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.badge-org {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.badge-footer {
+  margin-top: auto;
+  padding: 0.22in 0.3in 0.3in;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+@media print {
+  @page {
+    size: 3.5in 5.5in;
+    margin: 0;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .badge-print,
+  .badge-print * {
+    visibility: visible;
+  }
+
+  .badge-print {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+  }
 }
