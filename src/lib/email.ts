@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { Resend } from "resend";
 import { escapeHtml } from "@/lib/escape-html";
+import { EVENT_INFO } from "@/lib/event-info";
 
 // Brand colors, duplicated from globals.css — email HTML can't read CSS
 // custom properties, so these are hardcoded here.
@@ -127,6 +128,9 @@ export async function sendQrEmail({
         </p>
         <p style="margin:0 0 4px; color:rgba(10,26,49,0.7); font-size:15px; line-height:1.6;">
           ${t.thanks(safeEvent)}
+        </p>
+        <p style="margin:14px 0 4px; color:${NAVY}; font-size:15px; font-weight:700; line-height:1.6;">
+          ${EVENT_INFO.date[language]} &nbsp;·&nbsp; ${EVENT_INFO.place[language]}
         </p>
         ${
           safeRole

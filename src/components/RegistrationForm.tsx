@@ -16,6 +16,7 @@ import {
 } from "@/lib/registration-fields";
 import { COUNTRY_CODES, EUROPEAN_VAT_COUNTRIES } from "@/lib/countries";
 import { formatPrice } from "@/lib/tickets";
+import { EVENT_INFO } from "@/lib/event-info";
 
 export interface TicketOption {
   id: string;
@@ -381,6 +382,10 @@ export default function RegistrationForm({
           <div className="space-y-2">
             <Kicker>{t.kicker}</Kicker>
             <h1 className="font-display text-3xl sm:text-4xl text-navy">{t.title}</h1>
+            <p className="flex items-center gap-2 text-sm font-semibold text-navy/70">
+              <span className="h-1.5 w-1.5 rounded-full bg-gold" aria-hidden="true" />
+              {EVENT_INFO.date[lang]} · {EVENT_INFO.place[lang]}
+            </p>
           </div>
           <LanguageSwitch lang={lang} onChange={chooseLang} />
         </div>

@@ -51,7 +51,7 @@ export default async function RegisterSuccessPage(props: PageProps<"/register/su
                 src={ticketUrl}
                 alt={t.ticketAlt}
                 width={300}
-                height={467}
+                height={487}
                 className="mx-auto block w-[300px] max-w-full h-auto rounded-2xl shadow-[0_10px_28px_-12px_rgba(10,26,49,0.35)]"
               />
               <p className="text-sm text-navy/60">{t.qrHelp}</p>

@@ -464,23 +464,28 @@ export function drawFlyer(
   ctx.fillStyle = "rgba(10,26,49,0.85)";
   ctx.fillRect(cx - 1.5, pTop + pH * 0.16, 3, pH * 0.68);
 
-  // Left: calendar icon, date and place.
+  // Left: calendar icon, date and place — sized to fit the left half.
   const colL = W * 0.25;
-  const iconS = L.dateSize * 0.9;
+  const colMax = cx - L.pad * 0.6 - L.pad * 0.5; // left edge to divider, with margins
+  let ds = L.dateSize;
+  let iconS = 0, labelW = 0, dateW = 0, placeW = 0, blockW = 0;
+  for (; ds > L.dateSize * 0.55; ds -= 1) {
+    iconS = ds * 0.9;
+    setFont(ctx, 600, ds * 0.42, body);
+    setSpacing(ctx, ds * 0.04);
+    labelW = ctx.measureText(text.dateLabel.toUpperCase()).width;
+    setSpacing(ctx, 0);
+    setFont(ctx, 700, ds, display);
+    dateW = ctx.measureText(text.date).width;
+    setFont(ctx, 500, ds * 0.5, body);
+    placeW = ctx.measureText(text.place).width;
+    blockW = iconS + ds * 0.35 + Math.max(dateW, labelW, placeW);
+    if (blockW <= colMax) break;
+  }
   const dateY = pTop + pH * 0.54;
-  setFont(ctx, 600, L.dateSize * 0.42, body);
-  setSpacing(ctx, L.dateSize * 0.04);
-  ctx.fillStyle = BRAND_BLUE;
   ctx.textAlign = "left";
-  const labelW = ctx.measureText(text.dateLabel.toUpperCase()).width;
-  setSpacing(ctx, 0);
-  setFont(ctx, 700, L.dateSize, display);
-  const dateW = ctx.measureText(text.date).width;
-  setFont(ctx, 500, L.dateSize * 0.5, body);
-  const placeW = ctx.measureText(text.place).width;
-  const blockW = iconS + L.dateSize * 0.35 + Math.max(dateW, labelW, placeW);
   const blockX = Math.max(L.pad * 0.6, colL - blockW / 2);
-  const textX = blockX + iconS + L.dateSize * 0.35;
+  const textX = blockX + iconS + ds * 0.35;
 
   // Calendar icon.
   const iy = dateY - iconS * 0.82;
@@ -496,17 +501,17 @@ export function drawFlyer(
   ctx.fillRect(blockX + iconS * 0.24, iy - iconS * 0.1, iconS * 0.1, iconS * 0.24);
   ctx.fillRect(blockX + iconS * 0.66, iy - iconS * 0.1, iconS * 0.1, iconS * 0.24);
 
-  setFont(ctx, 600, L.dateSize * 0.42, body);
-  setSpacing(ctx, L.dateSize * 0.04);
+  setFont(ctx, 600, ds * 0.42, body);
+  setSpacing(ctx, ds * 0.04);
   ctx.fillStyle = BRAND_BLUE;
-  ctx.fillText(text.dateLabel.toUpperCase(), textX, dateY - L.dateSize * 0.95);
+  ctx.fillText(text.dateLabel.toUpperCase(), textX, dateY - ds * 0.95);
   setSpacing(ctx, 0);
-  setFont(ctx, 700, L.dateSize, display);
+  setFont(ctx, 700, ds, display);
   ctx.fillStyle = NAVY;
   ctx.fillText(text.date, textX, dateY);
-  setFont(ctx, 500, L.dateSize * 0.5, body);
+  setFont(ctx, 500, ds * 0.5, body);
   ctx.fillStyle = "rgba(10,26,49,0.7)";
-  ctx.fillText(text.place, textX, dateY + L.dateSize * 0.72);
+  ctx.fillText(text.place, textX, dateY + ds * 0.72);
 
   // Right: "Scan to register" + QR code.
   const qs = L.qrSize;

@@ -5,6 +5,7 @@ import { generateQrPngDataUrl } from "@/lib/qrcode";
 import { listTickets } from "@/lib/ticket-store";
 import { describeError } from "@/lib/describe-error";
 import type { Attendee } from "@/lib/types";
+import { EVENT_INFO } from "@/lib/event-info";
 
 // Branded, downloadable ticket (PNG): logo, attendee details and the check-in
 // QR code. Used for the "Download" button on /register/success and attached
@@ -16,7 +17,7 @@ import type { Attendee } from "@/lib/types";
 // Colours: the conference site's primary gold (#F09F07) and secondary blue
 // (#03416A), with the portal's navy.
 
-export const TICKET_SIZE = { width: 900, height: 1400 };
+export const TICKET_SIZE = { width: 900, height: 1460 };
 
 const NAVY = "#0A1A31";
 const BRAND_BLUE = "#03416A";
@@ -27,13 +28,13 @@ const PAGE_BG = "#E9EDF3";
 
 const COPY = {
   en: {
-    pass: "2027 · Attendee pass",
+    pass: "Attendee pass",
     ticket: "Ticket",
     reference: "Reference",
     scan: "Show this code at the registration desk to collect your badge.",
   },
   fr: {
-    pass: "2027 · Badge d'accès",
+    pass: "Badge d'accès",
     ticket: "Billet",
     reference: "Référence",
     scan: "Présentez ce code à l'accueil pour récupérer votre badge.",
@@ -194,6 +195,9 @@ export async function renderTicket(
               }}
             >
               {t.pass}
+            </div>
+            <div style={{ marginTop: 10, fontSize: 28, fontWeight: 600, color: "#FFFFFF" }}>
+              {`${EVENT_INFO.date[lang]} · ${EVENT_INFO.place[lang]}`}
             </div>
           </div>
 

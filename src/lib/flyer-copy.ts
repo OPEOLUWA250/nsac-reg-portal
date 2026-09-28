@@ -35,9 +35,9 @@ export const FLYER_COPY = {
     captionHint: "Edit it as you like. It's copied for you when you share.",
     defaultCaption: (headline: Headline) =>
       ({
-        attending: `I'm excited to be attending the ${EVENT_INFO.name.en} in ${EVENT_INFO.place.en}, ${EVENT_INFO.date.en}! 🚀\n\nLooking forward to connecting with leaders shaping Africa's space industry. Will I see you there?`,
-        speaking: `I'm honoured to be speaking at the ${EVENT_INFO.name.en} in ${EVENT_INFO.place.en}, ${EVENT_INFO.date.en}! 🚀\n\nLooking forward to the conversations on the future of Africa's space industry. Come and join us.`,
-        join: `Join me at the ${EVENT_INFO.name.en} in ${EVENT_INFO.place.en}, ${EVENT_INFO.date.en}! 🚀\n\nThe gathering for everyone building Africa's space industry.`,
+        attending: `I'm excited to be attending the ${EVENT_INFO.name.en} in ${EVENT_INFO.place.en} ${EVENT_INFO.dateInSentence.en}! 🚀\n\nLooking forward to connecting with leaders shaping Africa's space industry. Will I see you there?`,
+        speaking: `I'm honoured to be speaking at the ${EVENT_INFO.name.en} in ${EVENT_INFO.place.en} ${EVENT_INFO.dateInSentence.en}! 🚀\n\nLooking forward to the conversations on the future of Africa's space industry. Come and join us.`,
+        join: `Join me at the ${EVENT_INFO.name.en} in ${EVENT_INFO.place.en} ${EVENT_INFO.dateInSentence.en}! 🚀\n\nThe gathering for everyone building Africa's space industry.`,
       })[headline] + `\n\nRegister: ${EVENT_INFO.websiteUrl}\n\n${EVENT_INFO.hashtags}`,
     share: "Share",
     shareLinkedIn: "Share on LinkedIn",
@@ -79,9 +79,9 @@ export const FLYER_COPY = {
     captionHint: "Modifiez-le à votre guise. Il est copié automatiquement lors du partage.",
     defaultCaption: (headline: Headline) =>
       ({
-        attending: `Ravi(e) de participer à la ${EVENT_INFO.name.fr} à ${EVENT_INFO.place.fr}, ${EVENT_INFO.date.fr.toLowerCase()} ! 🚀\n\nHâte d'échanger avec les acteurs qui façonnent l'industrie spatiale africaine. Vous y serez ?`,
-        speaking: `Honoré(e) d'intervenir à la ${EVENT_INFO.name.fr} à ${EVENT_INFO.place.fr}, ${EVENT_INFO.date.fr.toLowerCase()} ! 🚀\n\nAu programme : l'avenir de l'industrie spatiale africaine. Rejoignez-nous.`,
-        join: `Rejoignez-moi à la ${EVENT_INFO.name.fr} à ${EVENT_INFO.place.fr}, ${EVENT_INFO.date.fr.toLowerCase()} ! 🚀\n\nLe rendez-vous de tous ceux qui construisent l'industrie spatiale africaine.`,
+        attending: `Ravi(e) de participer à la ${EVENT_INFO.name.fr} à ${EVENT_INFO.place.fr} ${EVENT_INFO.dateInSentence.fr} ! 🚀\n\nHâte d'échanger avec les acteurs qui façonnent l'industrie spatiale africaine. Vous y serez ?`,
+        speaking: `Honoré(e) d'intervenir à la ${EVENT_INFO.name.fr} à ${EVENT_INFO.place.fr} ${EVENT_INFO.dateInSentence.fr} ! 🚀\n\nAu programme : l'avenir de l'industrie spatiale africaine. Rejoignez-nous.`,
+        join: `Rejoignez-moi à la ${EVENT_INFO.name.fr} à ${EVENT_INFO.place.fr} ${EVENT_INFO.dateInSentence.fr} ! 🚀\n\nLe rendez-vous de tous ceux qui construisent l'industrie spatiale africaine.`,
       })[headline] + `\n\nInscription : ${EVENT_INFO.websiteUrl}\n\n${EVENT_INFO.hashtags}`,
     share: "Partager",
     shareLinkedIn: "Partager sur LinkedIn",
