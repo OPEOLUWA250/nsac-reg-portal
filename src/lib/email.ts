@@ -1,3 +1,4 @@
+import nodemailer from "nodemailer";
 import { Resend } from "resend";
 import { escapeHtml } from "@/lib/escape-html";
 
@@ -64,14 +65,11 @@ export async function sendQrEmail({
   role,
   language = "en",
 }: SendQrEmailArgs) {
-  const apiKey = process.env.RESEND_API_KEY;
   const fromAddress = process.env.EMAIL_FROM;
-
-  if (!apiKey || !fromAddress) {
-    throw new Error("Missing RESEND_API_KEY or EMAIL_FROM environment variables");
+  if (!fromAddress) {
+    throw new Error("Missing EMAIL_FROM environment variable");
   }
 
-  const resend = new Resend(apiKey);
   const t = COPY[language] ?? COPY.en;
 
   // Everything that came from a registrant is escaped before it goes into HTML.
@@ -80,7 +78,7 @@ export async function sendQrEmail({
   const safeRole = role ? escapeHtml(role) : "";
   const font = "Helvetica, Arial, 'Segoe UI', sans-serif";
 
-  const { error } = await resend.emails.send({
+  const message: OutgoingEmail = {
     from: fromAddress,
     to: toEmail,
     subject: t.subject(eventName),
@@ -165,7 +163,51 @@ export async function sendQrEmail({
   </table>
 </body>
     `,
-  });
+  };
+
+  await deliver(message);
+}
+
+interface OutgoingEmail {
+  from: string;
+  to: string;
+  subject: string;
+  html: string;
+  attachments: { filename: string; content: Buffer; contentType: string; contentId?: string }[];
+}
+
+// Two ways to send, chosen by environment:
+//  - SMTP (e.g. the organisation's Google Workspace account) when SMTP_HOST
+//    is set. Works without any DNS changes.
+//  - Resend otherwise. Needs the sending domain verified at resend.com/domains.
+async function deliver(message: OutgoingEmail) {
+  if (process.env.SMTP_HOST) {
+    const port = Number(process.env.SMTP_PORT ?? 465);
+    const transport = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port,
+      secure: port === 465,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    });
+    // Throws on failure, so a failed send is never recorded as sent.
+    await transport.sendMail({
+      from: message.from,
+      to: message.to,
+      subject: message.subject,
+      html: message.html,
+      attachments: message.attachments.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: a.contentType,
+        ...(a.contentId ? { cid: a.contentId } : {}),
+      })),
+    });
+    return;
+  }
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error("Missing RESEND_API_KEY (or SMTP_HOST) environment variable");
+  const { error } = await new Resend(apiKey).emails.send(message);
 
   // The Resend SDK reports API failures in `error` rather than throwing, so
   // surface them — otherwise a failed send would be recorded as sent.

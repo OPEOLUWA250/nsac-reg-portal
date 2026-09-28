@@ -76,10 +76,16 @@ Jotform form is closed.
   and it's attached to the confirmation email. It's drawn by
   `src/lib/ticket-image.tsx` using the white logo in `public/brand/logo.png`
   and the conference site's colours (gold `#F09F07`, blue `#03416A`).
-- **Emails need a verified domain.** With Resend's test sender
-  (`onboarding@resend.dev`) emails only reach the Resend account owner.
-  Verify the sending domain at resend.com/domains and set `EMAIL_FROM` to
-  an address on it. If a confirmation email fails, it is retried when the
+- **Sending email.** Two options, picked by environment variables:
+  - *SMTP* (e.g. the Google Workspace account): set `SMTP_HOST`,
+    `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` (a Google App Password) and
+    `EMAIL_FROM` to that account. Works without DNS changes; Google
+    Workspace allows about 2,000 emails a day.
+  - *Resend* (when `SMTP_HOST` is unset): needs the sending domain
+    verified. With Resend's test sender (`onboarding@resend.dev`) emails
+    only reach the Resend account owner. `newspace.spaceinafrica.com` has
+    been added in Resend; its 3 DNS records (1 TXT, 2 CNAME) still need
+    adding at the DNS host before it verifies. If a confirmation email fails, it is retried when the
   registrant revisits the success page or Stripe re-sends the webhook, and
   staff can always use **Resend QR** in `/admin`.
 
