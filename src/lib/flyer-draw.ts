@@ -7,11 +7,12 @@
 // name card overlapping the photo, tagline, then a white info panel with
 // the date/place and a "scan to register" QR code.
 
-export type FlyerFormat = "portrait" | "story";
+// One format for every platform: 4:5 portrait (1080×1350) — LinkedIn's
+// best-performing size, and it also works on Instagram and WhatsApp.
+export type FlyerFormat = "portrait";
 
 export const FLYER_SIZES: Record<FlyerFormat, { width: number; height: number }> = {
-  portrait: { width: 1080, height: 1350 }, // 4:5 — LinkedIn / Instagram feed
-  story: { width: 1080, height: 1920 }, // 9:16 — WhatsApp status / Instagram story
+  portrait: { width: 1080, height: 1350 },
 };
 
 export interface FlyerText {
@@ -86,27 +87,15 @@ interface Layout {
 const LAYOUTS: Record<FlyerFormat, Layout> = {
   portrait: {
     pad: 64, logoTop: 56, logoH: 84, markSize: 40,
-    headlineY: 268, headlineSize: 112, headlineMin: 64,
-    eventY: 326, eventSize: 30,
-    photoCy: 610, photoR: 215,
-    horizonY: 880, planetR: 1600,
+    headlineY: 260, headlineSize: 112, headlineMin: 64,
+    eventY: 318, eventSize: 30,
+    photoCy: 590, photoR: 212,
+    horizonY: 862, planetR: 1600,
     cardW: 780, cardH: 124, cardOverlap: 34,
     nameSize: 48, nameMin: 32, subSize: 24,
     taglineGap: 62, taglineSize: 26,
-    panelTop: 1090, panelH: 232, stripH: 28,
+    panelTop: 1058, panelH: 222, stripH: 70,
     dateSize: 46, qrSize: 150,
-  },
-  story: {
-    pad: 80, logoTop: 110, logoH: 118, markSize: 52,
-    headlineY: 450, headlineSize: 140, headlineMin: 80,
-    eventY: 530, eventSize: 38,
-    photoCy: 900, photoR: 300,
-    horizonY: 1250, planetR: 1500,
-    cardW: 860, cardH: 164, cardOverlap: 44,
-    nameSize: 64, nameMin: 40, subSize: 32,
-    taglineGap: 84, taglineSize: 34,
-    panelTop: 1520, panelH: 350, stripH: 50,
-    dateSize: 64, qrSize: 230,
   },
 };
 
@@ -248,7 +237,7 @@ export function drawFlyer(
   ctx.fillStyle = warm;
   ctx.fillRect(0, 0, W, L.panelTop);
 
-  for (const s of stars(W, L.panelTop, format === "story" ? 150 : 110)) {
+  for (const s of stars(W, L.panelTop, 110)) {
     ctx.fillStyle = `rgba(255,255,255,${s.a})`;
     ctx.beginPath();
     ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
@@ -545,14 +534,22 @@ export function drawFlyer(
   edge.addColorStop(0, GOLD);
   edge.addColorStop(1, GOLD_LIGHT);
   ctx.fillStyle = edge;
-  ctx.fillRect(0, sTop, W, Math.max(4, L.stripH * 0.14));
-  if (H - sTop > 30) {
-    setFont(ctx, 600, Math.min(L.stripH * 0.5, 24), body);
-    setSpacing(ctx, 2);
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.textAlign = "center";
-    ctx.fillText(text.website.toUpperCase(), cx, sTop + (H - sTop) * 0.66);
-    setSpacing(ctx, 0);
+  ctx.fillRect(0, sTop, W, 6);
+  // Website, centred between two small gold dots.
+  const stripMid = sTop + 3 + (H - sTop - 3) / 2;
+  setFont(ctx, 600, 26, body);
+  setSpacing(ctx, 3);
+  const site = text.website.toUpperCase();
+  const siteW = ctx.measureText(site).width;
+  ctx.fillStyle = "#FFFFFF";
+  ctx.textAlign = "center";
+  ctx.fillText(site, cx + 1.5, stripMid + 9);
+  setSpacing(ctx, 0);
+  ctx.fillStyle = GOLD;
+  for (const dx of [-(siteW / 2 + 26), siteW / 2 + 26]) {
+    ctx.beginPath();
+    ctx.arc(cx + dx, stripMid, 5, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   ctx.restore();

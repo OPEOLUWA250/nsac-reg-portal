@@ -77,9 +77,9 @@ Jotform form is closed.
   `src/lib/ticket-image.tsx` using the white logo in `public/brand/logo.png`
   and the conference site's colours (gold `#F09F07`, blue `#03416A`).
 - **"I'm attending" flyers (`/flyer`)**: registrants add their photo and
-  get a branded graphic (4:5 post for LinkedIn/Instagram, 9:16 story for
-  WhatsApp/Instagram) with a "scan to register" QR code and a ready-made
-  post text. It's linked from the
+  get a branded graphic in one size, 4:5 portrait (1080×1350 — LinkedIn's
+  best size, also fine on Instagram and WhatsApp), with a "scan to
+  register" QR code, the website, and a ready-made post text. It's linked from the
   success page (details pre-filled) and the confirmation email; anyone can
   also open it directly. The image is drawn in the browser — photos are
   never uploaded. Event date/place on it come from `src/lib/event-info.ts`

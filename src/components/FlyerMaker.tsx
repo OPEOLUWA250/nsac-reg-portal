@@ -20,7 +20,8 @@ import {
 import type { Language } from "@/lib/registration-fields";
 
 export interface FlyerPrefill {
-  name: string;
+  firstName: string;
+  lastName: string;
   jobTitle: string;
   organization: string;
   role: string | null;
@@ -28,7 +29,8 @@ export interface FlyerPrefill {
 }
 
 const LANG_KEY = "nsac_lang";
-const FORMATS: FlyerFormat[] = ["portrait", "story"];
+// One size for every platform (LinkedIn's 4:5 portrait).
+const FORMAT: FlyerFormat = "portrait";
 const START_FRAME: PhotoFrame = { zoom: 1, panX: 0, panY: 0 };
 
 function safeGet(key: string): string | null {
@@ -84,9 +86,10 @@ export default function FlyerMaker({
   const [lang, setLang] = useState<Language>(prefill.language ?? "en");
   const t = FLYER_COPY[lang];
 
-  const [format, setFormat] = useState<FlyerFormat>("portrait");
   const [headline, setHeadline] = useState<Headline>(prefill.role === "speaker" ? "speaking" : "attending");
-  const [name, setName] = useState(prefill.name);
+  const [firstName, setFirstName] = useState(prefill.firstName);
+  const [lastName, setLastName] = useState(prefill.lastName);
+  const name = `${firstName.trim()} ${lastName.trim()}`.trim();
   const [jobTitle, setJobTitle] = useState(prefill.jobTitle);
   const [organization, setOrganization] = useState(prefill.organization);
   const [caption, setCaption] = useState<string | null>(null); // null = use the default text
@@ -150,7 +153,7 @@ export default function FlyerMaker({
   }, [registerUrl]);
 
   const text: FlyerText = {
-    name: name.trim(),
+    name,
     subtitle: [jobTitle.trim(), organization.trim()].filter(Boolean).join(" · "),
     headline: t.headlines[headline],
     eventName: EVENT_INFO.name[lang],
@@ -167,11 +170,11 @@ export default function FlyerMaker({
   useEffect(() => {
     if (!assets || !canvasRef.current) return;
     const id = requestAnimationFrame(() => {
-      if (canvasRef.current) drawFlyer(canvasRef.current, format, text, { ...assets, photo }, frame);
+      if (canvasRef.current) drawFlyer(canvasRef.current, FORMAT, text, { ...assets, photo }, frame);
     });
     return () => cancelAnimationFrame(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `text` is derived from the listed values
-  }, [assets, format, photo, frame, name, jobTitle, organization, headline, lang]);
+  }, [assets, photo, frame, name, jobTitle, organization, headline, lang]);
 
   function chooseLang(next: Language) {
     setLang(next);
@@ -201,8 +204,8 @@ export default function FlyerMaker({
   function onPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
     if (!drag.current || !photo) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const toCanvas = FLYER_SIZES[format].width / rect.width;
-    const r = photoRadius(format);
+    const toCanvas = FLYER_SIZES[FORMAT].width / rect.width;
+    const r = photoRadius(FORMAT);
     const start = drag.current.frame;
     setFrame(
       clampFrame(photo, {
@@ -220,12 +223,12 @@ export default function FlyerMaker({
   const renderBlob = useCallback(async (): Promise<Blob | null> => {
     if (!assets) return null;
     const canvas = document.createElement("canvas");
-    drawFlyer(canvas, format, text, { ...assets, photo }, frame);
+    drawFlyer(canvas, FORMAT, text, { ...assets, photo }, frame);
     return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `text` is derived from the listed values
-  }, [assets, format, photo, frame, name, jobTitle, organization, headline, lang]);
+  }, [assets, photo, frame, name, jobTitle, organization, headline, lang]);
 
-  const filename = `newspace-africa-2027-${format}.png`;
+  const filename = "newspace-africa-2027-flyer.png";
 
   async function handleDownload() {
     setBusy(true);
@@ -272,7 +275,7 @@ export default function FlyerMaker({
     if (await copyText(captionText)) setMessage(t.copied);
   }
 
-  const { width, height } = FLYER_SIZES[format];
+  const { width, height } = FLYER_SIZES[FORMAT];
 
   return (
     <main className="flex-1 brand-glow px-4 py-8 sm:py-12">
@@ -331,16 +334,21 @@ export default function FlyerMaker({
             </Field>
 
             <div className="grid sm:grid-cols-2 gap-4">
-              <Field label={t.name}>
-                <input className={INPUT} value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder={t.namePlaceholder} />
+              <Field label={t.firstName}>
+                <input className={INPUT} value={firstName} onChange={(e) => setFirstName(e.target.value)} maxLength={40} autoComplete="given-name" />
               </Field>
+              <Field label={t.lastName}>
+                <input className={INPUT} value={lastName} onChange={(e) => setLastName(e.target.value)} maxLength={40} autoComplete="family-name" />
+              </Field>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
               <Field label={t.jobTitle}>
                 <input className={INPUT} value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} maxLength={120} />
               </Field>
+              <Field label={t.organization}>
+                <input className={INPUT} value={organization} onChange={(e) => setOrganization(e.target.value)} maxLength={160} />
+              </Field>
             </div>
-            <Field label={t.organization}>
-              <input className={INPUT} value={organization} onChange={(e) => setOrganization(e.target.value)} maxLength={160} />
-            </Field>
 
             <Field label={t.headline}>
               <Segmented
@@ -353,9 +361,6 @@ export default function FlyerMaker({
               />
             </Field>
 
-            <Field label={t.format}>
-              <Segmented value={format} onChange={setFormat} options={FORMATS.map((f) => ({ value: f, label: t.formats[f] }))} />
-            </Field>
 
             <Field label={t.caption} hint={t.captionHint}>
               <textarea className={INPUT} rows={6} value={captionText} onChange={(e) => setCaption(e.target.value)} />
@@ -364,7 +369,7 @@ export default function FlyerMaker({
 
           {/* Preview + actions */}
           <div className="space-y-4 order-1 lg:order-2 lg:sticky lg:top-24">
-            <div className={`mx-auto ${format === "story" ? "max-w-[340px]" : "max-w-[560px]"}`}>
+            <div className="mx-auto max-w-[560px]">
               <canvas
                 ref={canvasRef}
                 width={width}

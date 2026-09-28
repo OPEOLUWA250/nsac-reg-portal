@@ -18,7 +18,7 @@ export default async function FlyerPage(props: PageProps<"/flyer">) {
   const query = await props.searchParams;
   const sessionId = typeof query.session_id === "string" ? query.session_id : "";
 
-  let prefill: FlyerPrefill = { name: "", jobTitle: "", organization: "", role: null, language: null };
+  let prefill: FlyerPrefill = { firstName: "", lastName: "", jobTitle: "", organization: "", role: null, language: null };
   let backHref: string | undefined;
 
   if (sessionId) {
@@ -28,8 +28,12 @@ export default async function FlyerPage(props: PageProps<"/flyer">) {
       const { data } = await supabaseAdmin().from("attendees").select("*").eq("id", attendeeId).maybeSingle();
       const attendee = data as Attendee | null;
       if (attendee && hasValidTicket(attendee)) {
+        // Form registrations store first/last name; older rows only have
+        // full_name, so split that (first word / the rest).
+        const [first = "", ...rest] = attendee.full_name.trim().split(/\s+/);
         prefill = {
-          name: attendee.full_name,
+          firstName: attendee.first_name ?? first,
+          lastName: attendee.last_name ?? rest.join(" "),
           jobTitle: attendee.job_title ?? "",
           organization: attendee.organization ?? "",
           role: attendee.role,
