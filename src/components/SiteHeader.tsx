@@ -21,6 +21,12 @@ export default function SiteHeader() {
         </Link>
         <nav className="flex items-center gap-5 text-sm">
           <Link
+            href="/register"
+            className="text-gold-light hover:text-white font-semibold transition-colors"
+          >
+            Register
+          </Link>
+          <Link
             href="/checkin"
             className="text-white/75 hover:text-white transition-colors"
           >

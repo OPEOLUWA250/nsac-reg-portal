@@ -151,6 +151,12 @@ export default function CheckInApp() {
               )}
             </div>
 
+            {attendee.payment_status === "pending" && (
+              <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                Payment not completed for this registration. Send them to the help desk.
+              </p>
+            )}
+
             {alreadyCheckedIn && (
               <p className="text-sm text-gold bg-gold/10 border border-gold/30 rounded-lg px-3 py-2">
                 Already checked in previously. You can still print another badge.

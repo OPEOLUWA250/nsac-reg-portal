@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isStaffAuthorized } from "@/lib/staff-auth";
-import { generateUniqueCode, generateQrPngBuffer } from "@/lib/qrcode";
-import { sendQrEmail } from "@/lib/email";
+import { createAttendee, sendAttendeeQr } from "@/lib/attendee-service";
 
 export const runtime = "nodejs";
 
 // On-site walk-in registration, for attendees who show up without having
-// gone through Jotform. Creates the attendee record and emails their QR
-// code immediately, same as the Jotform webhook path does.
+// registered online. Creates the attendee record and emails their QR code
+// immediately, same as the public form does.
 export async function POST(req: NextRequest) {
   if (!isStaffAuthorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -28,58 +26,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "name and email are required" }, { status: 400 });
   }
 
-  const supabase = supabaseAdmin();
-
-  const { data: existing } = await supabase
-    .from("attendees")
-    .select("id, full_name")
-    .eq("email", email)
-    .maybeSingle();
-
-  if (existing) {
-    return NextResponse.json(
-      { error: `${existing.full_name} is already registered with this email — use Resend instead.` },
-      { status: 409 }
-    );
-  }
-
-  const uniqueCode = generateUniqueCode();
-
-  const { data: attendee, error } = await supabase
-    .from("attendees")
-    .insert({
+  let outcome;
+  try {
+    outcome = await createAttendee({
       full_name: fullName,
       email,
       role,
       organization,
       phone,
-      unique_code: uniqueCode,
-    })
-    .select()
-    .single();
-
-  if (error || !attendee) {
+      source: "walk_in",
+      // Walk-ins are registered by staff at the desk (payment, if any, is
+      // handled there), so they get their QR code straight away.
+      details: { payment_status: "not_required" },
+    });
+  } catch (error) {
     console.error("Walk-in registration error", error);
     return NextResponse.json({ error: "database error" }, { status: 500 });
   }
 
-  try {
-    const qrPngBuffer = await generateQrPngBuffer(attendee.unique_code);
-    await sendQrEmail({
-      toEmail: attendee.email,
-      fullName: attendee.full_name,
-      role: attendee.role,
-      qrPngBuffer,
-    });
-
-    await supabase
-      .from("attendees")
-      .update({ qr_email_sent_at: new Date().toISOString() })
-      .eq("id", attendee.id);
-  } catch (emailError) {
-    console.error("Failed to send QR email for walk-in", emailError);
-    // Attendee is still created — admin can hit Resend once email is fixed.
+  if (outcome.status !== "created") {
+    return NextResponse.json(
+      {
+        error: `${outcome.attendee.full_name} is already registered with this email — use Resend instead.`,
+      },
+      { status: 409 }
+    );
   }
 
-  return NextResponse.json({ ok: true, attendee });
+  const emailSent = await sendAttendeeQr(outcome.attendee);
+  // Attendee is created even if the email failed — admin can hit Resend.
+  return NextResponse.json({ ok: true, attendee: outcome.attendee, emailSent });
 }

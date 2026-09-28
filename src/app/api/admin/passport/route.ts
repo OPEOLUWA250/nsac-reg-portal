@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isStaffAuthorized } from "@/lib/staff-auth";
-import { sendAttendeeQr } from "@/lib/attendee-service";
-import type { Attendee } from "@/lib/types";
 
 export const runtime = "nodejs";
 
+// Returns a link to an attendee's passport scan that expires after 5
+// minutes, for preparing invitation letters. Passports are never public.
 export async function POST(req: NextRequest) {
   if (!isStaffAuthorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -17,21 +17,23 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = supabaseAdmin();
-  const { data: attendee, error } = await supabase
+  const { data: attendee } = await supabase
     .from("attendees")
-    .select("*")
+    .select("passport_path")
     .eq("id", id)
     .maybeSingle();
 
-  if (error || !attendee) {
-    return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (!attendee?.passport_path) {
+    return NextResponse.json({ error: "no passport uploaded" }, { status: 404 });
   }
 
-  // sendAttendeeQr also records qr_email_sent_at on success.
-  const sent = await sendAttendeeQr(attendee as Attendee);
-  if (!sent) {
-    return NextResponse.json({ error: "failed to send email" }, { status: 502 });
+  const { data, error } = await supabase.storage
+    .from("passports")
+    .createSignedUrl(attendee.passport_path, 300);
+
+  if (error || !data) {
+    return NextResponse.json({ error: "passport file not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ url: data.signedUrl });
 }

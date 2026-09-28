@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
 import { mapJotformSubmission } from "@/lib/jotform-mapping";
-import { generateUniqueCode, generateQrPngBuffer } from "@/lib/qrcode";
-import { sendQrEmail } from "@/lib/email";
+import { createAttendee, sendAttendeeQr, canResendQr } from "@/lib/attendee-service";
 
 export const runtime = "nodejs";
 
+// LEGACY: kept so registrations still arriving through Jotform keep working
+// while we switch to our own form at /register. Remove the Jotform webhook
+// (and this route) once the Jotform form is closed.
+//
 // Jotform posts submissions as multipart/form-data. Configure this URL as
 // the webhook target in Jotform: Settings -> Integrations -> Webhooks.
 export async function POST(req: NextRequest) {
@@ -47,51 +49,35 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const supabase = supabaseAdmin();
-  const uniqueCode = generateUniqueCode();
-
-  const { data: attendee, error } = await supabase
-    .from("attendees")
-    .upsert(
-      {
-        jotform_submission_id: submissionId,
-        jotform_form_id: formId,
-        full_name: mapped.full_name,
-        email: mapped.email,
-        role: mapped.role,
-        organization: mapped.organization,
-        phone: mapped.phone,
-        unique_code: uniqueCode,
-        raw_payload: rawRequest,
-      },
-      { onConflict: "jotform_submission_id" }
-    )
-    .select()
-    .single();
-
-  if (error || !attendee) {
-    console.error("Failed to upsert attendee", error);
+  let outcome;
+  try {
+    outcome = await createAttendee({
+      full_name: mapped.full_name,
+      email: mapped.email,
+      role: mapped.role,
+      organization: mapped.organization,
+      phone: mapped.phone,
+      source: "jotform",
+      jotform_submission_id: submissionId,
+      jotform_form_id: formId,
+      raw_payload: rawRequest,
+    });
+  } catch (error) {
+    console.error("Failed to save Jotform attendee", error);
     return NextResponse.json({ error: "database error" }, { status: 500 });
   }
 
-  try {
-    const qrPngBuffer = await generateQrPngBuffer(attendee.unique_code);
-    await sendQrEmail({
-      toEmail: attendee.email,
-      fullName: attendee.full_name,
-      role: attendee.role,
-      qrPngBuffer,
-    });
-
-    await supabase
-      .from("attendees")
-      .update({ qr_email_sent_at: new Date().toISOString() })
-      .eq("id", attendee.id);
-  } catch (emailError) {
-    // Attendee is saved even if the email fails — log and let it be resent
-    // manually/via a retry job rather than failing the whole webhook.
-    console.error("Failed to send QR email", emailError);
+  // Previously this route upserted and generated a NEW unique_code on every
+  // Jotform retry, which silently invalidated the QR code already emailed.
+  // Now: a retry leaves the record (and its QR) untouched.
+  if (outcome.status === "created") {
+    await sendAttendeeQr(outcome.attendee);
+  } else if (outcome.status === "retry" && !outcome.attendee.qr_email_sent_at) {
+    await sendAttendeeQr(outcome.attendee);
+  } else if (outcome.status === "duplicate_email" && canResendQr(outcome.attendee)) {
+    // Same person submitted the Jotform twice: one record, re-send their QR.
+    await sendAttendeeQr(outcome.attendee);
   }
 
-  return NextResponse.json({ ok: true, attendeeId: attendee.id });
+  return NextResponse.json({ ok: true, attendeeId: outcome.attendee.id, status: outcome.status });
 }

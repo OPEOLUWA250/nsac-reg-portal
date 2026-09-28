@@ -43,3 +43,6 @@ supabase/.temp
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Claude Code session lock
+.claude/scheduled_tasks.lock

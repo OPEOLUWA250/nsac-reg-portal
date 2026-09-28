@@ -36,15 +36,23 @@ export default async function Home() {
           <span style={{ color: "var(--gold-light)" }}>Conference</span>
         </h1>
         <p className="max-w-md mx-auto text-white/65 text-base sm:text-lg">
-          QR-based check-in and on-site badge printing for speakers,
-          delegates, hosts, and staff.
+          Registration, QR-based check-in and on-site badge printing for
+          speakers, delegates, hosts, and staff.
         </p>
-        <Link
-          href="/checkin"
-          className="inline-flex rounded-full bg-gold text-navy px-8 py-3.5 text-sm font-semibold tracking-wide hover:bg-gold-light transition-colors"
-        >
-          Open check-in scanner
-        </Link>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/register"
+            className="inline-flex rounded-full bg-gold text-navy px-8 py-3.5 text-sm font-semibold tracking-wide hover:bg-gold-light transition-colors"
+          >
+            Register now · S’inscrire
+          </Link>
+          <Link
+            href="/checkin"
+            className="inline-flex rounded-full border border-white/25 text-white px-8 py-3.5 text-sm font-semibold tracking-wide hover:bg-white/10 transition-colors"
+          >
+            Open check-in scanner
+          </Link>
+        </div>
 
         {stats && (
           <div className="flex items-center justify-center gap-10 sm:gap-14 pt-8 mt-2 border-t border-white/10">

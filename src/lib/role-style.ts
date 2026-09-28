@@ -6,6 +6,7 @@ const ROLE_ACCENTS: Record<string, string> = {
   host: "#0A4A7A",
   staff: "#1c4f82",
   sponsor: "#123a63",
+  press: "#f7c15c",
   delegate: "#0A1A31",
   attendee: "#0A1A31",
 };

@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
   const { data: existing } = await supabase
     .from("attendees")
-    .select("id, checked_in")
+    .select("id, checked_in, payment_status")
     .eq("unique_code", token.trim())
     .maybeSingle();
 
@@ -26,10 +26,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
+  if (existing.payment_status === "pending") {
+    return NextResponse.json(
+      { error: "Payment not completed for this registration — send them to the help desk." },
+      { status: 409 }
+    );
+  }
+
   if (existing.checked_in) {
     return NextResponse.json({ ok: true, alreadyCheckedIn: true });
   }
 
+  // Conditional on checked_in = false so two stations scanning the same
+  // person at the same moment record a single check-in.
   const { data: attendee, error } = await supabase
     .from("attendees")
     .update({
@@ -38,8 +47,13 @@ export async function POST(req: NextRequest) {
       checked_in_station: station ?? null,
     })
     .eq("id", existing.id)
+    .eq("checked_in", false)
     .select()
-    .single();
+    .maybeSingle();
+
+  if (!error && !attendee) {
+    return NextResponse.json({ ok: true, alreadyCheckedIn: true });
+  }
 
   if (error || !attendee) {
     console.error("Confirm check-in error", error);

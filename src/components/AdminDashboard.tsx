@@ -158,6 +158,25 @@ export default function AdminDashboard() {
     }
   }
 
+  async function handleViewPassport(id: string) {
+    // Open the tab first (inside the click) so pop-up blockers allow it.
+    const tab = window.open("", "_blank");
+    try {
+      const { url } = await apiCall("/api/admin/passport", {
+        method: "POST",
+        body: JSON.stringify({ id }),
+      });
+      if (tab) tab.location.href = url;
+      else window.location.href = url;
+    } catch (err) {
+      tab?.close();
+      setRowMessage((s) => ({
+        ...s,
+        [id]: err instanceof Error ? err.message : "Could not open passport",
+      }));
+    }
+  }
+
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setRegistering(true);
@@ -190,6 +209,24 @@ export default function AdminDashboard() {
       "Role",
       "Organization",
       "Phone",
+      "Job Title",
+      "Nationality",
+      "Country of Residence",
+      "Organization Location",
+      "Professional Category",
+      "Job Function",
+      "Invitation Letter",
+      "Passport Uploaded",
+      "Food Allergies",
+      "Ticket",
+      "Payment",
+      "Amount",
+      "VAT Number",
+      "Invoice ID",
+      "Opt-in Organizer",
+      "Opt-in Sponsors",
+      "Source",
+      "Registered At",
       "Checked In",
       "Checked In At",
       "Station",
@@ -201,15 +238,34 @@ export default function AdminDashboard() {
       a.role,
       a.organization ?? "",
       a.phone ?? "",
+      a.job_title ?? "",
+      a.nationality ?? "",
+      a.residence_country ?? "",
+      a.organization_country ?? "",
+      a.professional_category ?? "",
+      a.job_function ?? "",
+      a.needs_invitation_letter == null ? "" : a.needs_invitation_letter ? "yes" : "no",
+      a.passport_path ? "yes" : "no",
+      a.food_allergies ?? "",
+      a.ticket_type ?? "",
+      paymentLabel(a.payment_status),
+      a.amount_cents != null ? `${(a.amount_cents / 100).toFixed(2)} ${(a.currency ?? "").toUpperCase()}` : "",
+      a.vat_number ?? "",
+      a.invoice_reference ?? "",
+      a.opt_in_organizer ? "yes" : "no",
+      a.opt_in_sponsors ? "yes" : "no",
+      a.source ?? "",
+      a.created_at ?? "",
       a.checked_in ? "yes" : "no",
       a.checked_in_at ?? "",
       a.checked_in_station ?? "",
       String(a.badge_print_count),
     ]);
     const csv = [header, ...rows]
-      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .map((row) => row.map(csvCell).join(","))
       .join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
+    // The BOM makes Excel read the file as UTF-8 (accents like "Côte d'Ivoire").
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -367,7 +423,7 @@ export default function AdminDashboard() {
                   Organization
                 </th>
                 <th className="p-3.5 text-xs font-semibold uppercase tracking-wider">Status</th>
-                <th className="p-3.5 text-xs font-semibold uppercase tracking-wider">QR sent</th>
+                <th className="p-3.5 text-xs font-semibold uppercase tracking-wider">Payment · QR</th>
                 <th className="p-3.5 text-xs font-semibold uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -408,7 +464,13 @@ export default function AdminDashboard() {
                       </div>
                     )}
                   </td>
-                  <td className="p-3.5 text-navy/70">{a.qr_email_sent_at ? "Yes" : "No"}</td>
+                  <td className="p-3.5 text-navy/70">
+                    <PaymentPill status={a.payment_status} />
+                    <div className="text-[11px] text-navy/45 mt-1">
+                      QR {a.qr_email_sent_at ? "sent" : "not sent"}
+                      {a.ticket_type && ` · ${a.ticket_type.replace(/_/g, " ")}`}
+                    </div>
+                  </td>
                   <td className="p-3.5 space-y-1.5">
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -425,6 +487,15 @@ export default function AdminDashboard() {
                       >
                         {a.checked_in ? "Undo check-in" : "Mark checked in"}
                       </button>
+                      {a.passport_path && (
+                        <button
+                          className="rounded-full border border-navy/20 px-3 py-1 text-xs font-medium text-navy hover:bg-navy/5 disabled:opacity-50 transition-colors"
+                          disabled={rowBusy[a.id]}
+                          onClick={() => handleViewPassport(a.id)}
+                        >
+                          Passport
+                        </button>
+                      )}
                     </div>
                     {rowMessage[a.id] && (
                       <div className="text-[11px] text-navy/45">{rowMessage[a.id]}</div>
@@ -460,4 +531,32 @@ function StatCard({
       <div className="font-display text-3xl text-navy mt-1">{value}</div>
     </Card>
   );
+}
+
+function paymentLabel(status: Attendee["payment_status"]): string {
+  if (status === "pending") return "pending";
+  if (status === "paid") return "paid";
+  if (status === "not_required") return "not required";
+  return "jotform";
+}
+
+function PaymentPill({ status }: { status: Attendee["payment_status"] }) {
+  const pending = status === "pending";
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap ${
+        pending ? "border-red-300 bg-red-50 text-red-700" : "border-navy/15 text-navy/60"
+      }`}
+    >
+      {paymentLabel(status)}
+    </span>
+  );
+}
+
+// Quotes a CSV cell, and stops Excel from running cells that start with
+// =, +, - or @ as formulas (a registrant could type one into the form).
+function csvCell(value: unknown): string {
+  let text = String(value ?? "");
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
 }
