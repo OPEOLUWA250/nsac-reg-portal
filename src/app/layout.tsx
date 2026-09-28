@@ -17,7 +17,7 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: "NewSpace Africa — Registration Portal",
   description:
-    "Check-in and badge printing portal for the NewSpace Africa Conference.",
+    "Registration, check-in and badge printing for the NewSpace Africa Conference.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

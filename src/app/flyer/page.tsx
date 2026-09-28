@@ -3,6 +3,7 @@ import FlyerMaker, { type FlyerPrefill } from "@/components/FlyerMaker";
 import { retrieveCheckoutSession } from "@/lib/payments";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { hasValidTicket, type Attendee } from "@/lib/types";
+import { EVENT_INFO } from "@/lib/event-info";
 
 export const dynamic = "force-dynamic";
 
@@ -39,5 +40,9 @@ export default async function FlyerPage(props: PageProps<"/flyer">) {
     }
   }
 
-  return <FlyerMaker prefill={prefill} backHref={backHref} />;
+  // The flyer's QR code points people at the registration form.
+  const base = process.env.PUBLIC_BASE_URL?.replace(/\/$/, "");
+  const registerUrl = base ? `${base}/register` : EVENT_INFO.websiteUrl;
+
+  return <FlyerMaker prefill={prefill} backHref={backHref} registerUrl={registerUrl} />;
 }

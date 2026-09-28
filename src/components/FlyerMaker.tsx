@@ -5,13 +5,16 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { Button, Card, Kicker } from "@/components/ui";
 import { EVENT_INFO } from "@/lib/event-info";
 import { FLYER_COPY, HEADLINES, type Headline } from "@/lib/flyer-copy";
+import QRCode from "qrcode";
 import {
   clampFrame,
   drawFlyer,
   FLYER_SIZES,
+  initialFrame,
   photoRadius,
   type FlyerAssets,
   type FlyerFormat,
+  type FlyerText,
   type PhotoFrame,
 } from "@/lib/flyer-draw";
 import type { Language } from "@/lib/registration-fields";
@@ -25,7 +28,7 @@ export interface FlyerPrefill {
 }
 
 const LANG_KEY = "nsac_lang";
-const FORMATS: FlyerFormat[] = ["square", "story"];
+const FORMATS: FlyerFormat[] = ["portrait", "story"];
 const START_FRAME: PhotoFrame = { zoom: 1, panX: 0, panY: 0 };
 
 function safeGet(key: string): string | null {
@@ -68,11 +71,20 @@ function downloadBlob(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export default function FlyerMaker({ prefill, backHref }: { prefill: FlyerPrefill; backHref?: string }) {
+export default function FlyerMaker({
+  prefill,
+  backHref,
+  registerUrl,
+}: {
+  prefill: FlyerPrefill;
+  backHref?: string;
+  /** Where the flyer's QR code points. */
+  registerUrl: string;
+}) {
   const [lang, setLang] = useState<Language>(prefill.language ?? "en");
   const t = FLYER_COPY[lang];
 
-  const [format, setFormat] = useState<FlyerFormat>("square");
+  const [format, setFormat] = useState<FlyerFormat>("portrait");
   const [headline, setHeadline] = useState<Headline>(prefill.role === "speaker" ? "speaking" : "attending");
   const [name, setName] = useState(prefill.name);
   const [jobTitle, setJobTitle] = useState(prefill.jobTitle);
@@ -107,14 +119,22 @@ export default function FlyerMaker({ prefill, backHref }: { prefill: FlyerPrefil
     const body = cssFont("--font-inter", "Arial, sans-serif");
     const logo = new Image();
     logo.src = "/brand/logo.png";
+    // "Scan to register" QR code, drawn crisp at any size.
+    const qr = document.createElement("canvas");
     Promise.allSettled([
       document.fonts.load(`700 40px ${display}`),
       document.fonts.load(`500 40px ${body}`),
       document.fonts.load(`600 40px ${body}`),
       document.fonts.load(`700 40px ${body}`),
       logo.decode(),
-    ]).then(() => {
-      if (!cancelled) setAssets({ logo: logo.complete && logo.naturalWidth ? logo : null, fonts: { display, body } });
+      QRCode.toCanvas(qr, registerUrl, { margin: 0, width: 480, errorCorrectionLevel: "M", color: { dark: "#0A1A31", light: "#FFFFFF" } }),
+    ]).then(([, , , , , qrResult]) => {
+      if (cancelled) return;
+      setAssets({
+        logo: logo.complete && logo.naturalWidth ? logo : null,
+        qr: qrResult.status === "fulfilled" ? qr : null,
+        fonts: { display, body },
+      });
     });
     // Phones that can share images straight to LinkedIn / WhatsApp.
     try {
@@ -127,14 +147,19 @@ export default function FlyerMaker({ prefill, backHref }: { prefill: FlyerPrefil
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [registerUrl]);
 
-  const text = {
+  const text: FlyerText = {
     name: name.trim(),
     subtitle: [jobTitle.trim(), organization.trim()].filter(Boolean).join(" · "),
     headline: t.headlines[headline],
     eventName: EVENT_INFO.name[lang],
-    dateLine: `${EVENT_INFO.date[lang]} · ${EVENT_INFO.place[lang]}`,
+    tagline: t.tagline,
+    mark: EVENT_INFO.mark,
+    dateLabel: t.dateLabel,
+    date: EVENT_INFO.date[lang],
+    place: EVENT_INFO.place[lang],
+    scanLabel: t.scanLabel,
     website: EVENT_INFO.website,
   };
 
@@ -160,7 +185,7 @@ export default function FlyerMaker({ prefill, backHref }: { prefill: FlyerPrefil
       const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
       photo?.close();
       setPhoto(bitmap);
-      setFrame(START_FRAME);
+      setFrame(initialFrame(bitmap));
     } catch {
       setPhotoError(true);
     }

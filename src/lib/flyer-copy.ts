@@ -22,7 +22,10 @@ export const FLYER_COPY = {
     organization: "Organisation",
     headline: "Headline",
     format: "Format",
-    formats: { square: "Square · LinkedIn post", story: "Story · WhatsApp / Instagram" },
+    formats: { portrait: "Post · LinkedIn / Instagram", story: "Story · WhatsApp / Instagram" },
+    tagline: "The gathering of Africa's space industry leaders, innovators and partners.",
+    dateLabel: "Save the date",
+    scanLabel: "Scan to register",
     headlines: {
       attending: "I'm attending",
       speaking: "I'm speaking at",
@@ -63,7 +66,10 @@ export const FLYER_COPY = {
     organization: "Organisation",
     headline: "Titre",
     format: "Format",
-    formats: { square: "Carré · publication LinkedIn", story: "Story · WhatsApp / Instagram" },
+    formats: { portrait: "Publication · LinkedIn / Instagram", story: "Story · WhatsApp / Instagram" },
+    tagline: "Le rendez-vous des leaders, innovateurs et partenaires de l'industrie spatiale africaine.",
+    dateLabel: "À vos agendas",
+    scanLabel: "Scannez pour vous inscrire",
     headlines: {
       attending: "J'y serai",
       speaking: "J'interviens à",

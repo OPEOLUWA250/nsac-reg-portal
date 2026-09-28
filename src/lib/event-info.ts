@@ -6,6 +6,8 @@ export const EVENT_INFO = {
   name: { en: "NewSpace Africa Conference 2027", fr: "Conférence NewSpace Africa 2027" },
   date: { en: "April 2027", fr: "Avril 2027" },
   place: { en: "Dakar, Senegal", fr: "Dakar, Sénégal" },
+  /** Short top-right mark on the flyer. */
+  mark: ["DAKAR", "2027"] as [string, string],
   website: "newspace.spaceinafrica.com",
   websiteUrl: "https://newspace.spaceinafrica.com",
   hashtags: "#NewSpaceAfrica #SpaceInAfrica",
