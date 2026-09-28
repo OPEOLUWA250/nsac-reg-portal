@@ -251,12 +251,32 @@ export default function RegistrationForm({
   useEffect(() => {
     const onPageShow = (e: PageTransitionEvent) => {
       if (!e.persisted) return;
-      setPhase((p) => (p.kind === "already_registered" ? p : { kind: "editing" }));
       setNotice("");
+      setBanner("");
+      let draftExists = false;
+      try {
+        draftExists = sessionStorage.getItem(DRAFT_KEY) !== null;
+      } catch {
+        /* storage unavailable */
+      }
+      if (draftExists) {
+        // Came back from Stripe without paying: keep their answers.
+        setPhase((p) => (p.kind === "already_registered" ? p : { kind: "editing" }));
+        return;
+      }
+      // The draft is gone: payment succeeded (the success page clears it).
+      // Start a fresh registration on step 1.
+      dirty.current = false;
+      submissionId.current = "";
+      setForm({ ...EMPTY, ticket: tickets.length === 1 ? tickets[0].id : "" });
+      setPassportFile(null);
+      setErrors({});
+      setStep(0);
+      setPhase({ kind: "editing" });
     };
     window.addEventListener("pageshow", onPageShow);
     return () => window.removeEventListener("pageshow", onPageShow);
-  }, []);
+  }, [tickets]);
 
   useEffect(() => {
     if (!dirty.current) return;

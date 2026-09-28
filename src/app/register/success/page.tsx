@@ -44,9 +44,11 @@ export default async function RegisterSuccessPage(props: PageProps<"/register/su
         <Card className="p-6 sm:p-9 space-y-5 text-center">
           <Kicker>{COPY[lang].kicker}</Kicker>
 
+          {/* Payment done (or being confirmed): the form draft is no longer needed. */}
+          {session && attendee && <ClearRegistrationDraft />}
+
           {paid ? (
             <>
-              <ClearRegistrationDraft />
               <h1 className="font-display text-3xl text-navy">{t.title}</h1>
               <p className="text-navy/70">{t.paidBody(firstName)}</p>
               {/* eslint-disable-next-line @next/next/no-img-element -- generated per attendee, not optimisable */}
