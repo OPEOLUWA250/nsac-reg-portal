@@ -7,6 +7,7 @@ import { createCheckoutSession } from "@/lib/payments";
 import { availableTickets } from "@/lib/ticket-store";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import type { Attendee } from "@/lib/types";
+import { describeError } from "@/lib/describe-error";
 
 export const runtime = "nodejs";
 
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
   try {
     tickets = await availableTickets();
   } catch (err) {
-    console.error("Could not load tickets", err);
+    console.error(`Could not load tickets: ${describeError(err)}`);
     return NextResponse.json({ error: "server_error" }, { status: 500 });
   }
 
@@ -119,7 +120,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err) {
-    console.error("Registration failed", err);
+    console.error(`Registration failed: ${describeError(err)}`);
     return NextResponse.json({ error: "server_error" }, { status: 500 });
   }
 

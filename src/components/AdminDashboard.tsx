@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import StaffGate, { useStaffCode } from "@/components/StaffGate";
 import TicketManager, { type TicketCounts } from "@/components/TicketManager";
 import { Button, Card, Kicker, RolePill, StatusPill } from "@/components/ui";
-import type { Attendee } from "@/lib/types";
+import { ATTENDEE_ROLES, type Attendee } from "@/lib/types";
 
 const POLL_INTERVAL_MS = 20_000;
 
@@ -402,12 +402,18 @@ export default function AdminDashboard() {
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
               />
-              <input
-                className="rounded-lg border border-navy/15 px-4 py-2.5 text-navy placeholder:text-navy/35 outline-none focus:border-gold focus:ring-2 focus:ring-gold/25"
-                placeholder="Role (e.g. attendee, speaker, host)"
+              <select
+                aria-label="Role"
+                className="rounded-lg border border-navy/15 px-4 py-2.5 text-navy outline-none focus:border-gold focus:ring-2 focus:ring-gold/25"
                 value={form.role}
                 onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-              />
+              >
+                {ATTENDEE_ROLES.map((role) => (
+                  <option key={role} value={role}>
+                    {role}
+                  </option>
+                ))}
+              </select>
               <input
                 className="rounded-lg border border-navy/15 px-4 py-2.5 text-navy placeholder:text-navy/35 outline-none focus:border-gold focus:ring-2 focus:ring-gold/25"
                 placeholder="Organization"

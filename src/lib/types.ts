@@ -1,10 +1,19 @@
-export type AttendeeRole =
-  | "speaker"
-  | "delegate"
-  | "host"
-  | "staff"
-  | "sponsor"
-  | "press";
+// Must match the attendees_role_check constraint in the database
+// (supabase/migrations/20260928140000_attendee_roles.sql).
+export const ATTENDEE_ROLES = [
+  "attendee",
+  "delegate",
+  "speaker",
+  "host",
+  "staff",
+  "sponsor",
+  "press",
+] as const;
+export type AttendeeRole = (typeof ATTENDEE_ROLES)[number];
+
+export function isAttendeeRole(value: string): value is AttendeeRole {
+  return (ATTENDEE_ROLES as readonly string[]).includes(value);
+}
 
 /** null = legacy Jotform registration (Jotform collected the payment). */
 export type PaymentStatus = "pending" | "paid" | "not_required" | null;

@@ -100,6 +100,9 @@ Jotform form is closed.
      duplicates first if that last step fails).
    - `supabase/migrations/20260928130000_tickets.sql` — the `tickets` table
      behind **Tickets & prices**, pre-filled with Early Bird and Virtual.
+   - `supabase/migrations/20260928140000_attendee_roles.sql` — replaces the
+     table's original role check (which rejected `delegate`, so every form
+     submission failed) with the roles the app uses.
 
 3. In Stripe → Developers → Webhooks, add
    `https://your-domain.com/api/stripe-webhook` with the events

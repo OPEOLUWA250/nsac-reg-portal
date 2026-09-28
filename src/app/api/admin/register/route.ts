@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isStaffAuthorized } from "@/lib/staff-auth";
 import { createAttendee, sendAttendeeQr } from "@/lib/attendee-service";
+import { ATTENDEE_ROLES, isAttendeeRole } from "@/lib/types";
+import { describeError } from "@/lib/describe-error";
 
 export const runtime = "nodejs";
 
@@ -15,7 +17,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const fullName = typeof body.fullName === "string" ? body.fullName.trim() : "";
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-  const role = typeof body.role === "string" && body.role.trim() ? body.role.trim() : "attendee";
+  const role =
+    typeof body.role === "string" && body.role.trim() ? body.role.trim().toLowerCase() : "attendee";
   const organization =
     typeof body.organization === "string" && body.organization.trim()
       ? body.organization.trim()
@@ -24,6 +27,12 @@ export async function POST(req: NextRequest) {
 
   if (!fullName || !email) {
     return NextResponse.json({ error: "name and email are required" }, { status: 400 });
+  }
+  if (!isAttendeeRole(role)) {
+    return NextResponse.json(
+      { error: `Unknown role "${role}". Use one of: ${ATTENDEE_ROLES.join(", ")}.` },
+      { status: 400 }
+    );
   }
 
   let outcome;
@@ -40,7 +49,7 @@ export async function POST(req: NextRequest) {
       details: { payment_status: "not_required" },
     });
   } catch (error) {
-    console.error("Walk-in registration error", error);
+    console.error(`Walk-in registration error: ${describeError(error)}`);
     return NextResponse.json({ error: "database error" }, { status: 500 });
   }
 
