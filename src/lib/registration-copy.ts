@@ -56,6 +56,19 @@ type Copy = {
     payment: string;
     passportUpload: string;
   };
+  steps: readonly [string, string, string];
+  stepOf: (n: number, total: number) => string;
+  next: string;
+  back: string;
+  review: {
+    title: string;
+    name: string;
+    email: string;
+    organization: string;
+    total: string;
+    noTicket: string;
+    edit: string;
+  };
   submit: (price: string) => string;
   submitting: string;
   uploading: (pct: number) => string;
@@ -173,6 +186,19 @@ export const COPY: Record<Language, Copy> = {
       payment: "The payment service is unavailable right now. Please try again in a few minutes.",
       passportUpload:
         "Your passport couldn't be uploaded. You can continue to payment; we'll email you to collect it.",
+    },
+    steps: ["About you", "Organisation & travel", "Ticket & payment"],
+    stepOf: (n, total) => `Step ${n} of ${total}`,
+    next: "Continue",
+    back: "Back",
+    review: {
+      title: "Review your registration",
+      name: "Name",
+      email: "Email",
+      organization: "Role",
+      total: "Total",
+      noTicket: "Choose a ticket above",
+      edit: "Edit",
     },
     submit: (price) => `Continue to payment · ${price}`,
     submitting: "Saving your registration…",
@@ -298,6 +324,19 @@ export const COPY: Record<Language, Copy> = {
       payment: "Le service de paiement est indisponible. Veuillez réessayer dans quelques minutes.",
       passportUpload:
         "Votre passeport n'a pas pu être envoyé. Vous pouvez passer au paiement ; nous vous contacterons par e-mail pour le récupérer.",
+    },
+    steps: ["Vos informations", "Organisation et voyage", "Billet et paiement"],
+    stepOf: (n, total) => `Étape ${n} sur ${total}`,
+    next: "Continuer",
+    back: "Retour",
+    review: {
+      title: "Vérifiez votre inscription",
+      name: "Nom",
+      email: "E-mail",
+      organization: "Fonction",
+      total: "Total",
+      noTicket: "Choisissez un billet ci-dessus",
+      edit: "Modifier",
     },
     submit: (price) => `Continuer vers le paiement · ${price}`,
     submitting: "Enregistrement de votre inscription…",

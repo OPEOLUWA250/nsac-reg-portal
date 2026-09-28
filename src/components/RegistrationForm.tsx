@@ -88,6 +88,29 @@ type Phase =
   | { kind: "already_registered" };
 
 const LANG_KEY = "nsac_lang";
+// Answers are kept for this browser tab, so a refresh or a cancelled
+// payment doesn't mean starting again. (The passport file isn't kept.)
+const DRAFT_KEY = "nsac_reg_draft";
+
+// The three steps, and the fields each one asks for — used to check a step
+// before moving on, and to jump back to the step that has an error.
+const STEP_FIELDS: FieldName[][] = [
+  ["firstName", "lastName", "email", "jobTitle", "phone", "nationality", "residenceCountry"],
+  ["organization", "organizationCountry", "professionalCategory", "jobFunction", "invitationLetter", "passport", "foodAllergies"],
+  ["ticket", "vatNumber", "invoiceId", "safetyConsent"],
+];
+const LAST_STEP = STEP_FIELDS.length - 1;
+
+function stepOfField(field: string): number {
+  const i = STEP_FIELDS.findIndex((fields) => fields.includes(field as FieldName));
+  return i === -1 ? LAST_STEP : i;
+}
+
+function errorsForStep(all: ValidationErrors, step: number): ValidationErrors {
+  const out: ValidationErrors = {};
+  for (const f of STEP_FIELDS[step]) if (all[f]) out[f] = all[f];
+  return out;
+}
 
 // Reads a browser setting without ever throwing (private mode, blocked storage…).
 function safeGet(key: string): string | null {
@@ -150,6 +173,7 @@ declare global {
     turnstile?: {
       render: (el: HTMLElement, opts: Record<string, unknown>) => string;
       reset: (id?: string) => void;
+      remove: (id?: string) => void;
     };
   }
 }
@@ -172,6 +196,10 @@ export default function RegistrationForm({
   const [banner, setBanner] = useState<string>("");
   const [notice, setNotice] = useState<string>("");
   const [phase, setPhase] = useState<Phase>({ kind: "editing" });
+  const [step, setStep] = useState(0);
+  // Set once the visitor changes something, so the empty form on first
+  // load never overwrites a saved draft before it's restored.
+  const dirty = useRef(false);
   const [countryOptions, setCountryOptions] = useState<{ code: string; name: string }[]>([]);
   const submissionId = useRef<string>("");
   const turnstileToken = useRef<string>("");
@@ -191,6 +219,32 @@ export default function RegistrationForm({
     document.documentElement.lang = lang;
   }, [lang]);
 
+  // Restore answers saved earlier in this tab (refresh, or back from a
+  // cancelled payment — then straight to the last step).
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const draft = JSON.parse(raw) as { form?: Partial<FormState>; step?: number };
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- restoring a draft saved in this browser tab
+      if (draft.form) setForm((f) => ({ ...f, ...draft.form, website: "" }));
+      if (paymentCancelled) setStep(LAST_STEP);
+      else if (typeof draft.step === "number") setStep(Math.min(Math.max(0, draft.step), LAST_STEP));
+    } catch {
+      /* no saved draft */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on first load
+  }, []);
+
+  useEffect(() => {
+    if (!dirty.current) return;
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ form: { ...form, website: "" }, step }));
+    } catch {
+      /* storage unavailable (private mode) — nothing to do */
+    }
+  }, [form, step]);
+
   // Country names in the visitor's language. Built after hydration because
   // the server's and the browser's country-name data can differ slightly.
   useEffect(() => {
@@ -203,7 +257,7 @@ export default function RegistrationForm({
 
   // Cloudflare Turnstile spam check (only if a site key is configured).
   useEffect(() => {
-    if (!turnstileSiteKey || !turnstileEl.current) return;
+    if (!turnstileSiteKey || step !== LAST_STEP || !turnstileEl.current) return;
     const el = turnstileEl.current;
     const render = () => {
       if (!window.turnstile || turnstileWidget.current !== undefined) return;
@@ -214,16 +268,23 @@ export default function RegistrationForm({
         "error-callback": () => (turnstileToken.current = ""),
       });
     };
+    // The widget lives on the last step; forget it when leaving that step.
+    const cleanup = () => {
+      if (turnstileWidget.current !== undefined) window.turnstile?.remove(turnstileWidget.current);
+      turnstileWidget.current = undefined;
+      turnstileToken.current = "";
+    };
     if (window.turnstile) {
       render();
-      return;
+      return cleanup;
     }
     const script = document.createElement("script");
     script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
     script.async = true;
     script.onload = render;
     document.head.appendChild(script);
-  }, [turnstileSiteKey]);
+    return cleanup;
+  }, [turnstileSiteKey, step]);
 
   function chooseLang(next: Language) {
     setLang(next);
@@ -231,6 +292,7 @@ export default function RegistrationForm({
   }
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
+    dirty.current = true;
     setForm((f) => ({ ...f, [key]: value }));
     setErrors((e) => (key in e ? { ...e, [key]: undefined } : e));
   }
@@ -249,14 +311,52 @@ export default function RegistrationForm({
   );
 
   function scrollToFirstError(errs: ValidationErrors) {
-    const first = Object.keys(errs)[0];
-    const el = first ? document.getElementById(`field-${first}`) : null;
-    (el ?? formTop.current)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // After a step change the field isn't on screen until the next render.
+    setTimeout(() => {
+      const first = Object.keys(errs)[0];
+      const el = first ? document.getElementById(`field-${first}`) : null;
+      (el ?? formTop.current)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
+  }
+
+  function goToStep(next: number) {
+    dirty.current = true;
+    setStep(next);
+    setBanner("");
+    formTop.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /** Shows the errors, on the earliest step that has one. */
+  function showErrors(errs: ValidationErrors) {
+    const firstStep = Math.min(...Object.keys(errs).map(stepOfField));
+    setStep(firstStep);
+    setErrors(errs);
+    setBanner(t.errors.summary);
+    scrollToFirstError(errs);
+  }
+
+  function handleNext() {
+    if (!submissionId.current) submissionId.current = crypto.randomUUID();
+    const check = validateRegistration({ ...payload, id: submissionId.current }, tickets.map((tk) => tk.id));
+    const stepErrs = check.ok ? {} : errorsForStep(check.errors, step);
+    if (Object.keys(stepErrs).length > 0) {
+      setErrors(stepErrs);
+      setBanner(t.errors.summary);
+      scrollToFirstError(stepErrs);
+      return;
+    }
+    setErrors({});
+    goToStep(step + 1);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
+    // Enter / "Continue" on the first steps moves to the next step.
+    if (step < LAST_STEP) {
+      handleNext();
+      return;
+    }
     setBanner("");
     setNotice("");
 
@@ -269,9 +369,7 @@ export default function RegistrationForm({
       tickets.map((tk) => tk.id)
     );
     if (!local.ok) {
-      setErrors(local.errors);
-      setBanner(t.errors.summary);
-      scrollToFirstError(local.errors);
+      showErrors(local.errors);
       return;
     }
 
@@ -305,10 +403,7 @@ export default function RegistrationForm({
     if (!res.ok) {
       setPhase({ kind: "editing" });
       if (json.error === "validation" && json.fields) {
-        const fieldErrors = json.fields as ValidationErrors;
-        setErrors(fieldErrors);
-        setBanner(t.errors.summary);
-        scrollToFirstError(fieldErrors);
+        showErrors(json.fields as ValidationErrors);
       } else if (json.error === "spam_check_failed") setBanner(t.errors.spam);
       else if (json.error === "registration_closed") setBanner(t.errors.closed);
       else if (json.error === "payment_unavailable") setBanner(t.errors.payment);
@@ -410,162 +505,184 @@ export default function RegistrationForm({
             {banner && <Alert tone="error">{banner}</Alert>}
             {notice && <Alert tone="info">{notice}</Alert>}
 
-            <Section title={t.sections.you}>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <TextField name="firstName" label={t.fields.firstName} value={form.firstName} onChange={(v) => update("firstName", v)} error={err("firstName")} autoComplete="given-name" />
-                <TextField name="lastName" label={t.fields.lastName} value={form.lastName} onChange={(v) => update("lastName", v)} error={err("lastName")} autoComplete="family-name" />
-              </div>
-              <TextField name="email" type="email" label={t.fields.email} hint={t.fields.emailHint} value={form.email} onChange={(v) => update("email", v)} error={err("email")} autoComplete="email" inputMode="email" />
-              <TextField name="jobTitle" label={t.fields.jobTitle} value={form.jobTitle} onChange={(v) => update("jobTitle", v)} error={err("jobTitle")} autoComplete="organization-title" />
-              <TextField name="phone" type="tel" label={t.fields.phone} optionalLabel={t.optional} hint={t.fields.phoneHint} value={form.phone} onChange={(v) => update("phone", v)} error={err("phone")} autoComplete="tel" inputMode="tel" />
-              <div className="grid sm:grid-cols-2 gap-4">
-                <CountryField name="nationality" label={t.fields.nationality} value={form.nationality} onChange={(v) => update("nationality", v)} options={countryOptions} placeholder={t.selectPlaceholder} error={err("nationality")} />
-                <CountryField name="residenceCountry" label={t.fields.residenceCountry} hint={t.fields.residenceHint} value={form.residenceCountry} onChange={(v) => update("residenceCountry", v)} options={countryOptions} placeholder={t.selectPlaceholder} error={err("residenceCountry")} autoComplete="country" />
-              </div>
-            </Section>
+            <StepProgress labels={t.steps} current={step} stepOf={t.stepOf} onJump={goToStep} />
 
-            <Section title={t.sections.organization}>
-              <TextField name="organization" label={t.fields.organization} value={form.organization} onChange={(v) => update("organization", v)} error={err("organization")} autoComplete="organization" />
-              <CountryField name="organizationCountry" label={t.fields.organizationCountry} value={form.organizationCountry} onChange={(v) => update("organizationCountry", v)} options={countryOptions} placeholder={t.selectPlaceholder} error={err("organizationCountry")} />
-              <RadioGroup
-                name="professionalCategory"
-                label={t.fields.professionalCategory}
-                value={form.professionalCategory}
-                onChange={(v) => update("professionalCategory", v)}
-                options={PROFESSIONAL_CATEGORIES.map((c) => ({ value: c, label: t.professionalCategories[c] }))}
-                error={err("professionalCategory")}
-                columns
-              />
-              <RadioGroup
-                name="jobFunction"
-                label={t.fields.jobFunction}
-                value={form.jobFunction}
-                onChange={(v) => update("jobFunction", v)}
-                options={JOB_FUNCTIONS.map((c) => ({ value: c, label: t.jobFunctions[c] }))}
-                error={err("jobFunction")}
-              />
-            </Section>
-
-            <Section title={t.sections.travel}>
-              <RadioGroup
-                name="invitationLetter"
-                label={t.fields.invitationLetter}
-                value={form.invitationLetter}
-                onChange={(v) => update("invitationLetter", v)}
-                options={[
-                  { value: "yes", label: t.yes },
-                  { value: "no", label: t.no },
-                ]}
-                error={err("invitationLetter")}
-                inline
-              />
-              {form.invitationLetter === "yes" && (
-                <FieldShell name="passport" label={t.fields.passport} optionalLabel={t.optional} hint={t.fields.passportHint} error={err("passport")}>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <label className="inline-flex cursor-pointer items-center rounded-full border border-navy/20 px-4 py-2 text-sm font-semibold text-navy hover:bg-navy/5 focus-within:ring-2 focus-within:ring-gold/40">
-                      {t.fields.passportChoose}
-                      <input
-                        id="field-passport"
-                        type="file"
-                        accept={PASSPORT_MIME_TYPES.join(",")}
-                        className="sr-only"
-                        onChange={(e) => onPassportChange(e.target.files?.[0] ?? null)}
-                        aria-describedby="hint-passport"
-                      />
-                    </label>
-                    {passportFile && (
-                      <span className="flex items-center gap-2 text-sm text-navy/70 min-w-0">
-                        <span className="truncate max-w-[14rem]">{passportFile.name}</span>
-                        <span className="text-navy/40">({(passportFile.size / 1_048_576).toFixed(1)} MB)</span>
-                        <button type="button" className="text-navy/60 underline" onClick={() => onPassportChange(null)}>
-                          {t.fields.passportRemove}
-                        </button>
-                      </span>
-                    )}
+            {step === 0 && (
+              <>
+                <Section title={t.sections.you}>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <TextField name="firstName" label={t.fields.firstName} value={form.firstName} onChange={(v) => update("firstName", v)} error={err("firstName")} autoComplete="given-name" />
+                    <TextField name="lastName" label={t.fields.lastName} value={form.lastName} onChange={(v) => update("lastName", v)} error={err("lastName")} autoComplete="family-name" />
                   </div>
-                </FieldShell>
-              )}
-              <FieldShell name="foodAllergies" label={t.fields.foodAllergies} hint={t.fields.foodAllergiesHint} error={err("foodAllergies")}>
-                <textarea
-                  id="field-foodAllergies"
-                  rows={2}
-                  maxLength={500}
-                  className={inputClass(!!err("foodAllergies"))}
-                  value={form.foodAllergies}
-                  onChange={(e) => update("foodAllergies", e.target.value)}
-                  aria-invalid={!!err("foodAllergies")}
-                  aria-describedby="hint-foodAllergies error-foodAllergies"
-                />
-              </FieldShell>
-            </Section>
+                  <TextField name="email" type="email" label={t.fields.email} hint={t.fields.emailHint} value={form.email} onChange={(v) => update("email", v)} error={err("email")} autoComplete="email" inputMode="email" />
+                  <TextField name="jobTitle" label={t.fields.jobTitle} value={form.jobTitle} onChange={(v) => update("jobTitle", v)} error={err("jobTitle")} autoComplete="organization-title" />
+                  <TextField name="phone" type="tel" label={t.fields.phone} optionalLabel={t.optional} hint={t.fields.phoneHint} value={form.phone} onChange={(v) => update("phone", v)} error={err("phone")} autoComplete="tel" inputMode="tel" />
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <CountryField name="nationality" label={t.fields.nationality} value={form.nationality} onChange={(v) => update("nationality", v)} options={countryOptions} placeholder={t.selectPlaceholder} error={err("nationality")} />
+                    <CountryField name="residenceCountry" label={t.fields.residenceCountry} hint={t.fields.residenceHint} value={form.residenceCountry} onChange={(v) => update("residenceCountry", v)} options={countryOptions} placeholder={t.selectPlaceholder} error={err("residenceCountry")} autoComplete="country" />
+                  </div>
+                </Section>
+              </>
+            )}
 
-            <Section title={t.sections.ticket}>
-              <fieldset id="field-ticket" className="space-y-3" aria-describedby="error-ticket">
-                <legend className="text-sm font-semibold text-navy mb-2">{t.fields.ticket}</legend>
-                {tickets.map((tk) => {
-                  const checked = form.ticket === tk.id;
-                  return (
-                    <label
-                      key={tk.id}
-                      className={`flex cursor-pointer items-start justify-between gap-4 rounded-xl border p-4 transition-colors ${
-                        checked ? "border-gold bg-gold/[0.07] ring-1 ring-gold" : "border-navy/15 hover:border-navy/30"
-                      }`}
-                    >
-                      <span className="flex items-start gap-3">
-                        <input
-                          type="radio"
-                          name="ticket"
-                          value={tk.id}
-                          checked={checked}
-                          onChange={() => update("ticket", tk.id)}
-                          className="mt-1 h-4 w-4 accent-[var(--gold)]"
-                        />
-                        <span>
-                          <span className="block font-semibold text-navy">{tk.name[lang]}</span>
-                          <span className="block text-sm text-navy/60">{tk.description[lang]}</span>
-                        </span>
-                      </span>
-                      <span className="font-display text-lg text-navy whitespace-nowrap">
-                        {formatPrice(tk.amountCents, tk.currency, lang)}
-                      </span>
-                    </label>
-                  );
-                })}
-                {err("ticket") && <ErrorText id="error-ticket">{err("ticket")}</ErrorText>}
-                <p className="text-xs text-navy/50">{t.fields.couponHint}</p>
-              </fieldset>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <TextField
-                  name="vatNumber"
-                  label={t.fields.vatNumber}
-                  optionalLabel={vatRequired ? undefined : t.optional}
-                  hint={vatRequired ? t.fields.vatRequiredHint : t.fields.vatHint}
-                  value={form.vatNumber}
-                  onChange={(v) => update("vatNumber", v)}
-                  error={err("vatNumber")}
-                />
-                <TextField name="invoiceId" label={t.fields.invoiceId} optionalLabel={t.optional} value={form.invoiceId} onChange={(v) => update("invoiceId", v)} error={err("invoiceId")} />
-              </div>
-            </Section>
+            {step === 1 && (
+              <>
+                <Section title={t.sections.organization}>
+                  <TextField name="organization" label={t.fields.organization} value={form.organization} onChange={(v) => update("organization", v)} error={err("organization")} autoComplete="organization" />
+                  <CountryField name="organizationCountry" label={t.fields.organizationCountry} value={form.organizationCountry} onChange={(v) => update("organizationCountry", v)} options={countryOptions} placeholder={t.selectPlaceholder} error={err("organizationCountry")} />
+                  <RadioGroup
+                    name="professionalCategory"
+                    label={t.fields.professionalCategory}
+                    value={form.professionalCategory}
+                    onChange={(v) => update("professionalCategory", v)}
+                    options={PROFESSIONAL_CATEGORIES.map((c) => ({ value: c, label: t.professionalCategories[c] }))}
+                    error={err("professionalCategory")}
+                    columns
+                  />
+                  <RadioGroup
+                    name="jobFunction"
+                    label={t.fields.jobFunction}
+                    value={form.jobFunction}
+                    onChange={(v) => update("jobFunction", v)}
+                    options={JOB_FUNCTIONS.map((c) => ({ value: c, label: t.jobFunctions[c] }))}
+                    error={err("jobFunction")}
+                  />
+                </Section>
 
-            <Section title={t.sections.agreements}>
-              <div id="field-safetyConsent" className="space-y-1.5">
-                <Checkbox checked={form.safetyConsent} onChange={(v) => update("safetyConsent", v)} invalid={!!err("safetyConsent")} describedBy="error-safetyConsent">
-                  {consentBefore}
-                  <a href={privacyPolicyUrl} target="_blank" rel="noopener noreferrer" className="underline decoration-gold underline-offset-2 text-navy">
-                    {privacyLabel}
-                  </a>
-                  {consentAfter}
-                </Checkbox>
-                {err("safetyConsent") && <ErrorText id="error-safetyConsent">{err("safetyConsent")}</ErrorText>}
-              </div>
-              <Checkbox checked={form.optInOrganizer} onChange={(v) => update("optInOrganizer", v)}>
-                {t.fields.optInOrganizer}
-              </Checkbox>
-              <Checkbox checked={form.optInSponsors} onChange={(v) => update("optInSponsors", v)}>
-                {t.fields.optInSponsors}
-              </Checkbox>
-            </Section>
+                <Section title={t.sections.travel}>
+                  <RadioGroup
+                    name="invitationLetter"
+                    label={t.fields.invitationLetter}
+                    value={form.invitationLetter}
+                    onChange={(v) => update("invitationLetter", v)}
+                    options={[
+                      { value: "yes", label: t.yes },
+                      { value: "no", label: t.no },
+                    ]}
+                    error={err("invitationLetter")}
+                    inline
+                  />
+                  {form.invitationLetter === "yes" && (
+                    <FieldShell name="passport" label={t.fields.passport} optionalLabel={t.optional} hint={t.fields.passportHint} error={err("passport")}>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <label className="inline-flex cursor-pointer items-center rounded-full border border-navy/20 px-4 py-2 text-sm font-semibold text-navy hover:bg-navy/5 focus-within:ring-2 focus-within:ring-gold/40">
+                          {t.fields.passportChoose}
+                          <input
+                            id="field-passport"
+                            type="file"
+                            accept={PASSPORT_MIME_TYPES.join(",")}
+                            className="sr-only"
+                            onChange={(e) => onPassportChange(e.target.files?.[0] ?? null)}
+                            aria-describedby="hint-passport"
+                          />
+                        </label>
+                        {passportFile && (
+                          <span className="flex items-center gap-2 text-sm text-navy/70 min-w-0">
+                            <span className="truncate max-w-[14rem]">{passportFile.name}</span>
+                            <span className="text-navy/40">({(passportFile.size / 1_048_576).toFixed(1)} MB)</span>
+                            <button type="button" className="text-navy/60 underline" onClick={() => onPassportChange(null)}>
+                              {t.fields.passportRemove}
+                            </button>
+                          </span>
+                        )}
+                      </div>
+                    </FieldShell>
+                  )}
+                  <FieldShell name="foodAllergies" label={t.fields.foodAllergies} hint={t.fields.foodAllergiesHint} error={err("foodAllergies")}>
+                    <textarea
+                      id="field-foodAllergies"
+                      rows={2}
+                      maxLength={500}
+                      className={inputClass(!!err("foodAllergies"))}
+                      value={form.foodAllergies}
+                      onChange={(e) => update("foodAllergies", e.target.value)}
+                      aria-invalid={!!err("foodAllergies")}
+                      aria-describedby="hint-foodAllergies error-foodAllergies"
+                    />
+                  </FieldShell>
+                </Section>
+              </>
+            )}
+
+            {step === LAST_STEP && (
+              <>
+                <Section title={t.sections.ticket}>
+                  <fieldset id="field-ticket" className="space-y-3" aria-describedby="error-ticket">
+                    <legend className="text-sm font-semibold text-navy mb-2">{t.fields.ticket}</legend>
+                    {tickets.map((tk) => {
+                      const checked = form.ticket === tk.id;
+                      return (
+                        <label
+                          key={tk.id}
+                          className={`flex cursor-pointer items-start justify-between gap-4 rounded-xl border p-4 transition-colors ${
+                            checked ? "border-gold bg-gold/[0.07] ring-1 ring-gold" : "border-navy/15 hover:border-navy/30"
+                          }`}
+                        >
+                          <span className="flex items-start gap-3">
+                            <input
+                              type="radio"
+                              name="ticket"
+                              value={tk.id}
+                              checked={checked}
+                              onChange={() => update("ticket", tk.id)}
+                              className="mt-1 h-4 w-4 accent-[var(--gold)]"
+                            />
+                            <span>
+                              <span className="block font-semibold text-navy">{tk.name[lang]}</span>
+                              <span className="block text-sm text-navy/60">{tk.description[lang]}</span>
+                            </span>
+                          </span>
+                          <span className="font-display text-lg text-navy whitespace-nowrap">
+                            {formatPrice(tk.amountCents, tk.currency, lang)}
+                          </span>
+                        </label>
+                      );
+                    })}
+                    {err("ticket") && <ErrorText id="error-ticket">{err("ticket")}</ErrorText>}
+                    <p className="text-xs text-navy/50">{t.fields.couponHint}</p>
+                  </fieldset>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <TextField
+                      name="vatNumber"
+                      label={t.fields.vatNumber}
+                      optionalLabel={vatRequired ? undefined : t.optional}
+                      hint={vatRequired ? t.fields.vatRequiredHint : t.fields.vatHint}
+                      value={form.vatNumber}
+                      onChange={(v) => update("vatNumber", v)}
+                      error={err("vatNumber")}
+                    />
+                    <TextField name="invoiceId" label={t.fields.invoiceId} optionalLabel={t.optional} value={form.invoiceId} onChange={(v) => update("invoiceId", v)} error={err("invoiceId")} />
+                  </div>
+                </Section>
+
+                <Section title={t.sections.agreements}>
+                  <div id="field-safetyConsent" className="space-y-1.5">
+                    <Checkbox checked={form.safetyConsent} onChange={(v) => update("safetyConsent", v)} invalid={!!err("safetyConsent")} describedBy="error-safetyConsent">
+                      {consentBefore}
+                      <a href={privacyPolicyUrl} target="_blank" rel="noopener noreferrer" className="underline decoration-gold underline-offset-2 text-navy">
+                        {privacyLabel}
+                      </a>
+                      {consentAfter}
+                    </Checkbox>
+                    {err("safetyConsent") && <ErrorText id="error-safetyConsent">{err("safetyConsent")}</ErrorText>}
+                  </div>
+                  <Checkbox checked={form.optInOrganizer} onChange={(v) => update("optInOrganizer", v)}>
+                    {t.fields.optInOrganizer}
+                  </Checkbox>
+                  <Checkbox checked={form.optInSponsors} onChange={(v) => update("optInSponsors", v)}>
+                    {t.fields.optInSponsors}
+                  </Checkbox>
+                </Section>
+
+                <Review
+                  t={t}
+                  lang={lang}
+                  form={form}
+                  ticket={selectedTicket}
+                  onEdit={goToStep}
+                />
+              </>
+            )}
 
             {/* Honeypot: hidden from people and screen readers; bots fill it in. */}
             <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
@@ -575,25 +692,154 @@ export default function RegistrationForm({
               </label>
             </div>
 
-            {turnstileSiteKey && <div ref={turnstileEl} className="min-h-[65px]" />}
+            {step === LAST_STEP && turnstileSiteKey && <div ref={turnstileEl} className="min-h-[65px]" />}
 
-            <div className="space-y-3">
-              <Button type="submit" variant="gold" className="w-full !py-3.5 !text-base" disabled={busy}>
-                {phase.kind === "submitting"
-                  ? t.submitting
-                  : phase.kind === "uploading"
-                    ? t.uploading(phase.pct)
-                    : phase.kind === "redirecting"
-                      ? t.redirecting
-                      : t.submit(selectedTicket ? formatPrice(selectedTicket.amountCents, selectedTicket.currency, lang) : "")
-                        .replace(/ · $/, "")}
-              </Button>
-              <p className="text-center text-xs text-navy/50">{t.securePayment}</p>
-            </div>
+            {step < LAST_STEP ? (
+              <div className="flex items-center gap-3">
+                {step > 0 && (
+                  <Button type="button" variant="outline" onClick={() => goToStep(step - 1)}>
+                    ← {t.back}
+                  </Button>
+                )}
+                <Button type="submit" variant="gold" className="ml-auto !px-8 !py-3 !text-base">
+                  {t.next} →
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <Button type="submit" variant="gold" className="w-full !py-3.5 !text-base" disabled={busy}>
+                  {phase.kind === "submitting"
+                    ? t.submitting
+                    : phase.kind === "uploading"
+                      ? t.uploading(phase.pct)
+                      : phase.kind === "redirecting"
+                        ? t.redirecting
+                        : t.submit(selectedTicket ? formatPrice(selectedTicket.amountCents, selectedTicket.currency, lang) : "")
+                          .replace(/ · $/, "")}
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => goToStep(step - 1)}
+                  disabled={busy}
+                  className="block w-full text-center text-sm font-semibold text-navy/60 hover:text-navy disabled:opacity-50"
+                >
+                  ← {t.back}
+                </button>
+                <p className="text-center text-xs text-navy/50">{t.securePayment}</p>
+              </div>
+            )}
           </form>
         )}
       </div>
     </main>
+  );
+}
+
+// ---------- step progress + review ----------
+
+function StepProgress({
+  labels,
+  current,
+  stepOf,
+  onJump,
+}: {
+  labels: readonly string[];
+  current: number;
+  stepOf: (n: number, total: number) => string;
+  onJump: (step: number) => void;
+}) {
+  return (
+    <nav aria-label={stepOf(current + 1, labels.length)} className="space-y-3">
+      <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider">
+        <span className="text-gold">{stepOf(current + 1, labels.length)}</span>
+        <span className="text-navy/50 normal-case tracking-normal text-sm">{labels[current]}</span>
+      </div>
+      <ol className="grid gap-2" style={{ gridTemplateColumns: `repeat(${labels.length}, minmax(0, 1fr))` }}>
+        {labels.map((label, i) => {
+          const done = i < current;
+          const active = i === current;
+          return (
+            <li key={label}>
+              <button
+                type="button"
+                onClick={() => done && onJump(i)}
+                disabled={!done}
+                aria-current={active ? "step" : undefined}
+                className="group w-full text-left disabled:cursor-default"
+              >
+                <span
+                  className={`block h-1.5 rounded-full transition-colors ${
+                    done ? "bg-gold group-hover:bg-gold-light" : active ? "bg-navy" : "bg-navy/12"
+                  }`}
+                />
+                <span
+                  className={`mt-2 hidden sm:flex items-center gap-1.5 text-xs font-semibold ${
+                    active ? "text-navy" : done ? "text-navy/60 group-hover:text-navy" : "text-navy/35"
+                  }`}
+                >
+                  <span
+                    className={`inline-flex h-4.5 w-4.5 items-center justify-center rounded-full text-[10px] ${
+                      done ? "bg-gold text-navy" : active ? "bg-navy text-white" : "bg-navy/10 text-navy/50"
+                    }`}
+                  >
+                    {done ? "✓" : i + 1}
+                  </span>
+                  {label}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+function Review({
+  t,
+  lang,
+  form,
+  ticket,
+  onEdit,
+}: {
+  t: (typeof COPY)[Language];
+  lang: Language;
+  form: FormState;
+  ticket: TicketOption | undefined;
+  onEdit: (step: number) => void;
+}) {
+  const rows: { label: string; value: string; step: number }[] = [
+    { label: t.review.name, value: `${form.firstName} ${form.lastName}`.trim(), step: 0 },
+    { label: t.review.email, value: form.email, step: 0 },
+    { label: t.review.organization, value: [form.jobTitle, form.organization].filter(Boolean).join(" · "), step: 1 },
+  ];
+  return (
+    <Card className="p-5 sm:p-7 space-y-4">
+      <h2 className="font-display text-lg text-navy flex items-center gap-2.5">
+        <span className="h-4 w-1 rounded-full bg-gold" aria-hidden="true" />
+        {t.review.title}
+      </h2>
+      <dl className="divide-y divide-navy/8 text-[15px]">
+        {rows.map((r) => (
+          <div key={r.label} className="flex items-start justify-between gap-4 py-2.5">
+            <dt className="text-navy/55 shrink-0">{r.label}</dt>
+            <dd className="flex items-start gap-3 text-right text-navy font-medium min-w-0">
+              <span className="break-words">{r.value || "—"}</span>
+              <button type="button" onClick={() => onEdit(r.step)} className="text-xs font-semibold text-navy/50 underline decoration-gold hover:text-navy shrink-0">
+                {t.review.edit}
+              </button>
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <div className="flex items-end justify-between gap-4 rounded-xl bg-navy text-white px-5 py-4">
+        <div>
+          <div className="text-xs uppercase tracking-wider text-white/55">{t.review.total}</div>
+          <div className="text-sm text-white/80">{ticket ? ticket.name[lang] : t.review.noTicket}</div>
+        </div>
+        <div className="font-display text-2xl">{ticket ? formatPrice(ticket.amountCents, ticket.currency, lang) : "—"}</div>
+      </div>
+    </Card>
   );
 }
 
