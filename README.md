@@ -76,6 +76,13 @@ Jotform form is closed.
   and it's attached to the confirmation email. It's drawn by
   `src/lib/ticket-image.tsx` using the white logo in `public/brand/logo.png`
   and the conference site's colours (gold `#F09F07`, blue `#03416A`).
+- **"I'm attending" flyers (`/flyer`)**: registrants add their photo and
+  get a branded graphic (square for LinkedIn posts, story for
+  WhatsApp/Instagram) with a ready-made post text. It's linked from the
+  success page (details pre-filled) and the confirmation email; anyone can
+  also open it directly. The image is drawn in the browser — photos are
+  never uploaded. Event date/place on it come from `src/lib/event-info.ts`
+  (update it once the exact 2027 dates are announced).
 - **Sending email.** Two options, picked by environment variables:
   - *SMTP* (e.g. the Google Workspace account): set `SMTP_HOST`,
     `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` (a Google App Password) and

@@ -166,6 +166,9 @@ export async function sendAttendeeQr(attendee: Attendee): Promise<boolean> {
       qrPngBuffer,
       ticketPngBuffer,
       logoPngBuffer,
+      flyerUrl: process.env.PUBLIC_BASE_URL
+        ? `${process.env.PUBLIC_BASE_URL.replace(/\/$/, "")}/flyer`
+        : null,
     });
     await supabaseAdmin()
       .from("attendees")

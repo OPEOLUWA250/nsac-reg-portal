@@ -65,6 +65,16 @@ export default async function RegisterSuccessPage(props: PageProps<"/register/su
               <p className="text-xs text-navy/50">
                 {attendee?.qr_email_sent_at ? t.emailNote : t.emailPending}
               </p>
+              <div className="rounded-2xl border border-gold/40 bg-gold/10 p-5 space-y-3 text-left">
+                <div className="font-display text-lg text-navy">{t.flyerTitle}</div>
+                <p className="text-sm text-navy/70">{t.flyerBody}</p>
+                <Link
+                  href={`/flyer?session_id=${encodeURIComponent(sessionId)}`}
+                  className="inline-flex rounded-full bg-navy text-white px-5 py-2.5 text-sm font-semibold hover:bg-blue-2 transition-colors"
+                >
+                  {t.flyerCta}
+                </Link>
+              </div>
             </>
           ) : session && attendee ? (
             <>

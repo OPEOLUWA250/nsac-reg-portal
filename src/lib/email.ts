@@ -25,6 +25,7 @@ const COPY = {
       "Bring the QR code below (digital or printed) to the registration desk on the day of the event — it will be scanned to check you in and print your badge.",
     qrAlt: "Your check-in QR code",
     ticketAttached: "Your ticket is also attached to this email, ready to save or print.",
+    flyerCta: "Create your “I’m attending” flyer for LinkedIn",
     footer: "Questions? Just reply to this email.",
   },
   fr: {
@@ -38,6 +39,7 @@ const COPY = {
       "Présentez le QR code ci-dessous (sur votre téléphone ou imprimé) à l'accueil le jour de l'événement : il sera scanné pour enregistrer votre arrivée et imprimer votre badge.",
     qrAlt: "Votre QR code d'accès",
     ticketAttached: "Votre billet est aussi joint à cet e-mail, à enregistrer ou imprimer.",
+    flyerCta: "Créez votre visuel « J’y serai » pour LinkedIn",
     footer: "Des questions ? Répondez simplement à cet e-mail.",
   },
 } as const;
@@ -50,6 +52,8 @@ interface SendQrEmailArgs {
   ticketPngBuffer?: Buffer | null;
   /** White conference logo, shown in the email header when available. */
   logoPngBuffer?: Buffer | null;
+  /** Link to the "I'm attending" flyer maker, shown as a button when set. */
+  flyerUrl?: string | null;
   eventName?: string;
   role?: string;
   language?: EmailLanguage;
@@ -61,6 +65,7 @@ export async function sendQrEmail({
   qrPngBuffer,
   ticketPngBuffer,
   logoPngBuffer,
+  flyerUrl,
   eventName = "NewSpace Africa Conference",
   role,
   language = "en",
@@ -149,6 +154,11 @@ export async function sendQrEmail({
         ${
           ticketPngBuffer
             ? `<p style="margin:18px 0 0; color:rgba(10,26,49,0.55); font-size:13px; line-height:1.6;">${t.ticketAttached}</p>`
+            : ""
+        }
+        ${
+          flyerUrl
+            ? `<p style="margin:24px 0 0;"><a href="${escapeHtml(flyerUrl)}" style="display:inline-block; background:${GOLD}; color:${NAVY}; font-size:14px; font-weight:700; text-decoration:none; padding:12px 22px; border-radius:999px;">${t.flyerCta}</a></p>`
             : ""
         }
       </td>

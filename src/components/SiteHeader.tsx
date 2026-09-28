@@ -19,7 +19,7 @@ export default function SiteHeader() {
             Registration Portal
           </span>
         </Link>
-        <nav className="flex items-center gap-5 text-sm">
+        <nav className="flex items-center gap-3.5 sm:gap-5 text-sm">
           <Link
             href="/register"
             className="text-gold-light hover:text-white font-semibold transition-colors"
