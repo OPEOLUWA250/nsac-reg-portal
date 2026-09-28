@@ -69,7 +69,7 @@ export default function AttendeeDrawer({
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-white px-0.5 py-0.5"><RolePill role={a.role} /></span>
-            <PaymentBadge status={a.payment_status} />
+            <PaymentBadge status={a.payment_status} source={a.source} />
             <span className="rounded-full bg-white px-0.5 py-0.5"><StatusPill checkedIn={a.checked_in} /></span>
             <span className="text-xs text-white/50 font-mono ml-auto">#{a.id.slice(0, 8).toUpperCase()}</span>
           </div>
@@ -116,7 +116,7 @@ export default function AttendeeDrawer({
           <Section title="Ticket & payment">
             <Row label="Ticket" value={ticketName || null} />
             <Row label="Amount" value={money(a.amount_cents, a.currency) || null} />
-            <Row label="Payment" value={paymentLabel(a.payment_status)} />
+            <Row label="Payment" value={paymentLabel(a.payment_status, a.source)} />
             <Row label="Paid at" value={formatDateTime(a.paid_at) || null} />
             <Row label="VAT number" value={a.vat_number} />
             <Row label="Invoice ID" value={a.invoice_reference} />
@@ -171,19 +171,20 @@ export function Avatar({ name, large = false }: { name: string; large?: boolean 
   );
 }
 
-export function PaymentBadge({ status }: { status: Attendee["payment_status"] }) {
+export function PaymentBadge({ status, source }: { status: Attendee["payment_status"]; source?: string | null }) {
   const styles: Record<string, string> = {
     paid: "border-emerald-300 bg-emerald-50 text-emerald-700",
     pending: "border-red-300 bg-red-50 text-red-700",
-    not_required: "border-navy/15 bg-white text-navy/60",
+    walk_in: "border-gold/50 bg-gold/10 text-navy",
   };
+  const key = source === "walk_in" ? "walk_in" : (status ?? "");
   return (
     <span
       className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap ${
-        styles[status ?? ""] ?? "border-navy/15 bg-white text-navy/50"
+        styles[key] ?? "border-navy/15 bg-white text-navy/50"
       }`}
     >
-      {paymentLabel(status)}
+      {paymentLabel(status, source)}
     </span>
   );
 }

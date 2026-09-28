@@ -5,8 +5,10 @@ import type { Attendee } from "@/lib/types";
 
 const EN = COPY.en;
 
-export function paymentLabel(status: Attendee["payment_status"]): string {
-  if (status === "pending") return "Pending";
+/** Walk-ins (registered by staff at the desk) show as "Walk-in". */
+export function paymentLabel(status: Attendee["payment_status"], source?: string | null): string {
+  if (source === "walk_in") return "Walk-in";
+  if (status === "pending") return "Awaiting payment";
   if (status === "paid") return "Paid";
   if (status === "not_required") return "Not required";
   return "Jotform";
@@ -119,7 +121,7 @@ const COLUMNS: [string, (a: Attendee, ticketName: (id: string | null) => string)
   ["Ticket", (a, ticketName) => ticketName(a.ticket_type)],
   ["Amount", (a) => (a.amount_cents != null ? (a.amount_cents / 100).toFixed(2) : "")],
   ["Currency", (a) => (a.currency ?? "").toUpperCase()],
-  ["Payment Status", (a) => paymentLabel(a.payment_status)],
+  ["Payment Status", (a) => paymentLabel(a.payment_status, a.source)],
   ["Paid At", (a) => csvDate(a.paid_at)],
   ["VAT Number", (a) => a.vat_number],
   ["Invoice ID", (a) => a.invoice_reference],

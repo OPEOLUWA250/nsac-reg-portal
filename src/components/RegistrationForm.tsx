@@ -8,6 +8,7 @@ import {
   PASSPORT_MAX_BYTES,
   PASSPORT_MIME_TYPES,
   PROFESSIONAL_CATEGORIES,
+  REGISTRATION_DRAFT_KEY,
   validateRegistration,
   type FieldError,
   type FieldName,
@@ -90,7 +91,7 @@ type Phase =
 const LANG_KEY = "nsac_lang";
 // Answers are kept for this browser tab, so a refresh or a cancelled
 // payment doesn't mean starting again. (The passport file isn't kept.)
-const DRAFT_KEY = "nsac_reg_draft";
+const DRAFT_KEY = REGISTRATION_DRAFT_KEY;
 
 // The three steps, and the fields each one asks for — used to check a step
 // before moving on, and to jump back to the step that has an error.
@@ -110,6 +111,14 @@ function errorsForStep(all: ValidationErrors, step: number): ValidationErrors {
   const out: ValidationErrors = {};
   for (const f of STEP_FIELDS[step]) if (all[f]) out[f] = all[f];
   return out;
+}
+
+function clearDraft() {
+  try {
+    sessionStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 // Reads a browser setting without ever throwing (private mode, blocked storage…).
@@ -234,6 +243,19 @@ export default function RegistrationForm({
       /* no saved draft */
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only on first load
+  }, []);
+
+  // Browsers keep a frozen copy of this page when we send the visitor to
+  // Stripe. Coming back (Back button) restores it mid-"redirecting", with
+  // the button disabled — so reset it to a usable state.
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (!e.persisted) return;
+      setPhase((p) => (p.kind === "already_registered" ? p : { kind: "editing" }));
+      setNotice("");
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
   }, []);
 
   useEffect(() => {
@@ -413,6 +435,7 @@ export default function RegistrationForm({
     }
 
     if (json.status === "already_registered") {
+      clearDraft();
       setPhase({ kind: "already_registered" });
       formTop.current?.scrollIntoView({ behavior: "smooth" });
       return;

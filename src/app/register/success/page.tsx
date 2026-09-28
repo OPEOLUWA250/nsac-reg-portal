@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Card, Kicker } from "@/components/ui";
+import ClearRegistrationDraft from "@/components/ClearRegistrationDraft";
 import { COPY } from "@/lib/registration-copy";
 import { retrieveCheckoutSession, fulfillCheckoutSession } from "@/lib/payments";
 import type { Attendee } from "@/lib/types";
@@ -45,6 +46,7 @@ export default async function RegisterSuccessPage(props: PageProps<"/register/su
 
           {paid ? (
             <>
+              <ClearRegistrationDraft />
               <h1 className="font-display text-3xl text-navy">{t.title}</h1>
               <p className="text-navy/70">{t.paidBody(firstName)}</p>
               {/* eslint-disable-next-line @next/next/no-img-element -- generated per attendee, not optimisable */}

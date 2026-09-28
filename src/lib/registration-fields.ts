@@ -5,6 +5,12 @@
 import { isCountryCode, countryNameEn, EUROPEAN_VAT_COUNTRIES } from "@/lib/countries";
 
 export const LANGUAGES = ["en", "fr"] as const;
+
+/**
+ * sessionStorage key for the half-filled registration form. Cleared once
+ * payment succeeds (see ClearRegistrationDraft on /register/success).
+ */
+export const REGISTRATION_DRAFT_KEY = "nsac_reg_draft";
 export type Language = (typeof LANGUAGES)[number];
 
 export const PROFESSIONAL_CATEGORIES = [

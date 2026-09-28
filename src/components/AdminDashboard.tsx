@@ -17,7 +17,7 @@ type Sort = "newest" | "oldest" | "name";
 
 interface Filters {
   search: string;
-  payment: "all" | "paid" | "pending" | "not_required" | "legacy";
+  payment: "all" | "paid" | "walk_in" | "pending";
   ticket: string; // "all" | ticket id
   role: string; // "all" | role
   checkin: "all" | "in" | "out";
@@ -144,6 +144,11 @@ export default function AdminDashboard() {
       revenueCents,
       currency: paid[0]?.currency ?? "eur",
       pending: list.filter((a) => a.payment_status === "pending").length,
+      walkIns: list.filter((a) => a.source === "walk_in").length,
+      perTicket: list.reduce<Record<string, number>>((acc, a) => {
+        if (a.ticket_type) acc[a.ticket_type] = (acc[a.ticket_type] ?? 0) + 1;
+        return acc;
+      }, {}),
       checkedIn: list.filter((a) => a.checked_in).length,
       letters: list.filter((a) => a.needs_invitation_letter).length,
       lettersNoPassport: list.filter((a) => a.needs_invitation_letter && !a.passport_path).length,
@@ -178,7 +183,7 @@ export default function AdminDashboard() {
   const filtered = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
     const list = (attendees ?? []).filter((a) => {
-      if (filters.payment === "legacy" ? a.payment_status != null : filters.payment !== "all" && a.payment_status !== filters.payment) return false;
+      if (filters.payment === "walk_in" ? a.source !== "walk_in" : filters.payment !== "all" && a.payment_status !== filters.payment) return false;
       if (filters.ticket !== "all" && a.ticket_type !== filters.ticket) return false;
       if (filters.role !== "all" && a.role !== filters.role) return false;
       if (filters.checkin === "in" && !a.checked_in) return false;
@@ -419,8 +424,8 @@ export default function AdminDashboard() {
               </select>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <FilterSelect label="Payment" value={filters.payment} onChange={(v) => setFilter("payment", v as Filters["payment"])} options={[["all", "All payments"], ["paid", "Paid"], ["pending", "Awaiting payment"], ["not_required", "Not required"], ["legacy", "Jotform"]]} />
-              <FilterSelect label="Ticket" value={filters.ticket} onChange={(v) => setFilter("ticket", v)} options={[["all", "All tickets"], ...ticketIds.map((id) => [id, ticketName(id)] as [string, string])]} />
+              <FilterSelect label="Payment" value={filters.payment} onChange={(v) => setFilter("payment", v as Filters["payment"])} options={[["all", "All registrations"], ["paid", `Paid (${stats.paid})`], ["walk_in", `Walk-in (${stats.walkIns})`], ["pending", `Awaiting payment (${stats.pending})`]]} />
+              <FilterSelect label="Ticket" value={filters.ticket} onChange={(v) => setFilter("ticket", v)} options={[["all", "All tickets"], ...ticketIds.map((id) => [id, `${ticketName(id)} (${stats.perTicket[id] ?? 0})`] as [string, string])]} />
               <FilterSelect label="Role" value={filters.role} onChange={(v) => setFilter("role", v)} options={[["all", "All roles"], ...roles.map((r) => [r, r[0].toUpperCase() + r.slice(1)] as [string, string])]} />
               <FilterSelect label="Check-in" value={filters.checkin} onChange={(v) => setFilter("checkin", v as Filters["checkin"])} options={[["all", "Any check-in"], ["in", "Checked in"], ["out", "Not checked in"]]} />
               <button
@@ -485,7 +490,7 @@ export default function AdminDashboard() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <PaymentBadge status={a.payment_status} />
+                        <PaymentBadge status={a.payment_status} source={a.source} />
                         {a.role !== "delegate" && <RolePill role={a.role} />}
                       </div>
                       <div className="mt-1 text-xs text-navy/55">
@@ -599,7 +604,7 @@ function Breakdown({ title, rows, total }: { title: string; rows: [string, numbe
                 <span className="shrink-0 font-semibold text-navy">{n}</span>
               </div>
               <div className="mt-1 h-1.5 rounded-full bg-navy/6">
-                <div className="h-full rounded-full bg-linear-to-r from-[#03416A] to-gold" style={{ width: `${Math.max(4, (n / total) * 100)}%` }} />
+                <div className="h-full rounded-full bg-gold" style={{ width: `${Math.max(4, (n / total) * 100)}%` }} />
               </div>
             </li>
           ))}
