@@ -4,6 +4,8 @@ import { escapeHtml } from "@/lib/escape-html";
 // Brand colors, duplicated from globals.css — email HTML can't read CSS
 // custom properties, so these are hardcoded here.
 const NAVY = "#0A1A31";
+// Secondary blue of the conference site (newspace.spaceinafrica.com).
+const BRAND_BLUE = "#03416A";
 const GOLD = "#F09F07";
 const GOLD_LIGHT = "#f7c15c";
 const OFFWHITE = "#FAFAF8";
@@ -21,6 +23,7 @@ const COPY = {
     instructions:
       "Bring the QR code below (digital or printed) to the registration desk on the day of the event — it will be scanned to check you in and print your badge.",
     qrAlt: "Your check-in QR code",
+    ticketAttached: "Your ticket is also attached to this email, ready to save or print.",
     footer: "Questions? Just reply to this email.",
   },
   fr: {
@@ -33,6 +36,7 @@ const COPY = {
     instructions:
       "Présentez le QR code ci-dessous (sur votre téléphone ou imprimé) à l'accueil le jour de l'événement : il sera scanné pour enregistrer votre arrivée et imprimer votre badge.",
     qrAlt: "Votre QR code d'accès",
+    ticketAttached: "Votre billet est aussi joint à cet e-mail, à enregistrer ou imprimer.",
     footer: "Des questions ? Répondez simplement à cet e-mail.",
   },
 } as const;
@@ -41,6 +45,10 @@ interface SendQrEmailArgs {
   toEmail: string;
   fullName: string;
   qrPngBuffer: Buffer;
+  /** Branded ticket image, attached as a file when available. */
+  ticketPngBuffer?: Buffer | null;
+  /** White conference logo, shown in the email header when available. */
+  logoPngBuffer?: Buffer | null;
   eventName?: string;
   role?: string;
   language?: EmailLanguage;
@@ -50,6 +58,8 @@ export async function sendQrEmail({
   toEmail,
   fullName,
   qrPngBuffer,
+  ticketPngBuffer,
+  logoPngBuffer,
   eventName = "NewSpace Africa Conference",
   role,
   language = "en",
@@ -81,17 +91,25 @@ export async function sendQrEmail({
         contentType: "image/png",
         contentId: "checkin-qr.png",
       },
+      ...(logoPngBuffer
+        ? [{ filename: "newspace-africa-logo.png", content: logoPngBuffer, contentType: "image/png", contentId: "brand-logo.png" }]
+        : []),
+      ...(ticketPngBuffer
+        ? [{ filename: "newspace-africa-2027-ticket.png", content: ticketPngBuffer, contentType: "image/png" }]
+        : []),
     ],
     html: `
 <body style="margin:0; padding:32px 16px; background:${OFFWHITE}; font-family:${font};">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px; margin:0 auto; background:#ffffff; border:1px solid rgba(10,26,49,0.08); border-radius:16px; overflow:hidden;">
     <tr>
-      <td style="background:${NAVY}; padding:28px 32px; text-align:center;">
-        <div style="color:${GOLD_LIGHT}; font-size:11px; font-weight:700; letter-spacing:3px; text-transform:uppercase; margin-bottom:6px;">
+      <td style="background:${NAVY}; background-image:linear-gradient(135deg, ${NAVY} 0%, ${BRAND_BLUE} 100%); padding:28px 32px; text-align:center;">
+        ${
+          logoPngBuffer
+            ? `<img src="cid:brand-logo.png" alt="NewSpace Africa Conference" width="170" height="63" style="display:block; margin:0 auto 12px; width:170px; height:63px;" />`
+            : `<div style="color:#ffffff; font-size:20px; font-weight:700; letter-spacing:0.5px; margin-bottom:6px;">NewSpace Africa</div>`
+        }
+        <div style="color:${GOLD_LIGHT}; font-size:11px; font-weight:700; letter-spacing:3px; text-transform:uppercase;">
           ${t.kicker}
-        </div>
-        <div style="color:#ffffff; font-size:20px; font-weight:700; letter-spacing:0.5px;">
-          NewSpace Africa
         </div>
       </td>
     </tr>
@@ -130,6 +148,11 @@ export async function sendQrEmail({
             </td>
           </tr>
         </table>
+        ${
+          ticketPngBuffer
+            ? `<p style="margin:18px 0 0; color:rgba(10,26,49,0.55); font-size:13px; line-height:1.6;">${t.ticketAttached}</p>`
+            : ""
+        }
       </td>
     </tr>
     <tr>

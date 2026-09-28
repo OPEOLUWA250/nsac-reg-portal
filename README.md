@@ -71,6 +71,17 @@ Jotform form is closed.
 - **Passports** are private. In `/admin`, the **Passport** button opens a
   link that expires after 5 minutes.
 - **Closing registration**: set `REGISTRATION_OPEN=false`.
+- **Tickets (PNG)**: after paying, registrants see and can download a
+  branded ticket (logo, name, role, organisation, ticket type, QR code),
+  and it's attached to the confirmation email. It's drawn by
+  `src/lib/ticket-image.tsx` using the white logo in `public/brand/logo.png`
+  and the conference site's colours (gold `#F09F07`, blue `#03416A`).
+- **Emails need a verified domain.** With Resend's test sender
+  (`onboarding@resend.dev`) emails only reach the Resend account owner.
+  Verify the sending domain at resend.com/domains and set `EMAIL_FROM` to
+  an address on it. If a confirmation email fails, it is retried when the
+  registrant revisits the success page or Stripe re-sends the webhook, and
+  staff can always use **Resend QR** in `/admin`.
 
 ## Setup
 

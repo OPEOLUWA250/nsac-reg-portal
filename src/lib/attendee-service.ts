@@ -2,6 +2,8 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { generateUniqueCode, generateQrPngBuffer } from "@/lib/qrcode";
 import { sendQrEmail, type EmailLanguage } from "@/lib/email";
 import { hasValidTicket, type Attendee } from "@/lib/types";
+import { brandLogoPng, renderTicketPng } from "@/lib/ticket-image";
+import { describeError } from "@/lib/describe-error";
 
 // Single place that creates attendees, used by the public registration form,
 // the admin walk-in form and the (legacy) Jotform webhook, so every path
@@ -147,13 +149,23 @@ export async function sendAttendeeQr(attendee: Attendee): Promise<boolean> {
     return false;
   }
   try {
-    const qrPngBuffer = await generateQrPngBuffer(attendee.unique_code);
+    const [qrPngBuffer, ticketPngBuffer, logoPngBuffer] = await Promise.all([
+      generateQrPngBuffer(attendee.unique_code),
+      // The branded ticket is a nice extra: never let it block the email.
+      renderTicketPng(attendee).catch((err) => {
+        console.error(`Could not render ticket for attendee ${attendee.id}: ${describeError(err)}`);
+        return null;
+      }),
+      brandLogoPng(),
+    ]);
     await sendQrEmail({
       toEmail: attendee.email,
       fullName: attendee.full_name,
       role: attendee.role,
       language: attendee.language === "fr" ? "fr" : "en",
       qrPngBuffer,
+      ticketPngBuffer,
+      logoPngBuffer,
     });
     await supabaseAdmin()
       .from("attendees")
@@ -161,7 +173,7 @@ export async function sendAttendeeQr(attendee: Attendee): Promise<boolean> {
       .eq("id", attendee.id);
     return true;
   } catch (err) {
-    console.error(`Failed to send QR email to attendee ${attendee.id}`, err);
+    console.error(`Failed to send QR email to attendee ${attendee.id}: ${describeError(err)}`);
     return false;
   }
 }

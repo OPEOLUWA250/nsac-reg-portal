@@ -68,7 +68,9 @@ type Copy = {
     paidBody: (first: string) => string;
     qrHelp: string;
     download: string;
+    ticketAlt: string;
     emailNote: string;
+    emailPending: string;
     processingTitle: string;
     processingBody: string;
     notFoundTitle: string;
@@ -184,9 +186,12 @@ export const COPY: Record<Language, Copy> = {
       paidBody: (first) =>
         `Thank you${first ? `, ${first}` : ""}. Your payment was received and your place at the NewSpace Africa Conference 2027 is confirmed.`,
       qrHelp:
-        "This is your check-in QR code. Show it (on your phone or printed) at the registration desk to collect your badge.",
-      download: "Download QR code",
-      emailNote: "We've also emailed it to you, with your receipt from Stripe.",
+        "This is your ticket. Show its QR code (on your phone or printed) at the registration desk to collect your badge.",
+      download: "Download ticket",
+      ticketAlt: "Your NewSpace Africa Conference 2027 ticket with check-in QR code",
+      emailNote: "We've also emailed it to you. Stripe sends your receipt separately.",
+      emailPending:
+        "We couldn't email your ticket just yet, so please download it now. We'll try the email again shortly.",
       processingTitle: "Payment processing",
       processingBody:
         "Your payment is still being processed. As soon as it's confirmed, we'll email your QR ticket. You can close this page.",
@@ -302,9 +307,12 @@ export const COPY: Record<Language, Copy> = {
       paidBody: (first) =>
         `Merci${first ? ` ${first}` : ""}. Votre paiement a été reçu et votre place à la Conférence NewSpace Africa 2027 est confirmée.`,
       qrHelp:
-        "Voici votre QR code d'accès. Présentez-le (sur votre téléphone ou imprimé) à l'accueil pour récupérer votre badge.",
-      download: "Télécharger le QR code",
-      emailNote: "Nous vous l'avons aussi envoyé par e-mail, avec votre reçu Stripe.",
+        "Voici votre billet. Présentez son QR code (sur votre téléphone ou imprimé) à l'accueil pour récupérer votre badge.",
+      download: "Télécharger le billet",
+      ticketAlt: "Votre billet pour la Conférence NewSpace Africa 2027 avec QR code d'accès",
+      emailNote: "Nous vous l'avons aussi envoyé par e-mail. Stripe vous envoie votre reçu séparément.",
+      emailPending:
+        "Nous n'avons pas encore pu vous envoyer votre billet par e-mail : téléchargez-le dès maintenant. Nous réessaierons sous peu.",
       processingTitle: "Paiement en cours",
       processingBody:
         "Votre paiement est en cours de traitement. Dès sa confirmation, nous vous enverrons votre billet par e-mail. Vous pouvez fermer cette page.",

@@ -143,10 +143,31 @@ export async function fulfillCheckoutSession(
     return updated as Attendee;
   }
 
-  // Already paid earlier: just return the record.
+  // Already paid earlier. If the confirmation email failed back then (e.g.
+  // the email provider was down), try again now — but only once the first
+  // attempt is well past, so the webhook and the success page arriving
+  // together don't both send it.
   const { data: existing } = await supabase.from("attendees").select("*").eq("id", attendeeId).maybeSingle();
-  return (existing as Attendee | null) ?? null;
+  const attendee = (existing as Attendee | null) ?? null;
+  if (
+    attendee &&
+    !attendee.qr_email_sent_at &&
+    attendee.paid_at &&
+    Date.now() - new Date(attendee.paid_at).getTime() > EMAIL_RETRY_AFTER_MS &&
+    Date.now() - (lastEmailRetry.get(attendee.id) ?? 0) > EMAIL_RETRY_INTERVAL_MS
+  ) {
+    lastEmailRetry.set(attendee.id, Date.now());
+    if (await sendAttendeeQr(attendee)) {
+      return { ...attendee, qr_email_sent_at: new Date().toISOString() };
+    }
+  }
+  return attendee;
 }
+
+const EMAIL_RETRY_AFTER_MS = 60_000;
+// While email is failing, page reloads shouldn't hammer the email provider.
+const EMAIL_RETRY_INTERVAL_MS = 5 * 60_000;
+const lastEmailRetry = new Map<string, number>();
 
 export async function retrieveCheckoutSession(sessionId: string): Promise<Stripe.Checkout.Session | null> {
   if (!/^cs_[A-Za-z0-9_]+$/.test(sessionId)) return null;

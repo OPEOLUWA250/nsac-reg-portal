@@ -3,7 +3,6 @@ import Link from "next/link";
 import { Card, Kicker } from "@/components/ui";
 import { COPY } from "@/lib/registration-copy";
 import { retrieveCheckoutSession, fulfillCheckoutSession } from "@/lib/payments";
-import { generateQrPngDataUrl } from "@/lib/qrcode";
 import type { Attendee } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -33,8 +32,8 @@ export default async function RegisterSuccessPage(props: PageProps<"/register/su
   const lang = attendee?.language === "fr" ? "fr" : session?.locale === "fr" ? "fr" : "en";
   const t = COPY[lang].success;
   const help = COPY[lang].helpEmail;
-  const paid = attendee && attendee.payment_status !== "pending";
-  const qr = paid ? await generateQrPngDataUrl(attendee!.unique_code) : null;
+  const paid = Boolean(attendee && attendee.payment_status !== "pending");
+  const ticketUrl = `/api/ticket?session_id=${encodeURIComponent(sessionId)}`;
   const firstName = attendee?.first_name ?? attendee?.full_name.split(" ")[0] ?? "";
 
   return (
@@ -43,23 +42,29 @@ export default async function RegisterSuccessPage(props: PageProps<"/register/su
         <Card className="p-6 sm:p-9 space-y-5 text-center">
           <Kicker>{COPY[lang].kicker}</Kicker>
 
-          {paid && qr ? (
+          {paid ? (
             <>
               <h1 className="font-display text-3xl text-navy">{t.title}</h1>
               <p className="text-navy/70">{t.paidBody(firstName)}</p>
-              <div className="mx-auto w-fit rounded-2xl border border-navy/10 bg-offwhite p-4">
-                {/* eslint-disable-next-line @next/next/no-img-element -- data URL, nothing to optimise */}
-                <img src={qr} alt="QR code" width={240} height={240} className="block h-60 w-60" />
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element -- generated per attendee, not optimisable */}
+              <img
+                src={ticketUrl}
+                alt={t.ticketAlt}
+                width={300}
+                height={467}
+                className="mx-auto block w-[300px] max-w-full h-auto rounded-2xl shadow-[0_10px_28px_-12px_rgba(10,26,49,0.35)]"
+              />
               <p className="text-sm text-navy/60">{t.qrHelp}</p>
               <a
-                href={qr}
-                download="newspace-africa-2027-qr.png"
+                href={`${ticketUrl}&download=1`}
+                download="newspace-africa-2027-ticket.png"
                 className="inline-flex rounded-full bg-gold text-navy px-6 py-3 text-sm font-semibold hover:bg-gold-light transition-colors"
               >
                 {t.download}
               </a>
-              <p className="text-xs text-navy/50">{t.emailNote}</p>
+              <p className="text-xs text-navy/50">
+                {attendee?.qr_email_sent_at ? t.emailNote : t.emailPending}
+              </p>
             </>
           ) : session && attendee ? (
             <>
