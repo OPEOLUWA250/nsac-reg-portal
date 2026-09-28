@@ -71,6 +71,7 @@ type Copy = {
     ticketAlt: string;
     emailNote: string;
     emailPending: string;
+    addToCalendar: string;
     flyerTitle: string;
     flyerBody: string;
     flyerCta: string;
@@ -195,6 +196,7 @@ export const COPY: Record<Language, Copy> = {
       emailNote: "We've also emailed it to you. Stripe sends your receipt separately.",
       emailPending:
         "We couldn't email your ticket just yet, so please download it now. We'll try the email again shortly.",
+      addToCalendar: "Add to your calendar",
       flyerTitle: "Tell your network you're coming",
       flyerBody: "Make an “I'm attending” graphic with your photo for LinkedIn, Instagram or WhatsApp — it takes a minute.",
       flyerCta: "Create my flyer",
@@ -319,6 +321,7 @@ export const COPY: Record<Language, Copy> = {
       emailNote: "Nous vous l'avons aussi envoyé par e-mail. Stripe vous envoie votre reçu séparément.",
       emailPending:
         "Nous n'avons pas encore pu vous envoyer votre billet par e-mail : téléchargez-le dès maintenant. Nous réessaierons sous peu.",
+      addToCalendar: "Ajouter à votre agenda",
       flyerTitle: "Annoncez votre participation",
       flyerBody: "Créez un visuel « J'y serai » avec votre photo pour LinkedIn, Instagram ou WhatsApp — en une minute.",
       flyerCta: "Créer mon visuel",

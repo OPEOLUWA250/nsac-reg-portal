@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Kicker } from "@/components/ui";
 import HeroBackground from "@/components/HeroBackground";
+import StaffOnly from "@/components/StaffOnly";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -46,37 +47,42 @@ export default async function Home() {
           >
             Register now · S’inscrire
           </Link>
-          <Link
-            href="/checkin"
-            className="inline-flex rounded-full border border-white/25 text-white px-8 py-3.5 text-sm font-semibold tracking-wide hover:bg-white/10 transition-colors"
-          >
-            Open check-in scanner
-          </Link>
+          <StaffOnly>
+            <Link
+              href="/checkin"
+              className="inline-flex rounded-full border border-white/25 text-white px-8 py-3.5 text-sm font-semibold tracking-wide hover:bg-white/10 transition-colors"
+            >
+              Open check-in scanner
+            </Link>
+          </StaffOnly>
         </div>
 
+        {/* Live registration / check-in counts are for staff only. */}
         {stats && (
-          <div className="flex items-center justify-center gap-10 sm:gap-14 pt-8 mt-2 border-t border-white/10">
-            <div className="text-center">
-              <div className="font-display text-3xl sm:text-4xl text-white">
-                {stats.total.toLocaleString()}
+          <StaffOnly>
+            <div className="flex items-center justify-center gap-10 sm:gap-14 pt-8 mt-2 border-t border-white/10">
+              <div className="text-center">
+                <div className="font-display text-3xl sm:text-4xl text-white">
+                  {stats.total.toLocaleString()}
+                </div>
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/45 mt-1">
+                  Registered
+                </div>
               </div>
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/45 mt-1">
-                Registered
+              <div className="h-10 w-px bg-white/15" />
+              <div className="text-center">
+                <div
+                  className="font-display text-3xl sm:text-4xl"
+                  style={{ color: "var(--gold-light)" }}
+                >
+                  {stats.checkedIn.toLocaleString()}
+                </div>
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/45 mt-1">
+                  Checked In
+                </div>
               </div>
             </div>
-            <div className="h-10 w-px bg-white/15" />
-            <div className="text-center">
-              <div
-                className="font-display text-3xl sm:text-4xl"
-                style={{ color: "var(--gold-light)" }}
-              >
-                {stats.checkedIn.toLocaleString()}
-              </div>
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/45 mt-1">
-                Checked In
-              </div>
-            </div>
-          </div>
+          </StaffOnly>
         )}
       </div>
     </main>

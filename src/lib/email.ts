@@ -2,6 +2,7 @@ import nodemailer from "nodemailer";
 import { Resend } from "resend";
 import { escapeHtml } from "@/lib/escape-html";
 import { EVENT_INFO } from "@/lib/event-info";
+import { buildIcs, icsFilename } from "@/lib/calendar";
 
 // Brand colors, duplicated from globals.css — email HTML can't read CSS
 // custom properties, so these are hardcoded here.
@@ -26,6 +27,7 @@ const COPY = {
       "Bring the QR code below (digital or printed) to the registration desk on the day of the event — it will be scanned to check you in and print your badge.",
     qrAlt: "Your check-in QR code",
     ticketAttached: "Your ticket is also attached to this email, ready to save or print.",
+    calendarAttached: "Open the attached calendar invite to add the conference dates to your calendar.",
     flyerCta: "Create your “I’m attending” flyer for LinkedIn",
     footer: "Questions? Just reply to this email.",
   },
@@ -40,6 +42,7 @@ const COPY = {
       "Présentez le QR code ci-dessous (sur votre téléphone ou imprimé) à l'accueil le jour de l'événement : il sera scanné pour enregistrer votre arrivée et imprimer votre badge.",
     qrAlt: "Votre QR code d'accès",
     ticketAttached: "Votre billet est aussi joint à cet e-mail, à enregistrer ou imprimer.",
+    calendarAttached: "Ouvrez l'invitation jointe pour ajouter les dates de la conférence à votre agenda.",
     flyerCta: "Créez votre visuel « J’y serai » pour LinkedIn",
     footer: "Des questions ? Répondez simplement à cet e-mail.",
   },
@@ -101,6 +104,8 @@ export async function sendQrEmail({
       ...(ticketPngBuffer
         ? [{ filename: "newspace-africa-2027-ticket.png", content: ticketPngBuffer, contentType: "image/png" }]
         : []),
+      // "Add to calendar": the conference days as an .ics invite.
+      { filename: icsFilename(), content: Buffer.from(buildIcs(language)), contentType: "text/calendar" },
     ],
     html: `
 <body style="margin:0; padding:32px 16px; background:${OFFWHITE}; font-family:${font};">
@@ -160,6 +165,7 @@ export async function sendQrEmail({
             ? `<p style="margin:18px 0 0; color:rgba(10,26,49,0.55); font-size:13px; line-height:1.6;">${t.ticketAttached}</p>`
             : ""
         }
+        <p style="margin:8px 0 0; color:rgba(10,26,49,0.55); font-size:13px; line-height:1.6;">${t.calendarAttached}</p>
         ${
           flyerUrl
             ? `<p style="margin:24px 0 0;"><a href="${escapeHtml(flyerUrl)}" style="display:inline-block; background:${GOLD}; color:${NAVY}; font-size:14px; font-weight:700; text-decoration:none; padding:12px 22px; border-radius:999px;">${t.flyerCta}</a></p>`

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button, Card, Kicker } from "@/components/ui";
 
-const STAFF_CODE_KEY = "nsac_staff_code";
+export const STAFF_CODE_KEY = "nsac_staff_code";
 
 export function useStaffCode() {
   const [staffCode, setStaffCode] = useState<string | null>(() =>
@@ -14,6 +14,8 @@ export function useStaffCode() {
     const trimmed = code.trim();
     localStorage.setItem(STAFF_CODE_KEY, trimmed);
     setStaffCode(trimmed);
+    // Lets the header show the staff links straight away.
+    window.dispatchEvent(new Event("nsac-staff-code"));
   }
 
   return { staffCode, saveStaffCode };

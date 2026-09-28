@@ -62,7 +62,7 @@ async function loadGoogleFont(family: string, weight: number): Promise<ArrayBuff
 
 let fontsPromise: Promise<FontDef[]> | null = null;
 
-function brandFonts(): Promise<FontDef[]> {
+export function brandFonts(): Promise<FontDef[]> {
   fontsPromise ??= Promise.all([
     loadGoogleFont("Space Grotesk", 700).then((data) => ({ name: "Space Grotesk", data, weight: 700 as const, style: "normal" as const })),
     loadGoogleFont("Inter", 400).then((data) => ({ name: "Inter", data, weight: 400 as const, style: "normal" as const })),
@@ -92,7 +92,7 @@ export async function brandLogoPng(): Promise<Buffer | null> {
   }
 }
 
-async function logoDataUrl(): Promise<string | null> {
+export async function logoDataUrl(): Promise<string | null> {
   for (const [file, mime] of LOGO_FILES) {
     try {
       const data = await readFile(join(process.cwd(), "public", "brand", file));

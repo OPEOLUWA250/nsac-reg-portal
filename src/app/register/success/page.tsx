@@ -4,6 +4,7 @@ import { Card, Kicker } from "@/components/ui";
 import { COPY } from "@/lib/registration-copy";
 import { retrieveCheckoutSession, fulfillCheckoutSession } from "@/lib/payments";
 import type { Attendee } from "@/lib/types";
+import { googleCalendarUrl, outlookCalendarUrl } from "@/lib/calendar";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +66,26 @@ export default async function RegisterSuccessPage(props: PageProps<"/register/su
               <p className="text-xs text-navy/50">
                 {attendee?.qr_email_sent_at ? t.emailNote : t.emailPending}
               </p>
+              <div className="space-y-2.5 pt-1">
+                <div className="text-xs font-semibold uppercase tracking-wider text-navy/50">{t.addToCalendar}</div>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {[
+                    { href: googleCalendarUrl(lang), label: "Google", external: true },
+                    { href: outlookCalendarUrl(lang), label: "Outlook", external: true },
+                    { href: `/api/calendar?lang=${lang}`, label: "Apple / .ics", external: false },
+                  ].map((c) => (
+                    <a
+                      key={c.label}
+                      href={c.href}
+                      {...(c.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-navy/20 px-4 py-2 text-sm font-semibold text-navy hover:bg-navy/5 transition-colors"
+                    >
+                      <CalendarIcon />
+                      {c.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
               <div className="rounded-2xl border border-gold/40 bg-gold/10 p-5 space-y-3 text-left">
                 <div className="font-display text-lg text-navy">{t.flyerTitle}</div>
                 <p className="text-sm text-navy/70">{t.flyerBody}</p>
@@ -99,5 +120,14 @@ export default async function RegisterSuccessPage(props: PageProps<"/register/su
         </Card>
       </div>
     </main>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <rect x="3" y="5" width="18" height="16" rx="3" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+    </svg>
   );
 }

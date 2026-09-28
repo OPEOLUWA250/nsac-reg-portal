@@ -3,6 +3,9 @@
 export const EVENT_INFO = {
   name: { en: "NewSpace Africa Conference 2027", fr: "Conférence NewSpace Africa 2027" },
   date: { en: "19–23 April 2027", fr: "19–23 avril 2027" },
+  /** First and last day (inclusive), for calendar invites. */
+  startDate: "2027-04-19",
+  endDate: "2027-04-23",
   /** The same dates, worded to sit inside a sentence (post text). */
   dateInSentence: { en: "from 19 to 23 April 2027", fr: "du 19 au 23 avril 2027" },
   place: { en: "Dakar, Senegal", fr: "Dakar, Sénégal" },
