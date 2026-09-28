@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import StaffGate, { useStaffCode } from "@/components/StaffGate";
+import TicketManager, { type TicketCounts } from "@/components/TicketManager";
 import { Button, Card, Kicker, RolePill, StatusPill } from "@/components/ui";
 import type { Attendee } from "@/lib/types";
 
@@ -43,6 +44,8 @@ export default function AdminDashboard() {
   const [registering, setRegistering] = useState(false);
   const [registerError, setRegisterError] = useState("");
 
+  const [showTickets, setShowTickets] = useState(false);
+
   async function apiCall(path: string, options: RequestInit = {}) {
     const res = await fetch(path, {
       ...options,
@@ -53,7 +56,10 @@ export default function AdminDashboard() {
       },
     });
     const json = await res.json();
-    if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
+    if (!res.ok) {
+      // body carries extra detail, e.g. per-field errors from the tickets API.
+      throw Object.assign(new Error(json.error ?? `Request failed (${res.status})`), { body: json });
+    }
     return json;
   }
 
@@ -116,6 +122,18 @@ export default function AdminDashboard() {
     });
     return { total, checkedIn, byRole };
   }, [attendees, roles]);
+
+  // Registrations per ticket, shown in the Tickets & prices panel.
+  const ticketCounts = useMemo(() => {
+    const counts: Record<string, TicketCounts> = {};
+    for (const a of attendees ?? []) {
+      if (!a.ticket_type) continue;
+      const c = (counts[a.ticket_type] ??= { paid: 0, pending: 0 });
+      if (a.payment_status === "paid") c.paid++;
+      else if (a.payment_status === "pending") c.pending++;
+    }
+    return counts;
+  }, [attendees]);
 
   async function handleResend(id: string) {
     setRowBusy((s) => ({ ...s, [id]: true }));
@@ -286,12 +304,19 @@ export default function AdminDashboard() {
             <Kicker>Event Control</Kicker>
             <h1 className="font-display text-2xl text-navy">Admin Dashboard</h1>
           </div>
-          <Button variant="outline" onClick={loadAttendees} disabled={refreshing}>
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </Button>
+          <div className="flex flex-wrap justify-end gap-2.5">
+            <Button variant="outline" onClick={() => setShowTickets((s) => !s)}>
+              {showTickets ? "Hide tickets & prices" : "Tickets & prices"}
+            </Button>
+            <Button variant="outline" onClick={loadAttendees} disabled={refreshing}>
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </Button>
+          </div>
         </div>
 
         {loadError && <p className="text-red-600 text-sm">{loadError}</p>}
+
+        {showTickets && <TicketManager apiCall={apiCall} counts={ticketCounts} />}
 
         {stats && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

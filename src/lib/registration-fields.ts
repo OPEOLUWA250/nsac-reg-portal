@@ -3,7 +3,6 @@
 // NewSpace Africa Conference 2027 Jotform form.
 
 import { isCountryCode, countryNameEn, EUROPEAN_VAT_COUNTRIES } from "@/lib/countries";
-import { findAvailableTicket } from "@/lib/tickets";
 
 export const LANGUAGES = ["en", "fr"] as const;
 export type Language = (typeof LANGUAGES)[number];
@@ -136,9 +135,12 @@ function requireCountry(errors: ValidationErrors, field: FieldName, value: strin
   else if (!isCountryCode(value)) errors[field] = "invalid_choice";
 }
 
+// `availableTicketIds`: tickets on sale right now. Prices are set in the
+// admin, so the browser passes the list it was given and the server passes
+// a fresh one from the database.
 export function validateRegistration(
   raw: Record<string, unknown>,
-  now: Date = new Date()
+  availableTicketIds: readonly string[]
 ): { ok: true; value: CleanRegistration } | { ok: false; errors: ValidationErrors; badId?: boolean } {
   const errors: ValidationErrors = {};
 
@@ -207,7 +209,7 @@ export function validateRegistration(
   if (raw.safetyConsent !== true) errors.safetyConsent = "consent_required";
 
   if (!ticketId) errors.ticket = "required";
-  else if (!findAvailableTicket(ticketId, now)) errors.ticket = "ticket_unavailable";
+  else if (!availableTicketIds.includes(ticketId)) errors.ticket = "ticket_unavailable";
 
   if (vatNumber.length > LIMITS.vatNumber) errors.vatNumber = "too_long";
   else if (!vatNumber && EUROPEAN_VAT_COUNTRIES.has(organizationCountry))

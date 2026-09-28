@@ -4,7 +4,7 @@ import { verifyTurnstile } from "@/lib/turnstile";
 import { createAttendee, sendAttendeeQr, canResendQr } from "@/lib/attendee-service";
 import { registrationOpen } from "@/lib/registration-config";
 import { createCheckoutSession } from "@/lib/payments";
-import { findAvailableTicket } from "@/lib/tickets";
+import { availableTickets } from "@/lib/ticket-store";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import type { Attendee } from "@/lib/types";
 
@@ -65,7 +65,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "spam_check_failed" }, { status: 403 });
   }
 
-  const result = validateRegistration(body);
+  // Prices come from the database (set in /admin), never from the browser.
+  let tickets;
+  try {
+    tickets = await availableTickets();
+  } catch (err) {
+    console.error("Could not load tickets", err);
+    return NextResponse.json({ error: "server_error" }, { status: 500 });
+  }
+
+  const result = validateRegistration(body, tickets.map((t) => t.id));
   if (!result.ok) {
     return NextResponse.json(
       { error: result.badId ? "invalid_request" : "validation", fields: result.errors },
@@ -73,7 +82,7 @@ export async function POST(req: NextRequest) {
     );
   }
   const input = result.value;
-  const ticket = findAvailableTicket(input.ticketId)!; // validated above
+  const ticket = tickets.find((t) => t.id === input.ticketId)!; // validated above
 
   let outcome;
   try {

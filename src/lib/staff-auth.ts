@@ -9,3 +9,17 @@ export function isStaffAuthorized(req: NextRequest): boolean {
   const provided = req.headers.get("x-staff-code");
   return provided === expected;
 }
+
+// Changing prices is more sensitive than scanning badges, and the staff code
+// is shared with every check-in volunteer. If ADMIN_ACCESS_CODE is set,
+// those actions also need it (sent as x-admin-code).
+export function adminCodeRequired(): boolean {
+  return Boolean(process.env.ADMIN_ACCESS_CODE);
+}
+
+export function isAdminAuthorized(req: NextRequest): boolean {
+  if (!isStaffAuthorized(req)) return false;
+  const expected = process.env.ADMIN_ACCESS_CODE;
+  if (!expected) return true;
+  return req.headers.get("x-admin-code") === expected;
+}

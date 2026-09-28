@@ -263,7 +263,10 @@ export default function RegistrationForm({
     // never create two registrations.
     if (!submissionId.current) submissionId.current = crypto.randomUUID();
 
-    const local = validateRegistration({ ...payload, id: submissionId.current });
+    const local = validateRegistration(
+      { ...payload, id: submissionId.current },
+      tickets.map((tk) => tk.id)
+    );
     if (!local.ok) {
       setErrors(local.errors);
       setBanner(t.errors.summary);

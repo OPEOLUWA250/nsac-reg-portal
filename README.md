@@ -25,14 +25,14 @@ Jotform form is closed.
    `paid` and emails the QR code. The success page also shows the QR code.
    **No QR code is ever sent for an unpaid registration**, and the scanner
    refuses to check in anyone whose payment is still pending.
-3. Event day: staff open `/checkin`, enter the shared staff access code once,
+4. Event day: staff open `/checkin`, enter the shared staff access code once,
    and scan attendee QR codes with the device camera.
-4. A scan looks the attendee up (`/api/checkin/lookup`), shows their name +
+5. A scan looks the attendee up (`/api/checkin/lookup`), shows their name +
    role, and offers **Confirm check-in** and **Print badge**.
-5. **Print badge** opens the browser print dialog with a badge-sized page
+6. **Print badge** opens the browser print dialog with a badge-sized page
    (defaults to 3.5in × 5.5in — adjust `--badge-width` / `--badge-height` in
    `src/app/globals.css` to match your badge stock/printer).
-6. `/admin` gives staff a live attendee list with search/filters, registered
+7. `/admin` gives staff a live attendee list with search/filters, registered
    vs. checked-in stats, and per-attendee actions:
    - **Resend QR** — re-sends the QR email (for anyone who didn't get it, or
      lost it).
@@ -45,9 +45,14 @@ Jotform form is closed.
 
 ## Registration form: things to know
 
-- **Tickets and prices** live in `src/lib/tickets.ts` (Early Bird €500 until
-  31 Dec 2026, Virtual €300). Early Bird disappears automatically after its
-  deadline — add the next ticket (e.g. Standard) there before then.
+- **Tickets and prices** are managed in `/admin` → **Tickets & prices**:
+  change a price, name, description or sale end date, hide/show a ticket, or
+  add a new one (e.g. Standard, before Early Bird ends). Changes apply to the
+  form and to Stripe from the next page load; people who already registered
+  keep the price they were charged. The starting tickets are Early Bird €500
+  (until 31 Dec 2026) and Virtual €300. If `ADMIN_ACCESS_CODE` is set, saving
+  ticket changes also needs that code, so check-in volunteers who only have
+  the staff code can't change prices.
 - **Discount codes** are created in the Stripe dashboard (Products →
   Coupons → Promotion codes); registrants enter them on the Stripe page. A
   100% code registers them without a charge.
@@ -85,12 +90,16 @@ Jotform form is closed.
      for payments (see `.env.local.example`).
    - `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` — optional
      spam protection.
+   - `ADMIN_ACCESS_CODE` — optional, recommended: a second code needed to
+     change ticket prices in `/admin`.
 
-2. Run `supabase/migrations/20260928120000_registration_form.sql` in the
-   Supabase SQL editor **before deploying**. It adds the form's columns,
-   payment tracking, the private `passports` bucket and a one-registration-
-   per-email rule (the file explains how to find duplicates first if that
-   last step fails).
+2. Run these in the Supabase SQL editor, in order, **before deploying**:
+   - `supabase/migrations/20260928120000_registration_form.sql` — the form's
+     columns, payment tracking, the private `passports` bucket and a
+     one-registration-per-email rule (the file explains how to find
+     duplicates first if that last step fails).
+   - `supabase/migrations/20260928130000_tickets.sql` — the `tickets` table
+     behind **Tickets & prices**, pre-filled with Early Bird and Virtual.
 
 3. In Stripe → Developers → Webhooks, add
    `https://your-domain.com/api/stripe-webhook` with the events
