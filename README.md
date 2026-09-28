@@ -32,16 +32,25 @@ Jotform form is closed.
 6. **Print badge** opens the browser print dialog with a badge-sized page
    (defaults to 3.5in × 5.5in — adjust `--badge-width` / `--badge-height` in
    `src/app/globals.css` to match your badge stock/printer).
-7. `/admin` gives staff a live attendee list with search/filters, registered
-   vs. checked-in stats, and per-attendee actions:
-   - **Resend QR** — re-sends the QR email (for anyone who didn't get it, or
-     lost it).
-   - **Mark checked in / Undo check-in** — manual override for edge cases
-     (lost QR, verified by hand, or undoing an accidental scan).
-   - **+ Walk-in registration** — registers someone who shows up without a
-     prior Jotform submission: creates their record and emails their QR code
-     immediately, same as the webhook path.
-   - **Export CSV** — downloads the currently filtered attendee list.
+7. `/admin` is the event control dashboard (refreshes every 20 seconds):
+   - **Overview** — registrations (and new in the last 24 h), paid, revenue,
+     awaiting payment, checked in, invitation letters needed (and how many
+     have no passport yet); breakdowns by ticket, nationality and
+     professional category. Click "Awaiting payment" or "Invitation letters"
+     to filter the list to those people.
+   - **List** — search (name, email, organisation, phone, reference),
+     filters (payment, ticket, role, check-in, needs invitation letter),
+     sorting, 25 per page, quick **Check in / Undo** per row.
+   - **Details** — click anyone to see everything they submitted (contact,
+     professional, travel, ticket & payment with a link to the payment in
+     Stripe, check-in & badge, consent, record) with **Resend QR email**,
+     **Mark checked in / Undo**, **View passport** and **Copy email**.
+   - **+ Walk-in** — registers someone at the desk (speakers, staff, guests)
+     and emails their QR code immediately; no payment.
+   - **Tickets & prices** — see "Registration form: things to know".
+   - **Export CSV** — the current view, everyone, or just invitation-letter
+     requests; every field in its own column, readable labels, opens in
+     Excel / Google Sheets with accents and phone numbers intact.
 
 ## Registration form: things to know
 
