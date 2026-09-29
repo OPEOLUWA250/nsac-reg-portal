@@ -86,7 +86,7 @@ function PrivacyEn() {
       <LegalSection title="What stays on your device">
         <ul>
           <li>Your language choice, so the form opens in the same language next time.</li>
-          <li>Your answers while you fill in the form, so a refresh doesn&apos;t lose them. They are cleared once you have paid. Passport files are never kept this way.</li>
+          <li>Your answers while you fill in the form, so you can close the page and carry on later. They are deleted once you have paid, when you press Start over, or after 14 days. Passport files are never kept this way.</li>
           <li>The photo you use in the flyer maker. It is never uploaded.</li>
         </ul>
         <p>This site doesn&apos;t use advertising or tracking cookies.</p>
@@ -152,7 +152,7 @@ function PrivacyFr() {
       <LegalSection title="Ce qui reste sur votre appareil">
         <ul>
           <li>Votre choix de langue, pour que le formulaire s&apos;ouvre dans la même langue la prochaine fois.</li>
-          <li>Vos réponses pendant que vous remplissez le formulaire, pour ne rien perdre si la page est rechargée. Elles sont effacées une fois le paiement effectué. Les passeports ne sont jamais conservés de cette façon.</li>
+          <li>Vos réponses pendant que vous remplissez le formulaire, pour que vous puissiez fermer la page et reprendre plus tard. Elles sont effacées une fois le paiement effectué, si vous cliquez sur Recommencer, ou au bout de 14 jours. Les passeports ne sont jamais conservés de cette façon.</li>
           <li>La photo utilisée dans l&apos;outil de création de visuel. Elle n&apos;est jamais envoyée.</li>
         </ul>
         <p>Ce site n&apos;utilise pas de cookies publicitaires ni de cookies de suivi.</p>

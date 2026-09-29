@@ -8,6 +8,7 @@ type Copy = {
   intro: string;
   helpEmail: string;
   cancelled: string;
+  resumed: { title: string; body: string; startOver: string };
   closedTitle: string;
   closedBody: string;
   sections: { you: string; organization: string; travel: string; ticket: string; agreements: string };
@@ -108,6 +109,11 @@ export const COPY: Record<Language, Copy> = {
     intro:
       "Three short steps. You pay by card at the end, and your QR ticket arrives by email. Questions? Write to",
     helpEmail: "info@spaceinafrica.com",
+    resumed: {
+      title: "Welcome back",
+      body: "We kept your answers, so you can carry on where you left off.",
+      startOver: "Start over",
+    },
     closedTitle: "Registration is closed",
     closedBody: "The form isn't taking registrations at the moment. For questions, write to",
     cancelled: "Payment was cancelled. You weren't charged, and your answers are still here. Submit the form again whenever you're ready.",
@@ -250,6 +256,11 @@ export const COPY: Record<Language, Copy> = {
     intro:
       "Trois étapes rapides. Vous payez par carte à la fin et votre billet avec QR code arrive par e-mail. Une question\u00a0? Écrivez à",
     helpEmail: "info@spaceinafrica.com",
+    resumed: {
+      title: "Bon retour parmi nous",
+      body: "Nous avons gardé vos réponses\u00a0: vous pouvez reprendre là où vous vous étiez arrêté(e).",
+      startOver: "Recommencer",
+    },
     closedTitle: "Les inscriptions sont fermées",
     closedBody: "Le formulaire n'accepte pas d'inscriptions pour le moment. Pour toute question, écrivez à",
     cancelled:

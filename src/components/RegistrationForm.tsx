@@ -17,6 +17,7 @@ import {
 } from "@/components/ui";
 import { IconCheck } from "@/components/icons";
 import CountryCombobox from "@/components/CountryCombobox";
+import { clearDraft, readDraft, saveDraft } from "@/lib/registration-draft";
 import { preferredLanguage, setSiteLanguage } from "@/lib/site-language";
 import { COPY } from "@/lib/registration-copy";
 import {
@@ -24,7 +25,6 @@ import {
   PASSPORT_MAX_BYTES,
   PASSPORT_MIME_TYPES,
   PROFESSIONAL_CATEGORIES,
-  REGISTRATION_DRAFT_KEY,
   validateRegistration,
   type FieldError as FieldErrorCode,
   type FieldName,
@@ -106,10 +106,6 @@ type Phase =
   | { kind: "redirecting" }
   | { kind: "already_registered" };
 
-// Answers are kept for this browser tab, so a refresh or a cancelled
-// payment doesn't mean starting again. (The passport file isn't kept.)
-const DRAFT_KEY = REGISTRATION_DRAFT_KEY;
-
 // The three steps, and the fields each one asks for — used to check a step
 // before moving on, and to jump back to the step that has an error.
 const STEP_FIELDS: FieldName[][] = [
@@ -128,14 +124,6 @@ function errorsForStep(all: ValidationErrors, step: number): ValidationErrors {
   const out: ValidationErrors = {};
   for (const f of STEP_FIELDS[step]) if (all[f]) out[f] = all[f];
   return out;
-}
-
-function clearDraft() {
-  try {
-    sessionStorage.removeItem(DRAFT_KEY);
-  } catch {
-    /* ignore */
-  }
 }
 
 // Large phone photos are shrunk before upload (still sharp enough to read a
@@ -208,6 +196,8 @@ export default function RegistrationForm({
   const [notice, setNotice] = useState<string>("");
   const [phase, setPhase] = useState<Phase>({ kind: "editing" });
   const [step, setStep] = useState(0);
+  // True when answers from an earlier visit were restored ("Welcome back").
+  const [resumed, setResumed] = useState(false);
   // Set once the visitor changes something, so the empty form on first
   // load never overwrites a saved draft before it's restored.
   const dirty = useRef(false);
@@ -230,22 +220,41 @@ export default function RegistrationForm({
     setSiteLanguage(lang, { remember: lang === initialLang });
   }, [lang, initialLang]);
 
-  // Restore answers saved earlier in this tab (refresh, or back from a
-  // cancelled payment — then straight to the last step).
+  // Restore answers saved in this browser (a refresh, a closed tab, or back
+  // from a cancelled payment, then straight to the last step), on the step
+  // the visitor had reached.
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem(DRAFT_KEY);
-      if (!raw) return;
-      const draft = JSON.parse(raw) as { form?: Partial<FormState>; step?: number };
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- restoring a draft saved in this browser tab
-      if (draft.form) setForm((f) => ({ ...f, ...draft.form, website: "" }));
-      if (paymentCancelled) setStep(LAST_STEP);
-      else if (typeof draft.step === "number") setStep(Math.min(Math.max(0, draft.step), LAST_STEP));
-    } catch {
-      /* no saved draft */
+    const draft = readDraft();
+    if (!draft) return;
+    const saved = draft.form as Partial<FormState>;
+    // A ticket that has since gone off sale (e.g. Early Bird ended) is dropped.
+    const ticketStillOnSale = tickets.some((tk) => tk.id === saved.ticket);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- restoring a draft saved in this browser
+    setForm((f) => ({ ...f, ...saved, ticket: ticketStillOnSale ? (saved.ticket as string) : f.ticket, website: "" }));
+    if (draft.id) submissionId.current = draft.id;
+    const savedStep = Math.min(Math.max(0, draft.step), LAST_STEP);
+    setStep(paymentCancelled ? LAST_STEP : savedStep);
+    // "Welcome back" only when there's something to come back to.
+    if (!paymentCancelled && (savedStep > 0 || Object.values(saved).some((v) => typeof v === "string" && v.trim()))) {
+      setResumed(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only on first load
   }, []);
+
+  /** Forgets the saved answers and starts a new registration on step 1. */
+  function startOver() {
+    clearDraft();
+    dirty.current = false;
+    submissionId.current = "";
+    setForm({ ...EMPTY, ticket: tickets.length === 1 ? tickets[0].id : "" });
+    setPassportFile(null);
+    setErrors({});
+    setBanner("");
+    setNotice("");
+    setResumed(false);
+    setStep(0);
+    setPhase({ kind: "editing" });
+  }
 
   // Browsers keep a frozen copy of this page when we send the visitor to
   // Stripe. Coming back (Back button) restores it mid-"redirecting", with
@@ -255,38 +264,23 @@ export default function RegistrationForm({
       if (!e.persisted) return;
       setNotice("");
       setBanner("");
-      let draftExists = false;
-      try {
-        draftExists = sessionStorage.getItem(DRAFT_KEY) !== null;
-      } catch {
-        /* storage unavailable */
-      }
-      if (draftExists) {
+      if (readDraft()) {
         // Came back from Stripe without paying: keep their answers.
         setPhase((p) => (p.kind === "already_registered" ? p : { kind: "editing" }));
         return;
       }
       // The draft is gone: payment succeeded (the success page clears it).
       // Start a fresh registration on step 1.
-      dirty.current = false;
-      submissionId.current = "";
-      setForm({ ...EMPTY, ticket: tickets.length === 1 ? tickets[0].id : "" });
-      setPassportFile(null);
-      setErrors({});
-      setStep(0);
-      setPhase({ kind: "editing" });
+      startOver();
     };
     window.addEventListener("pageshow", onPageShow);
     return () => window.removeEventListener("pageshow", onPageShow);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- startOver only uses setters and refs
   }, [tickets]);
 
   useEffect(() => {
     if (!dirty.current) return;
-    try {
-      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ form: { ...form, website: "" }, step }));
-    } catch {
-      /* storage unavailable (private mode) — nothing to do */
-    }
+    saveDraft({ form: { ...form, website: "" }, step, id: submissionId.current || undefined });
   }, [form, step]);
 
   // Country names in the visitor's language. Built after hydration because
@@ -580,6 +574,19 @@ export default function RegistrationForm({
 
             <form onSubmit={handleSubmit} noValidate className="space-y-6">
               {paymentCancelled && !banner && <Alert tone="info">{t.cancelled}</Alert>}
+              {resumed && !paymentCancelled && !banner && (
+                <Alert
+                  tone="info"
+                  title={t.resumed.title}
+                  action={
+                    <Button variant="ghost" size="sm" onClick={startOver}>
+                      {t.resumed.startOver}
+                    </Button>
+                  }
+                >
+                  {t.resumed.body}
+                </Alert>
+              )}
               {banner && <Alert tone="error">{banner}</Alert>}
               {notice && <Alert tone="info">{notice}</Alert>}
 

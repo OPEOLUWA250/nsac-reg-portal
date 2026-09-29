@@ -7,8 +7,8 @@ import { isCountryCode, countryNameEn, EUROPEAN_VAT_COUNTRIES } from "@/lib/coun
 export const LANGUAGES = ["en", "fr"] as const;
 
 /**
- * sessionStorage key for the half-filled registration form. Cleared once
- * payment succeeds (see ClearRegistrationDraft on /register/success).
+ * localStorage key for the half-filled registration form (see
+ * src/lib/registration-draft.ts). Cleared once payment succeeds.
  */
 export const REGISTRATION_DRAFT_KEY = "nsac_reg_draft";
 export type Language = (typeof LANGUAGES)[number];
