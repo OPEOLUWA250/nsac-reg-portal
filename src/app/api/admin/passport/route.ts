@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { isStaffAuthorized } from "@/lib/staff-auth";
+import { isAdminAreaAuthorized } from "@/lib/staff-auth";
 
 export const runtime = "nodejs";
 
 // Returns a link to an attendee's passport scan that expires after 5
 // minutes, for preparing invitation letters. Passports are never public.
 export async function POST(req: NextRequest) {
-  if (!isStaffAuthorized(req)) {
+  if (!isAdminAreaAuthorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

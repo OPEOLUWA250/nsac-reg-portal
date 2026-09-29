@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { isStaffAuthorized } from "@/lib/staff-auth";
+import { isAdminAreaAuthorized } from "@/lib/staff-auth";
 
 export const runtime = "nodejs";
 
 // Manual override for edge cases (attendee lost their QR, staff verifies
 // identity by hand, or an accidental scan needs undoing).
 export async function POST(req: NextRequest) {
-  if (!isStaffAuthorized(req)) {
+  if (!isAdminAreaAuthorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

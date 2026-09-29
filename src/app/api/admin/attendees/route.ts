@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { isStaffAuthorized } from "@/lib/staff-auth";
+import { isAdminAreaAuthorized } from "@/lib/staff-auth";
 
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-  if (!isStaffAuthorized(req)) {
+  if (!isAdminAreaAuthorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { isStaffAuthorized } from "@/lib/staff-auth";
+import { isAdminAreaAuthorized } from "@/lib/staff-auth";
 
 export const runtime = "nodejs";
 
@@ -16,7 +16,7 @@ export interface ActivityItem {
 // Recent events for the admin's notification bell: new registrations,
 // payments, walk-ins and check-ins, newest first.
 export async function GET(req: NextRequest) {
-  if (!isStaffAuthorized(req)) {
+  if (!isAdminAreaAuthorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

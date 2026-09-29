@@ -4,29 +4,29 @@ import BrandLogo from "@/components/BrandLogo";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import StaffGate, { StaffCodeRejected, useStaffCode } from "@/components/StaffGate";
 import { AdminProvider, useAdmin } from "@/components/admin/AdminContext";
 import { ADMIN_NAV, ADMIN_NAV_BOTTOM, isAdminPathActive } from "@/components/admin/admin-nav";
 import { usePopover } from "@/components/admin/usePopover";
-import { IconBell, IconChevronDown, IconClose, IconCog, IconLogout, IconMenu, IconScan, IconUser } from "@/components/icons";
+import { IconBell, IconChevronDown, IconClose, IconCog, IconMenu, IconScan, IconUser } from "@/components/icons";
 import { Button, cx, Skeleton } from "@/components/ui";
 import { relativeTime } from "@/lib/admin-format";
 import type { ActivityItem } from "@/app/api/admin/activity/route";
 
-// Layout for every /admin page: staff sign-in, then a blue sidebar (logo
-// top left, page links) and a white top bar with notifications and the
-// profile menu. On phones the sidebar slides in from a menu button.
+// Layout for every /admin page: a blue sidebar (logo top left, page links)
+// and a white top bar with notifications and the profile menu. On phones the
+// sidebar slides in from a menu button.
+//
+// TEMPORARY: no sign-in while admin login is being built (see
+// ADMIN_SIGN_IN_ENABLED in src/lib/staff-auth.ts). To bring the staff code
+// back, wrap this in StaffGate / useStaffCode from @/components/StaffGate as
+// the check-in scanner does.
 
 const ACTIVITY_POLL_MS = 30_000;
 const SEEN_KEY = "nsac_admin_activity_seen";
 
 export default function AdminShell({ children }: { children: ReactNode }) {
-  const { staffCode, saveStaffCode, clearStaffCode } = useStaffCode();
-
-  if (!staffCode) return <StaffGate onSubmit={saveStaffCode} />;
-
   return (
-    <AdminProvider staffCode={staffCode} onSignOut={clearStaffCode}>
+    <AdminProvider staffCode="" onSignOut={() => {}}>
       <Frame>{children}</Frame>
     </AdminProvider>
   );
@@ -70,7 +70,6 @@ function Frame({ children }: { children: ReactNode }) {
         </header>
 
         <main id="main" className="flex-1">
-          <RejectedBanner />
           {children}
         </main>
       </div>
@@ -328,10 +327,7 @@ function NotificationBell() {
 // ---------- profile ----------
 
 function ProfileMenu() {
-  const { adminCode, signOut } = useAdmin();
   const { open, setOpen, wrap, trigger } = usePopover();
-  const role = adminCode ? "Admin" : "Staff";
-  const detail = adminCode ? "Admin code entered" : "Signed in with the staff code";
 
   return (
     <div ref={wrap} className="relative">
@@ -347,11 +343,11 @@ function ProfileMenu() {
           <IconUser className="h-4 w-4" />
         </span>
         <span className="hidden text-left leading-tight sm:block">
-          <span className="block text-sm font-semibold text-ink">Event {role.toLowerCase()}</span>
-          <span className="block text-xs text-ink-3">{role} access</span>
+          <span className="block text-sm font-semibold text-ink">Event admin</span>
+          <span className="block text-xs text-ink-3">No sign-in yet</span>
         </span>
         <IconChevronDown className="hidden h-4 w-4 text-ink-3 sm:block" />
-        <span className="sr-only sm:hidden">Profile and sign out</span>
+        <span className="sr-only sm:hidden">Profile</span>
       </button>
 
       {open && (
@@ -362,8 +358,8 @@ function ProfileMenu() {
           className="absolute right-0 top-full z-40 mt-2 w-64 rounded-lg border border-line bg-surface p-1.5 transition-[opacity,translate] duration-200 starting:-translate-y-1 starting:opacity-0"
         >
           <div className="border-b border-line px-3 pb-3 pt-2">
-            <p className="text-sm font-semibold text-ink">Event {role.toLowerCase()}</p>
-            <p className="text-xs text-ink-3">{detail} on this device.</p>
+            <p className="text-sm font-semibold text-ink">Event admin</p>
+            <p className="text-xs text-ink-3">The admin has no sign-in yet: anyone with its address can open it.</p>
           </div>
           <div className="py-1.5">
             <MenuLink href="/admin/settings" onClick={() => setOpen(false)} icon={<IconCog />}>
@@ -372,16 +368,6 @@ function ProfileMenu() {
             <MenuLink href="/checkin" onClick={() => setOpen(false)} icon={<IconScan />}>
               Check-in scanner
             </MenuLink>
-          </div>
-          <div className="border-t border-line pt-1.5">
-            <button
-              type="button"
-              onClick={signOut}
-              className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-semibold text-danger transition-colors duration-150 hover:bg-subtle active:bg-line"
-            >
-              <IconLogout />
-              Sign out
-            </button>
           </div>
         </div>
       )}
@@ -399,17 +385,5 @@ function MenuLink({ href, onClick, icon, children }: { href: string; onClick: ()
       <span className="text-ink-3">{icon}</span>
       {children}
     </Link>
-  );
-}
-
-function RejectedBanner() {
-  const { staffCodeRejected } = useAdmin();
-  if (!staffCodeRejected) return null;
-  return (
-    <div className="px-4 pt-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl">
-        <StaffCodeRejected />
-      </div>
-    </div>
   );
 }

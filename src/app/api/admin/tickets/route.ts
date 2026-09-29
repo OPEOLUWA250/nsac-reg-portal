@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminCodeRequired, isAdminAuthorized, isStaffAuthorized } from "@/lib/staff-auth";
+import { adminCodeRequired, isAdminAuthorized, isAdminAreaAuthorized } from "@/lib/staff-auth";
 import { deleteTicket, listTickets, saveTicket, ticketRegistrationCounts, validateTicketInput } from "@/lib/ticket-store";
 
 export const runtime = "nodejs";
@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 // Tickets & prices, edited from /admin. Changes show on /register straight
 // away. Registrations already made keep the price they were charged.
 export async function GET(req: NextRequest) {
-  if (!isStaffAuthorized(req)) {
+  if (!isAdminAreaAuthorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   try {
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 // Body: { isNew: boolean, ticket: { id, nameEn, nameFr, descriptionEn,
 // descriptionFr, amountCents, availableUntil, active, sortOrder } }
 export async function POST(req: NextRequest) {
-  if (!isStaffAuthorized(req)) {
+  if (!isAdminAreaAuthorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   if (!isAdminAuthorized(req)) {
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
 // DELETE /api/admin/tickets?id=standard — only for tickets nobody has
 // registered with (otherwise hide it: past registrations keep their ticket).
 export async function DELETE(req: NextRequest) {
-  if (!isStaffAuthorized(req)) {
+  if (!isAdminAreaAuthorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   if (!isAdminAuthorized(req)) {

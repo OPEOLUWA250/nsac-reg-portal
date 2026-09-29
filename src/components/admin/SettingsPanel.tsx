@@ -186,8 +186,8 @@ export default function SettingsPanel() {
             />
           </StatusGroup>
           <StatusGroup title="Security">
-            <Check ok={data.status.security.staffCode} label="Staff access code" />
-            <Check ok={data.status.security.adminCode} warn={!data.status.security.adminCode} label={data.status.security.adminCode ? "Admin code for prices and settings" : "No separate admin code"} />
+            <Check ok={false} label="Admin sign-in (not built yet: the admin is open)" />
+            <Check ok={data.status.security.staffCode} label="Staff code for the check-in scanner" />
             <Check ok={data.status.security.spamProtection} warn={!data.status.security.spamProtection} label="Spam protection (Turnstile)" />
           </StatusGroup>
         </div>

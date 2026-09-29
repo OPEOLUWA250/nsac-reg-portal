@@ -1,20 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { AdminPage, Button, Card, cx, ErrorState, LoadingLabel, PageHeader, Skeleton } from "@/components/ui";
+import { AdminPage, Card, cx, ErrorState, LoadingLabel, PageHeader, Skeleton } from "@/components/ui";
 import { useAdmin } from "@/components/admin/AdminContext";
 
-// /admin/admins: who can use the admin. Access today is by two shared
-// codes set on the server; this page shows whether each is set, what it
-// unlocks, and this device's access.
+// /admin/admins: who can use the admin and the scanner. The admin has no
+// sign-in for now (ADMIN_SIGN_IN_ENABLED in src/lib/staff-auth.ts); the
+// check-in scanner is protected by the shared staff code.
 
 interface Security {
   staffCode: boolean;
-  adminCode: boolean;
 }
 
 export default function AdminsPanel() {
-  const { apiCall, adminCode, signOut } = useAdmin();
+  const { apiCall } = useAdmin();
   const [security, setSecurity] = useState<Security | null>(null);
   const [error, setError] = useState("");
 
@@ -34,7 +33,7 @@ export default function AdminsPanel() {
 
   return (
     <AdminPage width="max-w-4xl">
-      <PageHeader eyebrow="Admins" title="Admins" description="Who can open the admin and the check-in scanner, and how." />
+      <PageHeader eyebrow="Admins" title="Admins" description="Who can open the admin and the check-in scanner." />
 
       {!security ? (
         error ? (
@@ -55,63 +54,43 @@ export default function AdminsPanel() {
           </Card>
         )
       ) : (
-        <>
-          <Card className="p-5 sm:p-6">
-            <h2 className="font-display text-xl font-bold text-blue">Access codes</h2>
-            <p className="mt-1 text-sm text-ink-3">Everyone working the event signs in with a shared code, once on each device.</p>
-            <dl className="mt-4 divide-y divide-line border-y border-line">
-              <CodeRow
-                name="Staff code"
-                set={security.staffCode}
-                unlocks="Opens the dashboard, walk-in registration and the check-in scanner. Give it to everyone working the event."
-                missing="Not set: anyone with the link can open the admin. Set STAFF_ACCESS_CODE on the server."
-              />
-              <CodeRow
-                name="Admin code"
-                set={security.adminCode}
-                unlocks="Also needed to change ticket prices and settings. Keep it to the organisers."
-                missing="Not set: anyone with the staff code can change prices and settings. Set ADMIN_ACCESS_CODE on the server."
-              />
-            </dl>
-            <p className="mt-4 text-sm text-ink-3">
-              The codes are set on the server. After a code changes, everyone using the old one is asked to sign in again.
-              Ask your developer to change them.
-            </p>
-          </Card>
-
-          <Card className="flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6">
-            <div className="space-y-1">
-              <h2 className="font-display text-xl font-bold text-blue">This device</h2>
-              <p className="text-sm text-ink-2">
-                Signed in with the staff code.{" "}
-                {security.adminCode && (adminCode ? "Admin code entered for this session." : "Admin code not entered yet.")}
-              </p>
-            </div>
-            <Button variant="danger" onClick={signOut}>
-              Sign out of this device
-            </Button>
-          </Card>
-        </>
+        <Card className="p-5 sm:p-6">
+          <h2 className="font-display text-xl font-bold text-blue">Access</h2>
+          <dl className="mt-4 divide-y divide-line border-y border-line">
+            <AccessRow
+              name="Admin"
+              ok={false}
+              status="Open: no sign-in yet"
+              text="Anyone with the admin's address can open it, see registrations and passports, and change prices and settings. Admin sign-in is being built. Until then, don't share this address."
+            />
+            <AccessRow
+              name="Check-in scanner"
+              ok={security.staffCode}
+              status={security.staffCode ? "Staff code set" : "Staff code not set"}
+              text={
+                security.staffCode
+                  ? "Staff enter the shared staff code once on each device before scanning."
+                  : "Anyone with the scanner's address can use it. Set STAFF_ACCESS_CODE on the server."
+              }
+            />
+          </dl>
+        </Card>
       )}
     </AdminPage>
   );
 }
 
-function CodeRow({ name, set, unlocks, missing }: { name: string; set: boolean; unlocks: string; missing: string }) {
+function AccessRow({ name, ok, status, text }: { name: string; ok: boolean; status: string; text: string }): ReactNode {
   return (
     <div className="grid gap-2 py-4 sm:grid-cols-[10rem_1fr] sm:gap-4">
       <dt className="flex items-center gap-2 text-sm font-semibold text-ink">
-        <span aria-hidden="true" className={cx("h-2 w-2 rounded-full", set ? "bg-success" : "bg-danger")} />
+        <span aria-hidden="true" className={cx("h-2 w-2 rounded-full", ok ? "bg-success" : "bg-danger")} />
         {name}
       </dt>
       <dd className="space-y-1 text-sm">
-        <Status set={set} />
-        <p className="text-ink-2">{set ? unlocks : missing}</p>
+        <p className={cx("font-semibold", ok ? "text-success" : "text-danger")}>{status}</p>
+        <p className="text-ink-2">{text}</p>
       </dd>
     </div>
   );
-}
-
-function Status({ set }: { set: boolean }): ReactNode {
-  return <p className={cx("font-semibold", set ? "text-success" : "text-danger")}>{set ? "Set" : "Not set"}</p>;
 }

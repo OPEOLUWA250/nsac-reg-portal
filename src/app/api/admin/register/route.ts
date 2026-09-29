@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isStaffAuthorized } from "@/lib/staff-auth";
+import { isAdminAreaAuthorized } from "@/lib/staff-auth";
 import { createAttendee, sendAttendeeQr } from "@/lib/attendee-service";
 import { ATTENDEE_ROLES, isAttendeeRole } from "@/lib/types";
 import { describeError } from "@/lib/describe-error";
@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 // registered online. Creates the attendee record and emails their QR code
 // immediately, same as the public form does.
 export async function POST(req: NextRequest) {
-  if (!isStaffAuthorized(req)) {
+  if (!isAdminAreaAuthorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

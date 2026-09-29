@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publicBaseUrl } from "@/lib/public-url";
-import { adminCodeRequired, isAdminAuthorized, isStaffAuthorized } from "@/lib/staff-auth";
+import { adminCodeRequired, isAdminAuthorized, isAdminAreaAuthorized } from "@/lib/staff-auth";
 import { getSettings, updateSettings } from "@/lib/settings-store";
 import { registrationClosedByEnv } from "@/lib/registration-config";
 import { availableTickets } from "@/lib/ticket-store";
@@ -34,7 +34,7 @@ function systemStatus() {
 }
 
 export async function GET(req: NextRequest) {
-  if (!isStaffAuthorized(req)) {
+  if (!isAdminAreaAuthorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const [settings, onSale] = await Promise.all([
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
 
 // Body: { registrationOpen?: boolean }
 export async function POST(req: NextRequest) {
-  if (!isStaffAuthorized(req)) {
+  if (!isAdminAreaAuthorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   if (!isAdminAuthorized(req)) {
