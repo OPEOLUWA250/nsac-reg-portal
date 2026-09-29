@@ -61,7 +61,7 @@ export async function createCheckoutSession({
         price_data: {
           currency: ticket.currency,
           unit_amount: ticket.amountCents,
-          product_data: { name: `${EVENT_TITLE} — ${ticket.name.en}` },
+          product_data: { name: `${EVENT_TITLE} · ${ticket.name.en}` },
         },
       },
     ],
@@ -81,7 +81,7 @@ export async function createCheckoutSession({
     },
     locale: language,
     success_url: `${baseUrl}/register/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${baseUrl}/register?payment=cancelled`,
+    cancel_url: `${baseUrl}/?payment=cancelled`,
   });
 
   if (!session.url) throw new Error("Stripe did not return a Checkout URL");

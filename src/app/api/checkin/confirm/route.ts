@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
   if (existing.payment_status === "pending") {
     return NextResponse.json(
-      { error: "Payment not completed for this registration — send them to the help desk." },
+      { error: "Payment not completed for this registration. Send them to the help desk." },
       { status: 409 }
     );
   }

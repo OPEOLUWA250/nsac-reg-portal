@@ -1,0 +1,51 @@
+import type { SiteLanguage } from "@/lib/site-language";
+
+// Text of the site header, phone menu and footer, in English and French.
+// They follow the language of the page (see src/lib/site-language.ts).
+
+export const SITE_COPY: Record<
+  SiteLanguage,
+  {
+    skip: string;
+    home: string;
+    openMenu: string;
+    closeMenu: string;
+    register: string;
+    form: string;
+    flyer: string;
+    privacy: string;
+    terms: string;
+    contact: string;
+    website: string;
+    organisedBy: string;
+  }
+> = {
+  en: {
+    skip: "Skip to content",
+    home: "NewSpace Africa Conference 2027, registration form",
+    openMenu: "Open menu",
+    closeMenu: "Close menu",
+    register: "Register",
+    form: "Registration form",
+    flyer: "Create your flyer",
+    privacy: "Privacy",
+    terms: "Terms",
+    contact: "Contact",
+    website: "Conference website",
+    organisedBy: "NewSpace Africa Conference 2027 is organised by Space in Africa.",
+  },
+  fr: {
+    skip: "Aller au contenu",
+    home: "Conférence NewSpace Africa 2027, formulaire d'inscription",
+    openMenu: "Ouvrir le menu",
+    closeMenu: "Fermer le menu",
+    register: "S'inscrire",
+    form: "Formulaire d'inscription",
+    flyer: "Créer votre visuel",
+    privacy: "Confidentialité",
+    terms: "Conditions",
+    contact: "Contact",
+    website: "Site de la conférence",
+    organisedBy: "La Conférence NewSpace Africa 2027 est organisée par Space in Africa.",
+  },
+};

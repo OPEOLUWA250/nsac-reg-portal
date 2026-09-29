@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { Card, Kicker } from "@/components/ui";
+import { ButtonAnchor, ButtonLink, Card, Eyebrow, linkClass, Spinner } from "@/components/ui";
+import { IconAlert, IconCalendar, IconCheck } from "@/components/icons";
 import ClearRegistrationDraft from "@/components/ClearRegistrationDraft";
 import { COPY } from "@/lib/registration-copy";
 import { retrieveCheckoutSession, fulfillCheckoutSession } from "@/lib/payments";
@@ -10,7 +10,8 @@ import { googleCalendarUrl, outlookCalendarUrl } from "@/lib/calendar";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Registration — NewSpace Africa Conference 2027",
+  title: "Your ticket",
+  description: "Your NewSpace Africa Conference 2027 ticket and check-in QR code.",
   robots: { index: false },
 };
 
@@ -39,99 +40,91 @@ export default async function RegisterSuccessPage(props: PageProps<"/register/su
   const firstName = attendee?.first_name ?? attendee?.full_name.split(" ")[0] ?? "";
 
   return (
-    <main className="flex-1 brand-glow px-4 py-10 sm:py-16" lang={lang}>
-      <div className="max-w-lg mx-auto">
-        <Card className="p-6 sm:p-9 space-y-5 text-center">
-          <Kicker>{COPY[lang].kicker}</Kicker>
+    <main id="main" className="flex-1 px-4 py-8 sm:px-6 sm:py-12" lang={lang}>
+      <div className="mx-auto max-w-lg space-y-6">
+        {/* Payment done (or being confirmed): the form draft is no longer needed. */}
+        {session && attendee && <ClearRegistrationDraft />}
 
-          {/* Payment done (or being confirmed): the form draft is no longer needed. */}
-          {session && attendee && <ClearRegistrationDraft />}
-
-          {paid ? (
-            <>
-              <h1 className="font-display text-3xl text-navy">{t.title}</h1>
-              <p className="text-navy/70">{t.paidBody(firstName)}</p>
+        {paid ? (
+          <>
+            <Card className="space-y-5 p-6 text-center sm:p-8">
+              <IconCheck className="mx-auto h-8 w-8 text-success" />
+              <div className="space-y-2">
+                <Eyebrow>{COPY[lang].kicker}</Eyebrow>
+                <h1 className="font-display text-3xl font-extrabold text-blue">{t.title}</h1>
+                <p className="text-ink-2">{t.paidBody(firstName)}</p>
+              </div>
               {/* eslint-disable-next-line @next/next/no-img-element -- generated per attendee, not optimisable */}
               <img
                 src={ticketUrl}
                 alt={t.ticketAlt}
                 width={300}
                 height={487}
-                className="mx-auto block w-[300px] max-w-full h-auto rounded-2xl shadow-[0_10px_28px_-12px_rgba(10,26,49,0.35)]"
+                className="mx-auto block h-auto w-72 max-w-full rounded-lg border border-line bg-subtle"
               />
-              <p className="text-sm text-navy/60">{t.qrHelp}</p>
-              <a
-                href={`${ticketUrl}&download=1`}
-                download="newspace-africa-2027-ticket.png"
-                className="inline-flex rounded-full bg-gold text-navy px-6 py-3 text-sm font-semibold hover:bg-gold-light transition-colors"
-              >
+              <p className="text-sm text-ink-3">{t.qrHelp}</p>
+              <ButtonAnchor href={`${ticketUrl}&download=1`} download="newspace-africa-2027-ticket.png" variant="primary" size="lg" className="w-full sm:w-auto">
                 {t.download}
+              </ButtonAnchor>
+              <p className="text-sm text-ink-3">{attendee?.qr_email_sent_at ? t.emailNote : t.emailPending}</p>
+            </Card>
+
+            <Card className="space-y-3 p-5 sm:p-6">
+              <h2 className="font-display text-xl font-bold text-blue">{t.addToCalendar}</h2>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { href: googleCalendarUrl(lang), label: "Google", external: true },
+                  { href: outlookCalendarUrl(lang), label: "Outlook", external: true },
+                  { href: `/api/calendar?lang=${lang}`, label: "Apple / .ics", external: false },
+                ].map((c) => (
+                  <ButtonAnchor
+                    key={c.label}
+                    href={c.href}
+                    {...(c.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <IconCalendar />
+                    {c.label}
+                  </ButtonAnchor>
+                ))}
+              </div>
+            </Card>
+
+            <Card className="space-y-3 p-5 sm:p-6">
+              <h2 className="font-display text-xl font-bold text-blue">{t.flyerTitle}</h2>
+              <p className="text-sm text-ink-2">{t.flyerBody}</p>
+              <ButtonLink href={`/flyer?session_id=${encodeURIComponent(sessionId)}`} variant="outline">
+                {t.flyerCta}
+              </ButtonLink>
+            </Card>
+          </>
+        ) : session && attendee ? (
+          <Card className="space-y-4 p-6 text-center sm:p-8" role="status">
+            <Spinner className="mx-auto h-8 w-8 text-ink-3" />
+            <h1 className="font-display text-2xl font-extrabold text-blue">{t.processingTitle}</h1>
+            <p className="text-ink-2">{t.processingBody}</p>
+            <ButtonLink href={`/register/success?session_id=${encodeURIComponent(sessionId)}`} variant="primary">
+              {t.checkAgain}
+            </ButtonLink>
+          </Card>
+        ) : (
+          <Card className="space-y-4 p-6 text-center sm:p-8">
+            <IconAlert className="mx-auto h-8 w-8 text-danger" />
+            <h1 className="font-display text-2xl font-extrabold text-blue">{t.notFoundTitle}</h1>
+            <p className="text-ink-2">
+              {t.notFoundBody}{" "}
+              <a className={linkClass} href={`mailto:${help}`}>
+                {help}
               </a>
-              <p className="text-xs text-navy/50">
-                {attendee?.qr_email_sent_at ? t.emailNote : t.emailPending}
-              </p>
-              <div className="space-y-2.5 pt-1">
-                <div className="text-xs font-semibold uppercase tracking-wider text-navy/50">{t.addToCalendar}</div>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {[
-                    { href: googleCalendarUrl(lang), label: "Google", external: true },
-                    { href: outlookCalendarUrl(lang), label: "Outlook", external: true },
-                    { href: `/api/calendar?lang=${lang}`, label: "Apple / .ics", external: false },
-                  ].map((c) => (
-                    <a
-                      key={c.label}
-                      href={c.href}
-                      {...(c.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-navy/20 px-4 py-2 text-sm font-semibold text-navy hover:bg-navy/5 transition-colors"
-                    >
-                      <CalendarIcon />
-                      {c.label}
-                    </a>
-                  ))}
-                </div>
-              </div>
-              <div className="rounded-2xl border border-gold/40 bg-gold/10 p-5 space-y-3 text-left">
-                <div className="font-display text-lg text-navy">{t.flyerTitle}</div>
-                <p className="text-sm text-navy/70">{t.flyerBody}</p>
-                <Link
-                  href={`/flyer?session_id=${encodeURIComponent(sessionId)}`}
-                  className="inline-flex rounded-full bg-navy text-white px-5 py-2.5 text-sm font-semibold hover:bg-blue-2 transition-colors"
-                >
-                  {t.flyerCta}
-                </Link>
-              </div>
-            </>
-          ) : session && attendee ? (
-            <>
-              <h1 className="font-display text-2xl text-navy">{t.processingTitle}</h1>
-              <p className="text-navy/70">{t.processingBody}</p>
-            </>
-          ) : (
-            <>
-              <h1 className="font-display text-2xl text-navy">{t.notFoundTitle}</h1>
-              <p className="text-navy/70">
-                {t.notFoundBody}{" "}
-                <a className="underline decoration-gold" href={`mailto:${help}`}>
-                  {help}
-                </a>
-                .
-              </p>
-              <Link href="/register" className="inline-block text-sm font-semibold text-navy underline decoration-gold">
-                {t.backToForm}
-              </Link>
-            </>
-          )}
-        </Card>
+              .
+            </p>
+            <ButtonLink href="/" variant="primary">
+              {t.backToForm}
+            </ButtonLink>
+          </Card>
+        )}
       </div>
     </main>
-  );
-}
-
-function CalendarIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <rect x="3" y="5" width="18" height="16" rx="3" />
-      <path d="M3 10h18M8 3v4M16 3v4" />
-    </svg>
   );
 }

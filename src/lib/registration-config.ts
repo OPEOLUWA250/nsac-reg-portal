@@ -15,5 +15,8 @@ export async function isRegistrationOpen(): Promise<boolean> {
   return (await getSettings()).registrationOpen;
 }
 
-export const PRIVACY_POLICY_URL =
-  process.env.NEXT_PUBLIC_PRIVACY_POLICY_URL ?? "https://spaceinafrica.com/privacy-policy-2/";
+/** Space in Africa's company-wide policy, linked from /privacy. */
+export const SPACE_IN_AFRICA_PRIVACY_URL = "https://spaceinafrica.com/privacy-policy-2/";
+
+/** Linked from the form's consent box: this site's own /privacy page. */
+export const PRIVACY_POLICY_URL = process.env.NEXT_PUBLIC_PRIVACY_POLICY_URL ?? "/privacy";

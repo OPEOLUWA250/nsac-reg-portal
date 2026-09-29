@@ -1,6 +1,6 @@
 // Consistent accent color per attendee role, reused across the attendee
 // card, the admin table, and the printed badge. Roles are free-text (see
-// jotform-mapping.ts), so anything unrecognized falls back to navy.
+// jotform-mapping.ts), so anything unrecognized falls back to the brand blue.
 const ROLE_ACCENTS: Record<string, string> = {
   speaker: "#F09F07",
   host: "#0A4A7A",

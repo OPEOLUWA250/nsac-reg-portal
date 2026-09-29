@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { publicBaseUrl, toHttps } from "@/lib/public-url";
 import { validateRegistration } from "@/lib/registration-fields";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { createAttendee, sendAttendeeQr, canResendQr } from "@/lib/attendee-service";
@@ -21,10 +22,10 @@ const PASSPORT_EXTENSIONS: Record<string, string> = {
 };
 
 function baseUrl(req: NextRequest): string {
-  return (process.env.PUBLIC_BASE_URL ?? req.nextUrl.origin).replace(/\/$/, "");
+  return publicBaseUrl() ?? toHttps(req.nextUrl.origin);
 }
 
-// Public registration endpoint used by /register (replaces the Jotform form).
+// Public registration endpoint used by the form on / (replaces the Jotform form).
 //
 // Responses:
 //   200 { status: "payment_required", checkoutUrl, passportUploadUrl? }

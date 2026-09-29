@@ -1,7 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Button, Card, Kicker } from "@/components/ui";
+import {
+  Alert,
+  Button,
+  buttonClass,
+  Card,
+  cx,
+  describedBy,
+  Eyebrow,
+  Field,
+  FieldError,
+  inputClass,
+  LanguageSwitch,
+  linkClass,
+} from "@/components/ui";
+import { IconCheck } from "@/components/icons";
+import CountryCombobox from "@/components/CountryCombobox";
+import { preferredLanguage, setSiteLanguage } from "@/lib/site-language";
 import { COPY } from "@/lib/registration-copy";
 import {
   JOB_FUNCTIONS,
@@ -10,7 +26,7 @@ import {
   PROFESSIONAL_CATEGORIES,
   REGISTRATION_DRAFT_KEY,
   validateRegistration,
-  type FieldError,
+  type FieldError as FieldErrorCode,
   type FieldName,
   type Language,
   type ValidationErrors,
@@ -33,6 +49,8 @@ interface Props {
   privacyPolicyUrl: string;
   registrationOpen: boolean;
   paymentCancelled: boolean;
+  /** From ?lang=fr on the link, e.g. the home page's French link. */
+  initialLang?: Language;
 }
 
 interface FormState {
@@ -88,7 +106,6 @@ type Phase =
   | { kind: "redirecting" }
   | { kind: "already_registered" };
 
-const LANG_KEY = "nsac_lang";
 // Answers are kept for this browser tab, so a refresh or a cancelled
 // payment doesn't mean starting again. (The passport file isn't kept.)
 const DRAFT_KEY = REGISTRATION_DRAFT_KEY;
@@ -116,22 +133,6 @@ function errorsForStep(all: ValidationErrors, step: number): ValidationErrors {
 function clearDraft() {
   try {
     sessionStorage.removeItem(DRAFT_KEY);
-  } catch {
-    /* ignore */
-  }
-}
-
-// Reads a browser setting without ever throwing (private mode, blocked storage…).
-function safeGet(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-function safeSet(key: string, value: string) {
-  try {
-    localStorage.setItem(key, value);
   } catch {
     /* ignore */
   }
@@ -193,6 +194,7 @@ export default function RegistrationForm({
   privacyPolicyUrl,
   registrationOpen,
   paymentCancelled,
+  initialLang,
 }: Props) {
   const [lang, setLang] = useState<Language>("en");
   const t = COPY[lang];
@@ -216,17 +218,17 @@ export default function RegistrationForm({
   const turnstileEl = useRef<HTMLDivElement>(null);
   const formTop = useRef<HTMLDivElement>(null);
 
-  // Language: saved choice, else the phone's language (French → fr).
+  // Language: the link's ?lang=, else the saved choice, else the phone's
+  // language (French → fr).
   useEffect(() => {
-    const saved = safeGet(LANG_KEY);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reading browser-only settings after hydration
-    if (saved === "en" || saved === "fr") setLang(saved);
-    else if (navigator.language?.toLowerCase().startsWith("fr")) setLang("fr");
-  }, []);
+    setLang(initialLang ?? preferredLanguage());
+  }, [initialLang]);
 
+  // The header and footer follow the form's language.
   useEffect(() => {
-    document.documentElement.lang = lang;
-  }, [lang]);
+    setSiteLanguage(lang, { remember: lang === initialLang });
+  }, [lang, initialLang]);
 
   // Restore answers saved earlier in this tab (refresh, or back from a
   // cancelled payment — then straight to the last step).
@@ -330,7 +332,7 @@ export default function RegistrationForm({
 
   function chooseLang(next: Language) {
     setLang(next);
-    safeSet(LANG_KEY, next);
+    setSiteLanguage(next, { remember: true });
   }
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -505,273 +507,291 @@ export default function RegistrationForm({
   }
 
   const err = (name: FieldName): string | undefined => {
-    const code = errors[name] as FieldError | undefined;
+    const code = errors[name] as FieldErrorCode | undefined;
     return code ? t.errors[code] : undefined;
   };
 
   const privacyToken = "{privacy}";
   const [consentBefore, consentAfter] = t.fields.safetyConsent(privacyToken).split(privacyToken);
   const privacyLabel = lang === "fr" ? "politique de confidentialité" : "privacy policy";
+  // Our own /privacy page opens in the form's language.
+  const privacyHref = privacyPolicyUrl.startsWith("/") ? `${privacyPolicyUrl}?lang=${lang}` : privacyPolicyUrl;
+
+  // Format problems (email, phone…) show as soon as the visitor leaves a
+  // field. "Required" waits for Continue, so a new form isn't covered in red.
+  function checkField(name: FieldName) {
+    const value = form[name as keyof FormState];
+    if (typeof value !== "string" || !value.trim()) return;
+    const check = validateRegistration({ ...payload, id: submissionId.current }, tickets.map((tk) => tk.id));
+    const code = check.ok ? undefined : check.errors[name];
+    if (code) setErrors((e) => ({ ...e, [name]: code }));
+  }
+
+  const submitLabel =
+    phase.kind === "submitting"
+      ? t.submitting
+      : phase.kind === "uploading"
+        ? t.uploading(phase.pct)
+        : phase.kind === "redirecting"
+          ? t.redirecting
+          : t.submit(selectedTicket ? formatPrice(selectedTicket.amountCents, selectedTicket.currency, lang) : "").replace(/ · $/, "");
 
   return (
-    <main className="flex-1 brand-glow px-4 py-8 sm:py-12">
-      <div ref={formTop} className="max-w-2xl mx-auto space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-2">
-            <Kicker>{t.kicker}</Kicker>
-            <h1 className="font-display text-3xl sm:text-4xl text-navy">{t.title}</h1>
-            <p className="flex items-center gap-2 text-sm font-semibold text-navy/70">
-              <span className="h-1.5 w-1.5 rounded-full bg-gold" aria-hidden="true" />
+    <main id="main" className="flex-1 px-4 py-8 sm:px-6 sm:py-12">
+      <div ref={formTop} className="mx-auto max-w-2xl scroll-mt-20 space-y-6">
+        {/* wrap-reverse: with very large text the language switch moves above the title instead of squeezing it (items-end = top, in reverse) */}
+        <div className="flex flex-wrap-reverse items-end justify-between gap-4">
+          <div className="min-w-0 flex-1 basis-48 space-y-2">
+            <Eyebrow>{t.kicker}</Eyebrow>
+            <h1 className="font-display text-3xl font-extrabold wrap-break-word text-blue sm:text-4xl">{t.title}</h1>
+            <p className="text-sm font-semibold text-ink-2">
               {EVENT_INFO.date[lang]} · {EVENT_INFO.place[lang]}
             </p>
           </div>
           <LanguageSwitch lang={lang} onChange={chooseLang} />
         </div>
-        <p className="text-navy/65 text-[15px] leading-relaxed">
-          {t.intro}{" "}
-          <a className="text-navy font-semibold underline decoration-gold underline-offset-2" href={`mailto:${t.helpEmail}`}>
-            {t.helpEmail}
-          </a>
-          .
-        </p>
 
         {!registrationOpen ? (
-          <Card className="p-6 text-navy">{t.errors.closed}</Card>
+          <Card className="p-6 sm:p-8 space-y-3">
+            <h2 className="font-display text-xl font-bold text-blue">{t.closedTitle}</h2>
+            <p className="text-ink-2">
+              {t.closedBody}{" "}
+              <a className={linkClass} href={`mailto:${t.helpEmail}`}>
+                {t.helpEmail}
+              </a>
+              .
+            </p>
+          </Card>
         ) : phase.kind === "already_registered" ? (
           <Card className="p-6 sm:p-8 space-y-3" role="status">
-            <h2 className="font-display text-2xl text-navy">{t.alreadyRegistered.title}</h2>
-            <p className="text-navy/70">{t.alreadyRegistered.body}</p>
+            <IconCheck className="h-7 w-7 text-success" />
+            <h2 className="font-display text-xl font-bold text-blue">{t.alreadyRegistered.title}</h2>
+            <p className="text-ink-2">{t.alreadyRegistered.body}</p>
           </Card>
         ) : (
-          <form onSubmit={handleSubmit} noValidate className="space-y-6">
-            {paymentCancelled && !banner && <Alert tone="info">{t.cancelled}</Alert>}
-            {banner && <Alert tone="error">{banner}</Alert>}
-            {notice && <Alert tone="info">{notice}</Alert>}
+          <>
+            <p className="text-base text-ink-2">
+              {t.intro}{" "}
+              <a className={linkClass} href={`mailto:${t.helpEmail}`}>
+                {t.helpEmail}
+              </a>
+              .
+            </p>
 
-            <StepProgress labels={t.steps} current={step} stepOf={t.stepOf} onJump={goToStep} />
+            <form onSubmit={handleSubmit} noValidate className="space-y-6">
+              {paymentCancelled && !banner && <Alert tone="info">{t.cancelled}</Alert>}
+              {banner && <Alert tone="error">{banner}</Alert>}
+              {notice && <Alert tone="info">{notice}</Alert>}
 
-            {step === 0 && (
-              <>
-                <Section title={t.sections.you}>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <TextField name="firstName" label={t.fields.firstName} value={form.firstName} onChange={(v) => update("firstName", v)} error={err("firstName")} autoComplete="given-name" />
-                    <TextField name="lastName" label={t.fields.lastName} value={form.lastName} onChange={(v) => update("lastName", v)} error={err("lastName")} autoComplete="family-name" />
-                  </div>
-                  <TextField name="email" type="email" label={t.fields.email} hint={t.fields.emailHint} value={form.email} onChange={(v) => update("email", v)} error={err("email")} autoComplete="email" inputMode="email" />
-                  <TextField name="jobTitle" label={t.fields.jobTitle} value={form.jobTitle} onChange={(v) => update("jobTitle", v)} error={err("jobTitle")} autoComplete="organization-title" />
-                  <TextField name="phone" type="tel" label={t.fields.phone} optionalLabel={t.optional} hint={t.fields.phoneHint} value={form.phone} onChange={(v) => update("phone", v)} error={err("phone")} autoComplete="tel" inputMode="tel" />
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <CountryField name="nationality" label={t.fields.nationality} value={form.nationality} onChange={(v) => update("nationality", v)} options={countryOptions} placeholder={t.selectPlaceholder} error={err("nationality")} />
-                    <CountryField name="residenceCountry" label={t.fields.residenceCountry} hint={t.fields.residenceHint} value={form.residenceCountry} onChange={(v) => update("residenceCountry", v)} options={countryOptions} placeholder={t.selectPlaceholder} error={err("residenceCountry")} autoComplete="country" />
-                  </div>
-                </Section>
-              </>
-            )}
+              <StepProgress labels={t.steps} current={step} stepOf={t.stepOf} onJump={goToStep} />
 
-            {step === 1 && (
-              <>
-                <Section title={t.sections.organization}>
-                  <TextField name="organization" label={t.fields.organization} value={form.organization} onChange={(v) => update("organization", v)} error={err("organization")} autoComplete="organization" />
-                  <CountryField name="organizationCountry" label={t.fields.organizationCountry} value={form.organizationCountry} onChange={(v) => update("organizationCountry", v)} options={countryOptions} placeholder={t.selectPlaceholder} error={err("organizationCountry")} />
-                  <RadioGroup
-                    name="professionalCategory"
-                    label={t.fields.professionalCategory}
-                    value={form.professionalCategory}
-                    onChange={(v) => update("professionalCategory", v)}
-                    options={PROFESSIONAL_CATEGORIES.map((c) => ({ value: c, label: t.professionalCategories[c] }))}
-                    error={err("professionalCategory")}
-                    columns
-                  />
-                  <RadioGroup
-                    name="jobFunction"
-                    label={t.fields.jobFunction}
-                    value={form.jobFunction}
-                    onChange={(v) => update("jobFunction", v)}
-                    options={JOB_FUNCTIONS.map((c) => ({ value: c, label: t.jobFunctions[c] }))}
-                    error={err("jobFunction")}
-                  />
-                </Section>
-
-                <Section title={t.sections.travel}>
-                  <RadioGroup
-                    name="invitationLetter"
-                    label={t.fields.invitationLetter}
-                    value={form.invitationLetter}
-                    onChange={(v) => update("invitationLetter", v)}
-                    options={[
-                      { value: "yes", label: t.yes },
-                      { value: "no", label: t.no },
-                    ]}
-                    error={err("invitationLetter")}
-                    inline
-                  />
-                  {form.invitationLetter === "yes" && (
-                    <FieldShell name="passport" label={t.fields.passport} optionalLabel={t.optional} hint={t.fields.passportHint} error={err("passport")}>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <label className="inline-flex cursor-pointer items-center rounded-full border border-navy/20 px-4 py-2 text-sm font-semibold text-navy hover:bg-navy/5 focus-within:ring-2 focus-within:ring-gold/40">
-                          {t.fields.passportChoose}
-                          <input
-                            id="field-passport"
-                            type="file"
-                            accept={PASSPORT_MIME_TYPES.join(",")}
-                            className="sr-only"
-                            onChange={(e) => onPassportChange(e.target.files?.[0] ?? null)}
-                            aria-describedby="hint-passport"
-                          />
-                        </label>
-                        {passportFile && (
-                          <span className="flex items-center gap-2 text-sm text-navy/70 min-w-0">
-                            <span className="truncate max-w-[14rem]">{passportFile.name}</span>
-                            <span className="text-navy/40">({(passportFile.size / 1_048_576).toFixed(1)} MB)</span>
-                            <button type="button" className="text-navy/60 underline" onClick={() => onPassportChange(null)}>
-                              {t.fields.passportRemove}
-                            </button>
-                          </span>
-                        )}
-                      </div>
-                    </FieldShell>
-                  )}
-                  <FieldShell name="foodAllergies" label={t.fields.foodAllergies} hint={t.fields.foodAllergiesHint} error={err("foodAllergies")}>
-                    <textarea
-                      id="field-foodAllergies"
-                      rows={2}
-                      maxLength={500}
-                      className={inputClass(!!err("foodAllergies"))}
-                      value={form.foodAllergies}
-                      onChange={(e) => update("foodAllergies", e.target.value)}
-                      aria-invalid={!!err("foodAllergies")}
-                      aria-describedby="hint-foodAllergies error-foodAllergies"
-                    />
-                  </FieldShell>
-                </Section>
-              </>
-            )}
-
-            {step === LAST_STEP && (
-              <>
-                <Section title={t.sections.ticket}>
-                  <fieldset id="field-ticket" className="space-y-3" aria-describedby="error-ticket">
-                    <legend className="text-sm font-semibold text-navy mb-2">{t.fields.ticket}</legend>
-                    {tickets.map((tk) => {
-                      const checked = form.ticket === tk.id;
-                      return (
-                        <label
-                          key={tk.id}
-                          className={`flex cursor-pointer items-start justify-between gap-4 rounded-xl border p-4 transition-colors ${
-                            checked ? "border-gold bg-gold/[0.07] ring-1 ring-gold" : "border-navy/15 hover:border-navy/30"
-                          }`}
-                        >
-                          <span className="flex items-start gap-3">
-                            <input
-                              type="radio"
-                              name="ticket"
-                              value={tk.id}
-                              checked={checked}
-                              onChange={() => update("ticket", tk.id)}
-                              className="mt-1 h-4 w-4 accent-[var(--gold)]"
-                            />
-                            <span>
-                              <span className="block font-semibold text-navy">{tk.name[lang]}</span>
-                              <span className="block text-sm text-navy/60">{tk.description[lang]}</span>
-                            </span>
-                          </span>
-                          <span className="font-display text-lg text-navy whitespace-nowrap">
-                            {formatPrice(tk.amountCents, tk.currency, lang)}
-                          </span>
-                        </label>
-                      );
-                    })}
-                    {err("ticket") && <ErrorText id="error-ticket">{err("ticket")}</ErrorText>}
-                    <p className="text-xs text-navy/50">{t.fields.couponHint}</p>
-                  </fieldset>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <TextField
-                      name="vatNumber"
-                      label={t.fields.vatNumber}
-                      optionalLabel={vatRequired ? undefined : t.optional}
-                      hint={vatRequired ? t.fields.vatRequiredHint : t.fields.vatHint}
-                      value={form.vatNumber}
-                      onChange={(v) => update("vatNumber", v)}
-                      error={err("vatNumber")}
-                    />
-                    <TextField name="invoiceId" label={t.fields.invoiceId} optionalLabel={t.optional} value={form.invoiceId} onChange={(v) => update("invoiceId", v)} error={err("invoiceId")} />
-                  </div>
-                </Section>
-
-                <Section title={t.sections.agreements}>
-                  <div id="field-safetyConsent" className="space-y-1.5">
-                    <Checkbox checked={form.safetyConsent} onChange={(v) => update("safetyConsent", v)} invalid={!!err("safetyConsent")} describedBy="error-safetyConsent">
-                      {consentBefore}
-                      <a href={privacyPolicyUrl} target="_blank" rel="noopener noreferrer" className="underline decoration-gold underline-offset-2 text-navy">
-                        {privacyLabel}
-                      </a>
-                      {consentAfter}
-                    </Checkbox>
-                    {err("safetyConsent") && <ErrorText id="error-safetyConsent">{err("safetyConsent")}</ErrorText>}
-                  </div>
-                  <Checkbox checked={form.optInOrganizer} onChange={(v) => update("optInOrganizer", v)}>
-                    {t.fields.optInOrganizer}
-                  </Checkbox>
-                  <Checkbox checked={form.optInSponsors} onChange={(v) => update("optInSponsors", v)}>
-                    {t.fields.optInSponsors}
-                  </Checkbox>
-                </Section>
-
-                <Review
-                  t={t}
-                  lang={lang}
-                  form={form}
-                  ticket={selectedTicket}
-                  onEdit={goToStep}
-                />
-              </>
-            )}
-
-            {/* Honeypot: hidden from people and screen readers; bots fill it in. */}
-            <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
-              <label>
-                Website
-                <input tabIndex={-1} autoComplete="off" value={form.website} onChange={(e) => update("website", e.target.value)} />
-              </label>
-            </div>
-
-            {step === LAST_STEP && turnstileSiteKey && <div ref={turnstileEl} className="min-h-[65px]" />}
-
-            {step < LAST_STEP ? (
-              <div className="flex items-center gap-3">
-                {step > 0 && (
-                  <Button type="button" variant="outline" onClick={() => goToStep(step - 1)}>
-                    ← {t.back}
-                  </Button>
+              {/* Keyed by step so each step fades in. */}
+              <div key={step} className="space-y-6 transition-opacity duration-150 starting:opacity-0">
+                {step === 0 && (
+                  <Section title={t.sections.you}>
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      <TextField name="firstName" label={t.fields.firstName} value={form.firstName} onChange={(v) => update("firstName", v)} error={err("firstName")} autoComplete="given-name" />
+                      <TextField name="lastName" label={t.fields.lastName} value={form.lastName} onChange={(v) => update("lastName", v)} error={err("lastName")} autoComplete="family-name" />
+                    </div>
+                    <TextField name="email" type="email" label={t.fields.email} hint={t.fields.emailHint} value={form.email} onChange={(v) => update("email", v)} onBlur={() => checkField("email")} error={err("email")} autoComplete="email" inputMode="email" />
+                    <TextField name="jobTitle" label={t.fields.jobTitle} value={form.jobTitle} onChange={(v) => update("jobTitle", v)} error={err("jobTitle")} autoComplete="organization-title" />
+                    <TextField name="phone" type="tel" label={t.fields.phone} optionalLabel={t.optional} hint={t.fields.phoneHint} value={form.phone} onChange={(v) => update("phone", v)} onBlur={() => checkField("phone")} error={err("phone")} autoComplete="tel" inputMode="tel" />
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      <CountryField name="nationality" label={t.fields.nationality} value={form.nationality} onChange={(v) => update("nationality", v)} options={countryOptions} placeholder={t.selectPlaceholder} noMatch={t.noCountry} error={err("nationality")} />
+                      <CountryField name="residenceCountry" label={t.fields.residenceCountry} hint={t.fields.residenceHint} value={form.residenceCountry} onChange={(v) => update("residenceCountry", v)} options={countryOptions} placeholder={t.selectPlaceholder} noMatch={t.noCountry} error={err("residenceCountry")} autoComplete="country" />
+                    </div>
+                  </Section>
                 )}
-                <Button type="submit" variant="gold" className="ml-auto !px-8 !py-3 !text-base">
-                  {t.next} →
-                </Button>
+
+                {step === 1 && (
+                  <>
+                    <Section title={t.sections.organization}>
+                      <TextField name="organization" label={t.fields.organization} value={form.organization} onChange={(v) => update("organization", v)} error={err("organization")} autoComplete="organization" />
+                      <CountryField name="organizationCountry" label={t.fields.organizationCountry} value={form.organizationCountry} onChange={(v) => update("organizationCountry", v)} options={countryOptions} placeholder={t.selectPlaceholder} noMatch={t.noCountry} error={err("organizationCountry")} />
+                      <RadioGroup
+                        name="professionalCategory"
+                        label={t.fields.professionalCategory}
+                        value={form.professionalCategory}
+                        onChange={(v) => update("professionalCategory", v)}
+                        options={PROFESSIONAL_CATEGORIES.map((c) => ({ value: c, label: t.professionalCategories[c] }))}
+                        error={err("professionalCategory")}
+                        columns
+                      />
+                      <RadioGroup
+                        name="jobFunction"
+                        label={t.fields.jobFunction}
+                        value={form.jobFunction}
+                        onChange={(v) => update("jobFunction", v)}
+                        options={JOB_FUNCTIONS.map((c) => ({ value: c, label: t.jobFunctions[c] }))}
+                        error={err("jobFunction")}
+                      />
+                    </Section>
+
+                    <Section title={t.sections.travel}>
+                      <RadioGroup
+                        name="invitationLetter"
+                        label={t.fields.invitationLetter}
+                        value={form.invitationLetter}
+                        onChange={(v) => update("invitationLetter", v)}
+                        options={[
+                          { value: "yes", label: t.yes },
+                          { value: "no", label: t.no },
+                        ]}
+                        error={err("invitationLetter")}
+                        inline
+                      />
+                      {form.invitationLetter === "yes" && (
+                        <Field id="field-passport" as="div" label={t.fields.passport} optionalLabel={t.optional} hint={t.fields.passportHint} error={err("passport")}>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <label className={buttonClass("outline", "md", "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-blue")}>
+                              {t.fields.passportChoose}
+                              <input
+                                id="field-passport"
+                                type="file"
+                                accept={PASSPORT_MIME_TYPES.join(",")}
+                                className="sr-only"
+                                onChange={(e) => onPassportChange(e.target.files?.[0] ?? null)}
+                                aria-describedby={describedBy("field-passport", { hint: true, error: err("passport") })}
+                              />
+                            </label>
+                            {passportFile && (
+                              <span className="flex min-w-0 items-center gap-2 text-sm text-ink-2">
+                                <span className="max-w-56 truncate">{passportFile.name}</span>
+                                <span className="text-ink-3">({(passportFile.size / 1_048_576).toFixed(1)} MB)</span>
+                                <Button variant="ghost" size="sm" onClick={() => onPassportChange(null)}>
+                                  {t.fields.passportRemove}
+                                </Button>
+                              </span>
+                            )}
+                          </div>
+                        </Field>
+                      )}
+                      <Field id="field-foodAllergies" label={t.fields.foodAllergies} required hint={t.fields.foodAllergiesHint} error={err("foodAllergies")}>
+                        <textarea
+                          id="field-foodAllergies"
+                          rows={2}
+                          maxLength={500}
+                          className={inputClass(!!err("foodAllergies"))}
+                          value={form.foodAllergies}
+                          onChange={(e) => update("foodAllergies", e.target.value)}
+                          aria-invalid={!!err("foodAllergies")}
+                          aria-describedby={describedBy("field-foodAllergies", { hint: true, error: err("foodAllergies") })}
+                        />
+                      </Field>
+                    </Section>
+                  </>
+                )}
+
+                {step === LAST_STEP && (
+                  <>
+                    <Section title={t.sections.ticket}>
+                      <fieldset id="field-ticket" className="space-y-3" aria-describedby={err("ticket") ? "field-ticket-error" : undefined}>
+                        <legend className="mb-2 text-sm font-semibold text-ink">{t.fields.ticket}</legend>
+                        {tickets.map((tk) => {
+                          const checked = form.ticket === tk.id;
+                          return (
+                            <label
+                              key={tk.id}
+                              className={cx(
+                                "flex cursor-pointer items-start justify-between gap-4 rounded-md border bg-surface p-4 transition-colors duration-150 has-[:focus-visible]:border-blue has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-blue",
+                                checked ? "border-blue ring-1 ring-blue" : "border-line-strong hover:border-ink-3 hover:bg-canvas"
+                              )}
+                            >
+                              <span className="flex items-start gap-3">
+                                <input
+                                  type="radio"
+                                  name="ticket"
+                                  value={tk.id}
+                                  checked={checked}
+                                  onChange={() => update("ticket", tk.id)}
+                                  className="mt-0.5 h-5 w-5 shrink-0 focus-visible:outline-none"
+                                />
+                                <span>
+                                  <span className="block font-semibold text-ink">{tk.name[lang]}</span>
+                                  {tk.description[lang] && <span className="block text-sm text-ink-3">{tk.description[lang]}</span>}
+                                </span>
+                              </span>
+                              <span className="font-display text-lg font-bold whitespace-nowrap text-blue">
+                                {formatPrice(tk.amountCents, tk.currency, lang)}
+                              </span>
+                            </label>
+                          );
+                        })}
+                        {err("ticket") && <FieldError id="field-ticket-error">{err("ticket")}</FieldError>}
+                        <p className="text-sm text-ink-3">{t.fields.couponHint}</p>
+                      </fieldset>
+                      <div className="grid gap-5 sm:grid-cols-2">
+                        <TextField
+                          name="vatNumber"
+                          label={t.fields.vatNumber}
+                          optionalLabel={vatRequired ? undefined : t.optional}
+                          hint={vatRequired ? t.fields.vatRequiredHint : t.fields.vatHint}
+                          value={form.vatNumber}
+                          onChange={(v) => update("vatNumber", v)}
+                          error={err("vatNumber")}
+                        />
+                        <TextField name="invoiceId" label={t.fields.invoiceId} optionalLabel={t.optional} value={form.invoiceId} onChange={(v) => update("invoiceId", v)} error={err("invoiceId")} />
+                      </div>
+                    </Section>
+
+                    <Section title={t.sections.agreements}>
+                      <div id="field-safetyConsent" className="space-y-1.5">
+                        <Checkbox checked={form.safetyConsent} onChange={(v) => update("safetyConsent", v)} invalid={!!err("safetyConsent")} describedBy="field-safetyConsent-error">
+                          {consentBefore}
+                          <a href={privacyHref} target="_blank" rel="noopener noreferrer" className={linkClass}>
+                            {privacyLabel}
+                          </a>
+                          {consentAfter}
+                        </Checkbox>
+                        {err("safetyConsent") && <FieldError id="field-safetyConsent-error">{err("safetyConsent")}</FieldError>}
+                      </div>
+                      <Checkbox checked={form.optInOrganizer} onChange={(v) => update("optInOrganizer", v)}>
+                        {t.fields.optInOrganizer}
+                      </Checkbox>
+                      <Checkbox checked={form.optInSponsors} onChange={(v) => update("optInSponsors", v)}>
+                        {t.fields.optInSponsors}
+                      </Checkbox>
+                    </Section>
+
+                    <Review t={t} lang={lang} form={form} ticket={selectedTicket} onEdit={goToStep} />
+                  </>
+                )}
               </div>
-            ) : (
-              <div className="space-y-3">
-                <Button type="submit" variant="gold" className="w-full !py-3.5 !text-base" disabled={busy}>
-                  {phase.kind === "submitting"
-                    ? t.submitting
-                    : phase.kind === "uploading"
-                      ? t.uploading(phase.pct)
-                      : phase.kind === "redirecting"
-                        ? t.redirecting
-                        : t.submit(selectedTicket ? formatPrice(selectedTicket.amountCents, selectedTicket.currency, lang) : "")
-                          .replace(/ · $/, "")}
-                </Button>
-                <button
-                  type="button"
-                  onClick={() => goToStep(step - 1)}
-                  disabled={busy}
-                  className="block w-full text-center text-sm font-semibold text-navy/60 hover:text-navy disabled:opacity-50"
-                >
-                  ← {t.back}
-                </button>
-                <p className="text-center text-xs text-navy/50">{t.securePayment}</p>
+
+              {/* Honeypot: hidden from people and screen readers; bots fill it in. */}
+              <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
+                <label>
+                  Website
+                  <input tabIndex={-1} autoComplete="off" value={form.website} onChange={(e) => update("website", e.target.value)} />
+                </label>
               </div>
-            )}
-          </form>
+
+              {step === LAST_STEP && turnstileSiteKey && <div ref={turnstileEl} className="min-h-16" />}
+
+              {step < LAST_STEP ? (
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
+                  {step > 0 && (
+                    <Button variant="outline" size="lg" onClick={() => goToStep(step - 1)}>
+                      {t.back}
+                    </Button>
+                  )}
+                  <Button type="submit" variant="primary" size="lg" className="sm:ml-auto sm:min-w-44">
+                    {t.next}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Button type="submit" variant="primary" size="lg" className="w-full" loading={busy}>
+                    {submitLabel}
+                  </Button>
+                  <Button variant="ghost" size="lg" className="w-full" onClick={() => goToStep(step - 1)} disabled={busy}>
+                    {t.back}
+                  </Button>
+                  <p className="text-center text-sm text-ink-3">{t.securePayment}</p>
+                </div>
+              )}
+            </form>
+          </>
         )}
       </div>
     </main>
@@ -793,9 +813,9 @@ function StepProgress({
 }) {
   return (
     <nav aria-label={stepOf(current + 1, labels.length)} className="space-y-3">
-      <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider">
-        <span className="text-gold">{stepOf(current + 1, labels.length)}</span>
-        <span className="text-navy/50 normal-case tracking-normal text-sm">{labels[current]}</span>
+      <div className="flex items-center justify-between gap-4 text-sm">
+        <span className="text-xs font-semibold uppercase tracking-wider text-gold-ink">{stepOf(current + 1, labels.length)}</span>
+        <span className="font-semibold text-ink sm:hidden">{labels[current]}</span>
       </div>
       <ol className="grid gap-2" style={{ gridTemplateColumns: `repeat(${labels.length}, minmax(0, 1fr))` }}>
         {labels.map((label, i) => {
@@ -808,24 +828,29 @@ function StepProgress({
                 onClick={() => done && onJump(i)}
                 disabled={!done}
                 aria-current={active ? "step" : undefined}
-                className="group w-full text-left disabled:cursor-default"
+                aria-label={label}
+                className="group block w-full rounded-sm py-1 text-left disabled:cursor-default"
               >
                 <span
-                  className={`block h-1.5 rounded-full transition-colors ${
-                    done ? "bg-gold group-hover:bg-gold-light" : active ? "bg-navy" : "bg-navy/12"
-                  }`}
+                  className={cx(
+                    "block h-1.5 rounded-sm transition-colors duration-150",
+                    done ? "bg-gold group-hover:bg-gold-hover" : active ? "bg-blue" : "bg-line"
+                  )}
                 />
                 <span
-                  className={`mt-2 hidden sm:flex items-center gap-1.5 text-xs font-semibold ${
-                    active ? "text-navy" : done ? "text-navy/60 group-hover:text-navy" : "text-navy/35"
-                  }`}
+                  className={cx(
+                    "mt-2 hidden items-center gap-2 text-sm font-semibold sm:flex",
+                    active ? "text-ink" : done ? "text-ink-2 group-hover:text-ink group-hover:underline" : "text-ink-3"
+                  )}
                 >
                   <span
-                    className={`inline-flex h-4.5 w-4.5 items-center justify-center rounded-full text-[10px] ${
-                      done ? "bg-gold text-navy" : active ? "bg-navy text-white" : "bg-navy/10 text-navy/50"
-                    }`}
+                    aria-hidden="true"
+                    className={cx(
+                      "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs",
+                      done ? "bg-gold text-blue" : active ? "bg-blue text-white" : "border border-line-strong text-ink-3"
+                    )}
                   >
-                    {done ? "✓" : i + 1}
+                    {done ? <IconCheck className="h-3 w-3" /> : i + 1}
                   </span>
                   {label}
                 </span>
@@ -857,30 +882,27 @@ function Review({
     { label: t.review.organization, value: [form.jobTitle, form.organization].filter(Boolean).join(" · "), step: 1 },
   ];
   return (
-    <Card className="p-5 sm:p-7 space-y-4">
-      <h2 className="font-display text-lg text-navy flex items-center gap-2.5">
-        <span className="h-4 w-1 rounded-full bg-gold" aria-hidden="true" />
-        {t.review.title}
-      </h2>
-      <dl className="divide-y divide-navy/8 text-[15px]">
+    <Card className="space-y-4 p-5 sm:p-6">
+      <h2 className="font-display text-xl font-bold text-blue">{t.review.title}</h2>
+      <dl className="divide-y divide-line">
         {rows.map((r) => (
-          <div key={r.label} className="flex items-start justify-between gap-4 py-2.5">
-            <dt className="text-navy/55 shrink-0">{r.label}</dt>
-            <dd className="flex items-start gap-3 text-right text-navy font-medium min-w-0">
-              <span className="break-words">{r.value || "—"}</span>
-              <button type="button" onClick={() => onEdit(r.step)} className="text-xs font-semibold text-navy/50 underline decoration-gold hover:text-navy shrink-0">
+          <div key={r.label} className="flex items-center justify-between gap-4 py-2">
+            <dt className="shrink-0 text-sm text-ink-3">{r.label}</dt>
+            <dd className="flex min-w-0 items-center gap-2 text-right font-medium text-ink">
+              <span className={cx("wrap-break-word", !r.value && "font-normal text-ink-3")}>{r.value || t.review.empty}</span>
+              <Button variant="ghost" size="sm" onClick={() => onEdit(r.step)} aria-label={`${t.review.edit}: ${r.label}`}>
                 {t.review.edit}
-              </button>
+              </Button>
             </dd>
           </div>
         ))}
       </dl>
-      <div className="flex items-end justify-between gap-4 rounded-xl bg-navy text-white px-5 py-4">
+      <div className="on-dark flex items-end justify-between gap-4 rounded-md bg-blue px-5 py-4 text-white">
         <div>
-          <div className="text-xs uppercase tracking-wider text-white/55">{t.review.total}</div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-white/65">{t.review.total}</div>
           <div className="text-sm text-white/80">{ticket ? ticket.name[lang] : t.review.noTicket}</div>
         </div>
-        <div className="font-display text-2xl">{ticket ? formatPrice(ticket.amountCents, ticket.currency, lang) : "—"}</div>
+        {ticket && <div className="font-display text-2xl font-bold">{formatPrice(ticket.amountCents, ticket.currency, lang)}</div>}
       </div>
     </Card>
   );
@@ -888,96 +910,12 @@ function Review({
 
 // ---------- small presentational helpers ----------
 
-function inputClass(invalid: boolean) {
-  return `w-full rounded-lg border bg-white px-4 py-2.5 text-[16px] text-navy placeholder:text-navy/35 outline-none focus:ring-2 ${
-    invalid ? "border-red-500 focus:ring-red-200" : "border-navy/15 focus:border-gold focus:ring-gold/25"
-  }`;
-}
-
-function LanguageSwitch({ lang, onChange }: { lang: Language; onChange: (l: Language) => void }) {
-  return (
-    <div className="inline-flex shrink-0 rounded-full border border-navy/15 bg-white p-0.5 text-xs font-semibold" role="group" aria-label="Language / Langue">
-      {(["en", "fr"] as const).map((l) => (
-        <button
-          key={l}
-          type="button"
-          onClick={() => onChange(l)}
-          aria-pressed={lang === l}
-          className={`rounded-full px-3 py-1.5 uppercase tracking-wider ${lang === l ? "bg-navy text-white" : "text-navy/60 hover:text-navy"}`}
-        >
-          {l}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <Card className="p-5 sm:p-7 space-y-5">
-      <h2 className="font-display text-lg text-navy flex items-center gap-2.5">
-        <span className="h-4 w-1 rounded-full bg-gold" aria-hidden="true" />
-        {title}
-      </h2>
+    <Card className="space-y-5 p-5 sm:p-6">
+      <h2 className="font-display text-xl font-bold text-blue">{title}</h2>
       {children}
     </Card>
-  );
-}
-
-function Alert({ tone, children }: { tone: "error" | "info"; children: ReactNode }) {
-  return (
-    <div
-      role={tone === "error" ? "alert" : "status"}
-      className={`rounded-xl border px-4 py-3 text-sm ${
-        tone === "error" ? "border-red-300 bg-red-50 text-red-800" : "border-gold/40 bg-gold/10 text-navy"
-      }`}
-    >
-      {children}
-    </div>
-  );
-}
-
-function ErrorText({ id, children }: { id: string; children: ReactNode }) {
-  return (
-    <p id={id} className="text-sm text-red-600">
-      {children}
-    </p>
-  );
-}
-
-function FieldShell({
-  name,
-  label,
-  optionalLabel,
-  hint,
-  error,
-  children,
-}: {
-  name: string;
-  label: string;
-  optionalLabel?: string;
-  hint?: string;
-  error?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <label htmlFor={`field-${name}`} className="block text-sm font-semibold text-navy">
-        {label}
-        {optionalLabel ? (
-          <span className="ml-1.5 font-normal text-navy/45">({optionalLabel})</span>
-        ) : (
-          <span className="ml-0.5 text-gold" aria-hidden="true">*</span>
-        )}
-      </label>
-      {children}
-      {hint && (
-        <p id={`hint-${name}`} className="text-xs text-navy/50">
-          {hint}
-        </p>
-      )}
-      {error && <ErrorText id={`error-${name}`}>{error}</ErrorText>}
-    </div>
   );
 }
 
@@ -986,6 +924,7 @@ function TextField({
   label,
   value,
   onChange,
+  onBlur,
   error,
   hint,
   optionalLabel,
@@ -997,6 +936,7 @@ function TextField({
   label: string;
   value: string;
   onChange: (v: string) => void;
+  onBlur?: () => void;
   error?: string;
   hint?: string;
   optionalLabel?: string;
@@ -1004,21 +944,23 @@ function TextField({
   autoComplete?: string;
   inputMode?: "email" | "tel" | "text";
 }) {
+  const id = `field-${name}`;
   return (
-    <FieldShell name={name} label={label} optionalLabel={optionalLabel} hint={hint} error={error}>
+    <Field id={id} label={label} optionalLabel={optionalLabel} required={!optionalLabel} hint={hint} error={error}>
       <input
-        id={`field-${name}`}
+        id={id}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
         autoComplete={autoComplete}
         inputMode={inputMode}
         className={inputClass(!!error)}
         aria-invalid={!!error}
-        aria-describedby={`${hint ? `hint-${name} ` : ""}${error ? `error-${name}` : ""}`.trim() || undefined}
+        aria-describedby={describedBy(id, { hint, error })}
         required={!optionalLabel}
       />
-    </FieldShell>
+    </Field>
   );
 }
 
@@ -1029,6 +971,7 @@ function CountryField({
   onChange,
   options,
   placeholder,
+  noMatch,
   error,
   hint,
   autoComplete,
@@ -1039,29 +982,26 @@ function CountryField({
   onChange: (v: string) => void;
   options: { code: string; name: string }[];
   placeholder: string;
+  noMatch: (query: string) => string;
   error?: string;
   hint?: string;
   autoComplete?: string;
 }) {
+  const id = `field-${name}`;
   return (
-    <FieldShell name={name} label={label} hint={hint} error={error}>
-      <select
-        id={`field-${name}`}
+    <Field id={id} label={label} required hint={hint} error={error}>
+      <CountryCombobox
+        id={id}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={inputClass(!!error)}
-        aria-invalid={!!error}
-        autoComplete={autoComplete}
-        required
-      >
-        <option value="">{placeholder}</option>
-        {options.map((o) => (
-          <option key={o.code} value={o.code}>
-            {o.name}
-          </option>
-        ))}
-      </select>
-    </FieldShell>
+        onChange={onChange}
+        options={options}
+        placeholder={placeholder}
+        noMatch={noMatch}
+        invalid={!!error}
+        describedBy={describedBy(id, { hint, error })}
+        autoComplete={autoComplete === "country" ? "country-name" : undefined}
+      />
+    </Field>
   );
 }
 
@@ -1085,20 +1025,24 @@ function RadioGroup({
   columns?: boolean;
 }) {
   return (
-    <fieldset id={`field-${name}`} className="space-y-2" aria-describedby={error ? `error-${name}` : undefined}>
-      <legend className="text-sm font-semibold text-navy mb-1">
+    <fieldset id={`field-${name}`} className="space-y-2" aria-describedby={error ? `field-${name}-error` : undefined}>
+      <legend className="mb-1.5 text-sm font-semibold text-ink">
         {label}
-        <span className="ml-0.5 text-gold" aria-hidden="true">*</span>
+        <span className="ml-0.5 text-gold-ink" aria-hidden="true">
+          *
+        </span>
       </legend>
-      <div className={inline ? "flex flex-wrap gap-2" : columns ? "grid sm:grid-cols-2 gap-2" : "grid gap-2"}>
+      <div className={inline ? "flex flex-wrap gap-2" : columns ? "grid gap-2 sm:grid-cols-2" : "grid gap-2"}>
         {options.map((o) => {
           const checked = value === o.value;
           return (
             <label
               key={o.value}
-              className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3.5 py-2.5 text-[15px] transition-colors ${
-                checked ? "border-gold bg-gold/[0.07] text-navy" : "border-navy/15 text-navy/80 hover:border-navy/30"
-              } ${inline ? "min-w-[6rem]" : ""}`}
+              className={cx(
+                "flex min-h-12 cursor-pointer items-center gap-3 rounded-md border bg-surface px-4 py-2.5 text-base transition-colors duration-150 has-[:focus-visible]:border-blue has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-blue",
+                checked ? "border-ink text-ink ring-1 ring-ink" : error ? "border-danger text-ink-2" : "border-line-strong text-ink-2 hover:border-ink-3 hover:bg-canvas",
+                inline && "min-w-28"
+              )}
             >
               <input
                 type="radio"
@@ -1106,14 +1050,14 @@ function RadioGroup({
                 value={o.value}
                 checked={checked}
                 onChange={() => onChange(o.value)}
-                className="h-4 w-4 shrink-0 accent-[var(--gold)]"
+                className="h-5 w-5 shrink-0 focus-visible:outline-none"
               />
               {o.label}
             </label>
           );
         })}
       </div>
-      {error && <ErrorText id={`error-${name}`}>{error}</ErrorText>}
+      {error && <FieldError id={`field-${name}-error`}>{error}</FieldError>}
     </fieldset>
   );
 }
@@ -1132,12 +1076,12 @@ function Checkbox({
   describedBy?: string;
 }) {
   return (
-    <label className={`flex cursor-pointer items-start gap-3 text-[15px] leading-snug ${invalid ? "text-red-700" : "text-navy/80"}`}>
+    <label className="flex cursor-pointer items-start gap-3 py-1 text-base leading-snug text-ink-2">
       <input
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--gold)]"
+        className={cx("mt-0.5 h-5 w-5 shrink-0", invalid && "outline-2 outline-offset-1 outline-danger")}
         aria-invalid={invalid || undefined}
         aria-describedby={invalid ? describedBy : undefined}
       />

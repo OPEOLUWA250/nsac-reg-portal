@@ -9,12 +9,14 @@ import { describeError } from "@/lib/describe-error";
 // (e.g. Early Bird after 31 Dec), show up immediately without a redeploy.
 export const dynamic = "force-dynamic";
 
+// The home page is the registration form itself.
 export const metadata: Metadata = {
-  title: "Register — NewSpace Africa Conference 2027",
-  description: "Register for the NewSpace Africa Conference 2027. Inscription à la Conférence NewSpace Africa 2027.",
+  title: { absolute: "Register | NewSpace Africa Conference 2027" },
+  description:
+    "Register for the NewSpace Africa Conference 2027 in Dakar, 19–23 April. Inscription à la Conférence NewSpace Africa 2027.",
 };
 
-export default async function RegisterPage(props: PageProps<"/register">) {
+export default async function HomePage(props: PageProps<"/">) {
   const query = await props.searchParams;
   let onSale: Ticket[] = [];
   try {
@@ -40,6 +42,7 @@ export default async function RegisterPage(props: PageProps<"/register">) {
       privacyPolicyUrl={PRIVACY_POLICY_URL}
       registrationOpen={open && tickets.length > 0}
       paymentCancelled={query.payment === "cancelled"}
+      initialLang={query.lang === "fr" ? "fr" : query.lang === "en" ? "en" : undefined}
     />
   );
 }

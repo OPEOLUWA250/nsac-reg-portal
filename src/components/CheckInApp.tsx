@@ -3,12 +3,27 @@
 import { useState } from "react";
 import QrScanner from "@/components/QrScanner";
 import Badge from "@/components/Badge";
-import StaffGate, { useStaffCode } from "@/components/StaffGate";
+import StaffGate, { StaffCodeRejected, useStaffCode } from "@/components/StaffGate";
 import StationGate, { useStationName } from "@/components/StationGate";
-import { Button, Card, Kicker, RolePill } from "@/components/ui";
+import { Alert, Button, Card, Eyebrow, RolePill, Spinner } from "@/components/ui";
+import { IconAlert, IconPin } from "@/components/icons";
 import type { Attendee } from "@/lib/types";
 
 type Status = "scanning" | "loading" | "found" | "error";
+
+// Plain-language messages for what the check-in API can answer.
+async function apiError(res: Response): Promise<Error & { status: number }> {
+  const json = await res.json().catch(() => ({}));
+  const message =
+    res.status === 404
+      ? "This QR code doesn't match any registration. Check it's a NewSpace Africa 2027 ticket, or send them to the help desk."
+      : res.status === 401
+        ? "Your access code no longer works."
+        : res.status >= 500
+          ? "The server had a problem. Try again in a moment."
+          : (json.error ?? `Request failed (${res.status})`);
+  return Object.assign(new Error(message), { status: res.status });
+}
 
 // Rendered client-only (see src/app/checkin/page.tsx, ssr: false) so it's
 // safe to read localStorage directly in the initial state — there's no
@@ -21,19 +36,30 @@ export default function CheckInApp() {
   const [errorMsg, setErrorMsg] = useState("");
   const [alreadyCheckedIn, setAlreadyCheckedIn] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
+  const [done, setDone] = useState(false);
+  const [codeRejected, setCodeRejected] = useState(false);
 
   async function apiCall(path: string, body: unknown) {
-    const res = await fetch(path, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-staff-code": staffCode ?? "",
-      },
-      body: JSON.stringify(body),
-    });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
-    return json;
+    let res: Response;
+    try {
+      res = await fetch(path, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-staff-code": staffCode ?? "",
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(20_000),
+      });
+    } catch {
+      throw new Error("Couldn't reach the server. Check the Wi-Fi or mobile data and try again.");
+    }
+    if (!res.ok) {
+      const err = await apiError(res);
+      if (err.status === 401) setCodeRejected(true);
+      throw err;
+    }
+    return res.json();
   }
 
   async function handleScan(token: string) {
@@ -43,9 +69,11 @@ export default function CheckInApp() {
       const { attendee } = await apiCall("/api/checkin/lookup", { token });
       setAttendee(attendee);
       setAlreadyCheckedIn(attendee.checked_in);
+      setDone(false);
+      setErrorMsg("");
       setStatus("found");
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Lookup failed");
+      setErrorMsg(err instanceof Error ? err.message : "Lookup failed.");
       setStatus("error");
     }
   }
@@ -54,6 +82,7 @@ export default function CheckInApp() {
     setAttendee(null);
     setAlreadyCheckedIn(false);
     setErrorMsg("");
+    setDone(false);
     setStatus("scanning");
   }
 
@@ -64,6 +93,7 @@ export default function CheckInApp() {
   async function handleConfirmAndPrint() {
     if (!attendee) return;
     setCheckingIn(true);
+    setErrorMsg("");
     try {
       const result = await apiCall("/api/checkin/confirm", {
         token: attendee.unique_code,
@@ -71,6 +101,7 @@ export default function CheckInApp() {
       });
       setAlreadyCheckedIn(false);
       if (result.attendee) setAttendee(result.attendee);
+      setDone(true);
       window.print();
       try {
         await apiCall("/api/checkin/badge-printed", {
@@ -80,7 +111,7 @@ export default function CheckInApp() {
         // non-critical — printing already happened
       }
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Check-in failed");
+      setErrorMsg(err instanceof Error ? err.message : "Check-in failed.");
     } finally {
       setCheckingIn(false);
     }
@@ -108,82 +139,88 @@ export default function CheckInApp() {
   }
 
   return (
-    <main className="flex-1 p-6 sm:p-10 brand-glow">
-      <div className="max-w-md mx-auto space-y-6">
-        <div className="text-center space-y-1.5">
-          <Kicker>Event Day</Kicker>
-          <h1 className="font-display text-2xl text-navy">Check-in Scanner</h1>
-          <button
-            onClick={clearStationName}
-            className="text-xs text-navy/45 hover:text-navy/70 transition-colors"
-          >
-            📍 {stationName} · Change
-          </button>
+    <main id="main" className="flex-1 px-4 py-8 sm:px-6 sm:py-12">
+      <div className="mx-auto max-w-md space-y-6">
+        <div className="space-y-2 text-center">
+          <Eyebrow>Event day</Eyebrow>
+          <h1 className="font-display text-3xl font-extrabold text-blue">Check-in scanner</h1>
+          <Button variant="ghost" size="sm" onClick={clearStationName} aria-label={`Station: ${stationName}. Change station`}>
+            <IconPin />
+            {stationName}
+            <span className="font-normal text-ink-3">Change</span>
+          </Button>
         </div>
 
-        {status !== "found" && (
+        {codeRejected && <StaffCodeRejected />}
+
+        {(status === "scanning" || status === "loading") && (
           <div className="space-y-3">
-            <QrScanner onScan={handleScan} paused={status === "loading"} />
-            <p className="text-center text-sm text-navy/50">
-              Point the camera at an attendee&apos;s QR code
-            </p>
+            <div className="relative">
+              <QrScanner onScan={handleScan} paused={status === "loading"} />
+              {status === "loading" && (
+                <div role="status" className="absolute inset-0 mx-auto flex max-w-sm flex-col items-center justify-center gap-3 rounded-lg bg-surface/95 text-sm font-semibold text-ink">
+                  <Spinner className="h-6 w-6" />
+                  Looking up the ticket
+                </div>
+              )}
+            </div>
+            <p className="text-center text-sm text-ink-3">Point the camera at the attendee&apos;s QR code.</p>
           </div>
         )}
 
         {status === "error" && (
-          <Card className="p-6 text-center space-y-4">
-            <p className="text-red-600 text-sm">{errorMsg}</p>
-            <Button variant="outline" onClick={reset}>
-              Try again
+          <Card role="alert" className="space-y-4 p-6 text-center">
+            <IconAlert className="mx-auto h-7 w-7 text-danger" />
+            <p className="font-display text-xl font-bold text-blue">Ticket not recognised</p>
+            <p className="text-sm text-ink-2">{errorMsg}</p>
+            <Button variant="primary" size="lg" className="w-full" onClick={reset}>
+              Scan again
             </Button>
           </Card>
         )}
 
         {status === "found" && attendee && (
-          <Card className="p-6 space-y-5">
-            <div className="space-y-1.5">
+          <Card className="space-y-5 p-6 transition-opacity duration-200 starting:opacity-0">
+            <div className="space-y-2">
               <RolePill role={attendee.role} />
-              <div className="font-display text-2xl text-navy pt-1">
-                {attendee.full_name}
-              </div>
-              {attendee.organization && (
-                <div className="text-navy/55 text-sm">{attendee.organization}</div>
-              )}
+              <p className="font-display text-3xl font-extrabold text-blue">{attendee.full_name}</p>
+              {attendee.organization && <p className="text-ink-2">{attendee.organization}</p>}
             </div>
 
             {attendee.payment_status === "pending" && (
-              <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                Payment not completed for this registration. Send them to the help desk.
-              </p>
+              <Alert tone="error" title="Payment not completed">
+                Send them to the help desk before printing a badge.
+              </Alert>
             )}
 
-            {alreadyCheckedIn && (
-              <p className="text-sm text-gold bg-gold/10 border border-gold/30 rounded-lg px-3 py-2">
-                Already checked in previously. You can still print another badge.
-              </p>
+            {done ? (
+              <Alert tone="success" title="Checked in">
+                The badge is printing. If it didn&apos;t print, use Print badge again.
+              </Alert>
+            ) : (
+              alreadyCheckedIn && (
+                <Alert tone="info" title="Already checked in">
+                  They checked in earlier. You can still print another badge.
+                </Alert>
+              )
             )}
+
+            {errorMsg && <Alert tone="error">{errorMsg}</Alert>}
 
             <div className="flex flex-col gap-2.5">
-              {!alreadyCheckedIn ? (
-                <Button
-                  variant="gold"
-                  onClick={handleConfirmAndPrint}
-                  disabled={checkingIn}
-                >
-                  {checkingIn ? "Checking in..." : "Confirm check-in & print badge"}
+              {!alreadyCheckedIn && !done ? (
+                <Button variant="primary" size="lg" onClick={handleConfirmAndPrint} loading={checkingIn}>
+                  {checkingIn ? "Checking in" : "Confirm check-in and print badge"}
                 </Button>
               ) : (
-                <Button variant="gold" onClick={handlePrintBadge}>
+                <Button variant="primary" size="lg" onClick={handlePrintBadge}>
                   Print badge
                 </Button>
               )}
-
-              <Button variant="ghost" className="!px-0" onClick={reset}>
+              <Button variant="outline" size="lg" onClick={reset} disabled={checkingIn}>
                 Scan next attendee
               </Button>
             </div>
-
-            {errorMsg && <p className="text-red-600 text-sm">{errorMsg}</p>}
           </Card>
         )}
       </div>

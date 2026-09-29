@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Button, Card, Kicker } from "@/components/ui";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Alert, Button, buttonClass, Card, cx, Eyebrow, Field, inputClass, LanguageSwitch, linkClass } from "@/components/ui";
+import { IconLinkedIn } from "@/components/icons";
+import { preferredLanguage, setSiteLanguage } from "@/lib/site-language";
 import { EVENT_INFO } from "@/lib/event-info";
 import { FLYER_COPY, HEADLINES, type Headline } from "@/lib/flyer-copy";
 import QRCode from "qrcode";
@@ -28,26 +30,9 @@ export interface FlyerPrefill {
   language: Language | null;
 }
 
-const LANG_KEY = "nsac_lang";
 // One size for every platform (LinkedIn's 4:5 portrait).
 const FORMAT: FlyerFormat = "portrait";
 const START_FRAME: PhotoFrame = { zoom: 1, panX: 0, panY: 0 };
-
-function safeGet(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function safeSet(key: string, value: string) {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    /* ignore */
-  }
-}
 
 // next/font exposes its generated font-family names as CSS variables.
 function cssFont(variable: string, fallback: string) {
@@ -109,28 +94,31 @@ export default function FlyerMaker({
   // Language: registration language, else saved choice, else browser language.
   useEffect(() => {
     if (prefill.language) return;
-    const saved = safeGet(LANG_KEY);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reading browser-only settings after hydration
-    if (saved === "en" || saved === "fr") setLang(saved);
-    else if (navigator.language?.toLowerCase().startsWith("fr")) setLang("fr");
+    setLang(preferredLanguage());
   }, [prefill.language]);
+
+  // The header and footer follow the flyer's language.
+  useEffect(() => {
+    setSiteLanguage(lang);
+  }, [lang]);
 
   // Brand fonts + logo must be loaded before drawing on the canvas.
   useEffect(() => {
     let cancelled = false;
-    const display = cssFont("--font-space-grotesk", "Arial, sans-serif");
-    const body = cssFont("--font-inter", "Arial, sans-serif");
+    const display = cssFont("--font-raleway", "Arial, sans-serif");
+    const body = cssFont("--font-dm-sans", "Arial, sans-serif");
     const logo = new Image();
     logo.src = "/brand/logo.png";
     // "Scan to register" QR code, drawn crisp at any size.
     const qr = document.createElement("canvas");
     Promise.allSettled([
-      document.fonts.load(`700 40px ${display}`),
+      document.fonts.load(`800 40px ${display}`),
       document.fonts.load(`500 40px ${body}`),
       document.fonts.load(`600 40px ${body}`),
       document.fonts.load(`700 40px ${body}`),
       logo.decode(),
-      QRCode.toCanvas(qr, registerUrl, { margin: 0, width: 480, errorCorrectionLevel: "M", color: { dark: "#0A1A31", light: "#FFFFFF" } }),
+      QRCode.toCanvas(qr, registerUrl, { margin: 0, width: 480, errorCorrectionLevel: "M", color: { dark: "#03416A", light: "#FFFFFF" } }),
     ]).then(([, , , , , qrResult]) => {
       if (cancelled) return;
       setAssets({
@@ -141,7 +129,7 @@ export default function FlyerMaker({
     });
     // Phones that can share images straight to LinkedIn / WhatsApp.
     try {
-      const probe = new File([new Blob()], "x.png", { type: "image/png" });
+      const probe = new File([new Blob()], "x.jpg", { type: "image/jpeg" });
       // eslint-disable-next-line react-hooks/set-state-in-effect -- browser capability, only known after hydration
       setCanShareFiles(Boolean(navigator.canShare?.({ files: [probe] })));
     } catch {
@@ -178,7 +166,7 @@ export default function FlyerMaker({
 
   function chooseLang(next: Language) {
     setLang(next);
-    safeSet(LANG_KEY, next);
+    setSiteLanguage(next, { remember: true });
   }
 
   async function onPhoto(file: File | undefined) {
@@ -220,15 +208,36 @@ export default function FlyerMaker({
     drag.current = null;
   }
 
+  // Keyboard: arrow keys move the photo inside its circle, + and - zoom.
+  function onCanvasKey(e: React.KeyboardEvent<HTMLCanvasElement>) {
+    if (!photo) return;
+    const step = e.shiftKey ? 0.2 : 0.05;
+    const moves: Record<string, Partial<PhotoFrame>> = {
+      ArrowLeft: { panX: frame.panX - step },
+      ArrowRight: { panX: frame.panX + step },
+      ArrowUp: { panY: frame.panY - step },
+      ArrowDown: { panY: frame.panY + step },
+      "+": { zoom: Math.min(3, frame.zoom + 0.1) },
+      "=": { zoom: Math.min(3, frame.zoom + 0.1) },
+      "-": { zoom: Math.max(1, frame.zoom - 0.1) },
+    };
+    const move = moves[e.key];
+    if (!move) return;
+    e.preventDefault();
+    setFrame(clampFrame(photo, { ...frame, ...move }));
+  }
+
   const renderBlob = useCallback(async (): Promise<Blob | null> => {
     if (!assets) return null;
     const canvas = document.createElement("canvas");
     drawFlyer(canvas, FORMAT, text, { ...assets, photo }, frame);
-    return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    // JPEG: with a photo in it, a PNG is 2 to 3 times bigger for no visible
+    // gain, and LinkedIn / WhatsApp recompress uploads anyway.
+    return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `text` is derived from the listed values
   }, [assets, photo, frame, name, jobTitle, organization, headline, lang]);
 
-  const filename = "newspace-africa-2027-flyer.png";
+  const filename = "newspace-africa-2027-flyer.jpg";
 
   async function handleDownload() {
     setBusy(true);
@@ -261,7 +270,7 @@ export default function FlyerMaker({
     const [blob] = await Promise.all([renderBlob(), copyText(captionText)]);
     setBusy(false);
     if (!blob) return;
-    const file = new File([blob], filename, { type: "image/png" });
+    const file = new File([blob], filename, { type: "image/jpeg" });
     try {
       await navigator.share({ files: [file], text: captionText, title: EVENT_INFO.name[lang] });
     } catch (err) {
@@ -278,47 +287,30 @@ export default function FlyerMaker({
   const { width, height } = FLYER_SIZES[FORMAT];
 
   return (
-    <main className="flex-1 brand-glow px-4 py-8 sm:py-12">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-2">
-            <Kicker>{t.kicker}</Kicker>
-            <h1 className="font-display text-3xl sm:text-4xl text-navy">{t.title}</h1>
-            <p className="text-navy/65 text-[15px] leading-relaxed max-w-2xl">{t.intro}</p>
+    <main id="main" className="flex-1 px-4 py-8 sm:px-6 sm:py-12">
+      <div className="mx-auto max-w-5xl space-y-6">
+        <div className="flex flex-wrap-reverse items-end justify-between gap-4">
+          <div className="min-w-0 flex-1 basis-48 space-y-2">
+            <Eyebrow>{t.kicker}</Eyebrow>
+            <h1 className="font-display text-3xl font-extrabold text-blue sm:text-4xl">{t.title}</h1>
+            <p className="max-w-2xl text-base text-ink-2">{t.intro}</p>
           </div>
-          <div className="inline-flex shrink-0 rounded-full border border-navy/15 bg-white p-0.5 text-xs font-semibold" role="group" aria-label="Language / Langue">
-            {(["en", "fr"] as const).map((l) => (
-              <button
-                key={l}
-                type="button"
-                onClick={() => chooseLang(l)}
-                aria-pressed={lang === l}
-                className={`rounded-full px-3 py-1.5 uppercase tracking-wider ${lang === l ? "bg-navy text-white" : "text-navy/60 hover:text-navy"}`}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
+          <LanguageSwitch lang={lang} onChange={chooseLang} />
         </div>
 
-        <div className="grid lg:grid-cols-[1fr_1.1fr] gap-6 items-start">
+        <div className="grid items-start gap-6 lg:grid-cols-2">
           {/* Controls */}
-          <Card className="p-5 sm:p-7 space-y-5 order-2 lg:order-1">
-            <Field label={t.photo} hint={t.photoHint}>
+          <Card className="order-2 space-y-5 p-5 sm:p-6 lg:order-1">
+            <Field id="flyer-photo" as="div" label={t.photo} hint={t.photoHint} error={photoError ? t.photoError : undefined}>
               <div className="flex flex-wrap items-center gap-3">
-                <label className="inline-flex cursor-pointer items-center rounded-full bg-navy text-white px-5 py-2.5 text-sm font-semibold hover:bg-blue-2 transition-colors focus-within:ring-2 focus-within:ring-gold/50">
+                <label className={buttonClass("secondary", "md", "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-blue")}>
                   {photo ? t.photoChange : t.photoChoose}
-                  <input type="file" accept="image/*" className="sr-only" onChange={(e) => onPhoto(e.target.files?.[0])} />
+                  <input id="flyer-photo" type="file" accept="image/*" className="sr-only" onChange={(e) => onPhoto(e.target.files?.[0])} aria-describedby="flyer-photo-hint" />
                 </label>
-                {photoError && (
-                  <span className="text-sm text-red-600">
-                    {lang === "fr" ? "Impossible de lire cette image. Essayez une photo JPG ou PNG." : "Couldn't read that image. Try a JPG or PNG photo."}
-                  </span>
-                )}
               </div>
               {photo && (
                 <div className="flex items-center gap-3 pt-3">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-navy/55 w-12">{t.zoom}</span>
+                  <span className="w-12 text-sm font-semibold text-ink-2">{t.zoom}</span>
                   <input
                     type="range"
                     min={1}
@@ -326,31 +318,31 @@ export default function FlyerMaker({
                     step={0.01}
                     value={frame.zoom}
                     onChange={(e) => setFrame((f) => clampFrame(photo, { ...f, zoom: Number(e.target.value) }))}
-                    className="flex-1 accent-[var(--gold)]"
+                    className="h-11 flex-1"
                     aria-label={t.zoom}
                   />
                 </div>
               )}
             </Field>
 
-            <div className="grid sm:grid-cols-2 gap-4">
-              <Field label={t.firstName}>
-                <input className={INPUT} value={firstName} onChange={(e) => setFirstName(e.target.value)} maxLength={40} autoComplete="given-name" />
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field id="flyer-first" label={t.firstName}>
+                <input id="flyer-first" className={inputClass()} value={firstName} onChange={(e) => setFirstName(e.target.value)} maxLength={40} autoComplete="given-name" />
               </Field>
-              <Field label={t.lastName}>
-                <input className={INPUT} value={lastName} onChange={(e) => setLastName(e.target.value)} maxLength={40} autoComplete="family-name" />
+              <Field id="flyer-last" label={t.lastName}>
+                <input id="flyer-last" className={inputClass()} value={lastName} onChange={(e) => setLastName(e.target.value)} maxLength={40} autoComplete="family-name" />
               </Field>
             </div>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <Field label={t.jobTitle}>
-                <input className={INPUT} value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} maxLength={120} />
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field id="flyer-job" label={t.jobTitle}>
+                <input id="flyer-job" className={inputClass()} value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} maxLength={120} />
               </Field>
-              <Field label={t.organization}>
-                <input className={INPUT} value={organization} onChange={(e) => setOrganization(e.target.value)} maxLength={160} />
+              <Field id="flyer-org" label={t.organization}>
+                <input id="flyer-org" className={inputClass()} value={organization} onChange={(e) => setOrganization(e.target.value)} maxLength={160} />
               </Field>
             </div>
 
-            <Field label={t.headline}>
+            <Field id="flyer-headline" as="div" label={t.headline}>
               <Segmented
                 value={headline}
                 onChange={(h) => {
@@ -362,14 +354,14 @@ export default function FlyerMaker({
             </Field>
 
 
-            <Field label={t.caption} hint={t.captionHint}>
-              <textarea className={INPUT} rows={6} value={captionText} onChange={(e) => setCaption(e.target.value)} />
+            <Field id="flyer-caption" label={t.caption} hint={t.captionHint}>
+              <textarea id="flyer-caption" aria-describedby="flyer-caption-hint" className={inputClass()} rows={6} value={captionText} onChange={(e) => setCaption(e.target.value)} />
             </Field>
           </Card>
 
           {/* Preview + actions */}
-          <div className="space-y-4 order-1 lg:order-2 lg:sticky lg:top-24">
-            <div className="mx-auto max-w-[560px]">
+          <div className="order-1 space-y-4 lg:sticky lg:top-24 lg:order-2">
+            <div className="mx-auto max-w-md">
               <canvas
                 ref={canvasRef}
                 width={width}
@@ -378,15 +370,17 @@ export default function FlyerMaker({
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}
                 onPointerCancel={onPointerUp}
-                className={`block w-full h-auto rounded-2xl shadow-[0_10px_28px_-12px_rgba(10,26,49,0.45)] bg-navy touch-none ${photo ? "cursor-grab active:cursor-grabbing" : ""}`}
+                tabIndex={photo ? 0 : -1}
+                onKeyDown={onCanvasKey}
+                className={cx("block h-auto w-full touch-none rounded-lg bg-blue", photo && "cursor-grab active:cursor-grabbing")}
                 role="img"
-                aria-label={`${t.headlines[headline]} ${EVENT_INFO.name[lang]} — ${name}`}
+                aria-label={`${t.headlines[headline]} ${EVENT_INFO.name[lang]}: ${name}.${photo ? ` ${t.moveHint}` : ""}`}
               />
             </div>
 
             {!photo && (
               <div className="flex justify-center">
-                <label className="inline-flex cursor-pointer items-center rounded-full bg-navy text-white px-6 py-3 text-sm font-semibold hover:bg-blue-2 transition-colors focus-within:ring-2 focus-within:ring-gold/50">
+                <label className={buttonClass("secondary", "lg", "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-blue")}>
                   {t.photoChoose}
                   <input type="file" accept="image/*" className="sr-only" onChange={(e) => onPhoto(e.target.files?.[0])} />
                 </label>
@@ -394,30 +388,30 @@ export default function FlyerMaker({
             )}
 
             <div className="flex flex-wrap justify-center gap-2.5">
-              <Button variant="gold" onClick={handleLinkedIn} disabled={busy || !assets}>
-                <LinkedInIcon />
+              <Button variant="primary" onClick={handleLinkedIn} disabled={!assets} loading={busy}>
+                <IconLinkedIn />
                 {t.shareLinkedIn}
               </Button>
               {canShareFiles && (
-                <Button variant="navy" onClick={handleShare} disabled={busy || !assets}>
+                <Button variant="secondary" onClick={handleShare} disabled={busy || !assets}>
                   {t.share}
                 </Button>
               )}
               <Button variant="outline" onClick={handleDownload} disabled={busy || !assets}>
-                {busy ? t.rendering : t.download}
+                {t.download}
               </Button>
               <Button variant="ghost" onClick={handleCopy}>
                 {t.copyCaption}
               </Button>
             </div>
             {message && (
-              <p role="status" className="text-sm text-navy bg-gold/10 border border-gold/30 rounded-lg px-3 py-2 max-w-[560px] mx-auto">
-                {message}
-              </p>
+              <div className="mx-auto max-w-md">
+                <Alert tone="success">{message}</Alert>
+              </div>
             )}
             {backHref && (
               <p className="text-center">
-                <Link href={backHref} className="text-sm font-semibold text-navy underline decoration-gold">
+                <Link href={backHref} className={linkClass}>
                   {t.backToTicket}
                 </Link>
               </p>
@@ -426,19 +420,6 @@ export default function FlyerMaker({
         </div>
       </div>
     </main>
-  );
-}
-
-const INPUT =
-  "w-full rounded-lg border border-navy/15 bg-white px-4 py-2.5 text-[16px] text-navy placeholder:text-navy/35 outline-none focus:border-gold focus:ring-2 focus:ring-gold/25";
-
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
-  return (
-    <div className="space-y-1.5">
-      <div className="text-sm font-semibold text-navy">{label}</div>
-      {children}
-      {hint && <p className="text-xs text-navy/50">{hint}</p>}
-    </div>
   );
 }
 
@@ -459,21 +440,14 @@ function Segmented<T extends string>({
           type="button"
           onClick={() => onChange(o.value)}
           aria-pressed={value === o.value}
-          className={`rounded-lg border px-3.5 py-2 text-sm transition-colors ${
-            value === o.value ? "border-gold bg-gold/[0.08] text-navy font-semibold" : "border-navy/15 text-navy/75 hover:border-navy/30"
-          }`}
+          className={cx(
+            "min-h-11 rounded-md border px-3.5 text-sm transition-colors duration-150",
+            value === o.value ? "border-blue bg-surface font-semibold text-blue ring-1 ring-blue" : "border-line-strong bg-surface text-ink-2 hover:bg-subtle active:bg-line"
+          )}
         >
           {o.label}
         </button>
       ))}
     </div>
-  );
-}
-
-function LinkedInIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
-      <path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z" />
-    </svg>
   );
 }

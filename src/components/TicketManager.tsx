@@ -1,7 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Kicker } from "@/components/ui";
+import {
+  AdminPage,
+  Alert,
+  Button,
+  Card,
+  Chip,
+  describedBy,
+  EmptyState,
+  ErrorState,
+  Field,
+  inputClass,
+  LoadingLabel,
+  PageHeader,
+  Skeleton,
+} from "@/components/ui";
 import { useAdmin } from "@/components/admin/AdminContext";
 import { formatPrice, isOnSale, MIN_PRICE_CENTS, type Ticket } from "@/lib/tickets";
 
@@ -39,9 +53,6 @@ interface Draft {
 type FieldErrors = Partial<Record<string, string>>;
 
 const NEW_KEY = "__new__";
-
-const INPUT =
-  "w-full rounded-lg border border-navy/15 px-3 py-2 text-sm text-navy placeholder:text-navy/35 outline-none focus:border-gold focus:ring-2 focus:ring-gold/25";
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -127,7 +138,7 @@ export default function TicketManager() {
           setAdminCodeRequired(json.adminCodeRequired === true);
           setLoadError("");
         },
-        (err) => setLoadError(err instanceof Error ? err.message : "Failed to load tickets"),
+        (err) => setLoadError(err instanceof Error ? err.message : "Couldn't load tickets."),
       ),
     [apiCall],
   );
@@ -177,7 +188,7 @@ export default function TicketManager() {
       });
       return ticket;
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Failed to save");
+      setSaveError(err instanceof Error ? err.message : "Couldn't save.");
       const fields = (err as { body?: { fields?: FieldErrors } }).body?.fields;
       if (fields) setFieldErrors(fields);
       return null;
@@ -243,7 +254,7 @@ export default function TicketManager() {
       setTickets((prev) => (prev ?? []).filter((x) => x.id !== t.id));
       setNotice(`"${t.name.en}" deleted.`);
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Failed to delete");
+      setSaveError(err instanceof Error ? err.message : "Couldn't delete.");
     } finally {
       setSaving(false);
     }
@@ -253,147 +264,156 @@ export default function TicketManager() {
   const onSaleCount = tickets?.filter((t) => isOnSale(t)).length ?? 0;
 
   return (
-    <main className="px-4 py-6 sm:px-8 sm:py-10">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="space-y-1">
-            <Kicker>Registration form</Kicker>
-            <h1 className="font-display text-3xl text-navy">Tickets &amp; prices</h1>
-            <p className="text-sm text-navy/55 max-w-2xl">
-              What you save here is what the registration form shows and what Stripe charges, from the next page load.
-              People who already registered keep the price they were charged. Discount codes are managed in Stripe.
-            </p>
-          </div>
-          <Button variant="gold" onClick={startNew} disabled={saving || editingKey === NEW_KEY}>
-            + Add ticket
+    <AdminPage>
+      <PageHeader
+        eyebrow="Registration form"
+        title="Tickets & prices"
+        description="What you save here is what the registration form shows and what Stripe charges, from the next page load. People who already registered keep the price they paid. Discount codes are managed in Stripe."
+        actions={
+          <Button variant="primary" onClick={startNew} disabled={saving || editingKey === NEW_KEY || tickets === null}>
+            Add ticket
           </Button>
-        </div>
+        }
+      />
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <details className="group rounded-lg border border-line bg-surface">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-4 py-2 text-sm font-semibold text-ink transition-colors duration-150 hover:bg-canvas">
+          How the ticket controls work
+          <span aria-hidden="true" className="text-ink-3 transition-transform duration-150 group-open:rotate-180">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 9l6 6 6-6" /></svg>
+          </span>
+        </summary>
+        <dl className="grid gap-x-8 gap-y-3 border-t border-line px-4 py-4 text-sm sm:grid-cols-2">
           {GUIDE.map(([title, body]) => (
-            <div key={title} className="rounded-2xl border border-navy/10 bg-white p-4">
-              <div className="text-sm font-semibold text-navy">{title}</div>
-              <p className="mt-1 text-xs leading-relaxed text-navy/55">{body}</p>
+            <div key={title}>
+              <dt className="font-semibold text-ink">{title}</dt>
+              <dd className="text-ink-3">{body}</dd>
             </div>
           ))}
-        </div>
+        </dl>
+      </details>
 
-        <Card className="p-6 space-y-5">
-          {adminCodeRequired && (
-            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gold/40 bg-gold/10 px-4 py-3">
-              <label htmlFor="admin-code" className="text-sm font-semibold text-navy">
-                Admin code
-              </label>
+      {adminCodeRequired && (
+        <Card className="p-4 sm:p-5">
+          <div className="max-w-xs">
+            <Field id="admin-code" label="Admin code" hint="Needed to save changes to tickets and prices.">
               <input
                 id="admin-code"
                 type="password"
                 autoComplete="off"
-                className={`${INPUT} max-w-[220px] bg-white`}
+                className={inputClass()}
                 value={adminCode}
                 onChange={(e) => setAdminCode(e.target.value)}
+                aria-describedby="admin-code-hint"
               />
-              <span className="text-xs text-navy/55">Needed to save changes to tickets and prices.</span>
-            </div>
-          )}
+            </Field>
+          </div>
+        </Card>
+      )}
 
-          {loadError && <p className="text-red-600 text-sm">{loadError}</p>}
-          {notice && (
-            <p className="text-sm text-navy bg-gold/10 border border-gold/30 rounded-lg px-3 py-2">{notice}</p>
-          )}
-          {saveError && !editingKey && <p className="text-red-600 text-sm">{saveError}</p>}
-          {tickets && onSaleCount === 0 && (
-            <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-              No ticket is on sale, so the registration form is closed.
-            </p>
-          )}
+      {notice && <Alert tone="success">{notice}</Alert>}
+      {saveError && !editingKey && <Alert tone="error">{saveError}</Alert>}
+      {tickets && tickets.length > 0 && onSaleCount === 0 && (
+        <Alert tone="error" title="The registration form is closed">
+          No ticket is on sale. Show a ticket, or give one a later sale end date, to open the form again.
+        </Alert>
+      )}
 
-          {editingKey === NEW_KEY && draft && (
-            <TicketForm
-              draft={draft}
-              setDraft={setDraft}
-              isNew
-              errors={fieldErrors}
-              saveError={saveError}
-              saving={saving}
-              timezone={timezone}
-              onSubmit={handleSubmit}
-              onCancel={cancelEdit}
+      {editingKey === NEW_KEY && draft && (
+        <Card className="p-5 transition-opacity duration-200 starting:opacity-0 sm:p-6">
+          <h2 className="mb-4 font-display text-xl font-bold text-blue">New ticket</h2>
+          <TicketForm
+            draft={draft}
+            setDraft={setDraft}
+            isNew
+            errors={fieldErrors}
+            saveError={saveError}
+            saving={saving}
+            timezone={timezone}
+            onSubmit={handleSubmit}
+            onCancel={cancelEdit}
+          />
+        </Card>
+      )}
+
+      {tickets === null ? (
+        loadError ? (
+          <ErrorState title="Couldn't load tickets" message={loadError} onRetry={() => { setLoadError(""); load(); }} />
+        ) : (
+          <Card>
+            <LoadingLabel>Loading tickets</LoadingLabel>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex flex-wrap items-center gap-4 border-t border-line p-4 first:border-t-0">
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-56 max-w-full" />
+                </div>
+                <Skeleton className="h-7 w-20" />
+                <Skeleton className="h-9 w-48 rounded-md" />
+              </div>
+            ))}
+          </Card>
+        )
+      ) : tickets.length === 0 ? (
+        editingKey !== NEW_KEY && (
+          <Card>
+            <EmptyState
+              title="No tickets yet"
+              body="The registration form stays closed until at least one ticket is on sale."
+              action={<Button variant="outline" onClick={startNew}>Add the first ticket</Button>}
             />
-          )}
-
-          {tickets === null && !loadError && <p className="text-sm text-navy/50">Loading tickets...</p>}
-
-          {tickets && tickets.length > 0 && (
-            <div className="divide-y divide-navy/8 rounded-xl border border-navy/10">
-              {tickets.map((t) => {
-                const status = statusOf(t);
-                const c = counts[t.id] ?? { paid: 0, pending: 0, total: 0 };
-                return (
-                  <div key={t.id} className="p-4 space-y-4">
-                    <div className="grid grid-cols-2 items-center gap-x-6 gap-y-3 lg:grid-cols-[minmax(0,1fr)_6rem_9rem_7rem_4.5rem_19.5rem]">
-                      <div className="col-span-2 lg:col-span-1 min-w-0">
-                        <div className="font-semibold text-navy">{t.name.en}</div>
-                        <div className="text-xs text-navy/50">
-                          {t.name.fr} · <span className="font-mono">{t.id}</span>
-                        </div>
+          </Card>
+        )
+      ) : (
+        <Card>
+          <ul className="divide-y divide-line">
+            {tickets.map((t) => {
+              const status = statusOf(t);
+              const c = counts[t.id] ?? { paid: 0, pending: 0, total: 0 };
+              const editing = editingKey === t.id;
+              return (
+                <li key={t.id} className="space-y-4 p-4 sm:p-5">
+                  <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+                    <div className="min-w-0 flex-1 basis-56">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="font-semibold text-ink">{t.name.en}</h2>
+                        <Chip dot={status.tone === "on" ? "var(--color-success)" : "var(--color-line-strong)"} className={status.tone === "off" ? "text-ink-3" : ""}>
+                          {status.label}
+                        </Chip>
                       </div>
-                      <div className="font-display text-xl text-navy">
-                        {formatPrice(t.amountCents, t.currency)}
-                      </div>
-                      <div className="text-xs text-navy/60">
-                        {t.availableUntil ? (
-                          <>Sale ends {new Date(t.availableUntil).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</>
-                        ) : (
-                          "No end date"
-                        )}
-                      </div>
-                      <span
-                        className={`justify-self-start inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap ${
-                          status.tone === "on" ? "border-gold/40 bg-gold/15 text-navy" : "border-navy/15 text-navy/50"
-                        }`}
-                      >
-                        {status.label}
-                      </span>
-                      <div className="text-xs text-navy/55">
-                        {c.paid} paid{c.pending > 0 && ` · ${c.pending} pending`}
-                      </div>
-                      <div className="col-span-2 lg:col-span-1 flex flex-wrap gap-2 lg:justify-end">
-                        <button
-                          className="rounded-full border border-navy/20 px-3 py-1 text-xs font-medium text-navy hover:bg-navy/5 disabled:opacity-50 transition-colors"
-                          disabled={saving}
-                          onClick={() => (editingKey === t.id ? cancelEdit() : startEdit(t))}
-                        >
-                          {editingKey === t.id ? "Close" : "Edit"}
-                        </button>
-                        <button
-                          className="rounded-full border border-navy/20 px-3 py-1 text-xs font-medium text-navy hover:bg-navy/5 disabled:opacity-50 transition-colors"
-                          disabled={saving}
-                          onClick={() => toggleActive(t)}
-                        >
-                          {t.active ? "Hide" : "Show"}
-                        </button>
-                        {isOnSale(t) && (
-                          <button
-                            className="rounded-full border border-navy/20 px-3 py-1 text-xs font-medium text-navy hover:bg-navy/5 disabled:opacity-50 transition-colors"
-                            disabled={saving}
-                            onClick={() => endSaleNow(t)}
-                          >
-                            End sale now
-                          </button>
-                        )}
-                        <button
-                          className="rounded-full border border-red-200 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-40 transition-colors"
-                          disabled={saving || c.total > 0}
-                          title={
-                            c.total > 0 ? "People registered with this ticket. Hide it instead." : "Delete this ticket"
-                          }
-                          onClick={() => remove(t)}
-                        >
-                          Delete
-                        </button>
-                      </div>
+                      <p className="text-sm text-ink-3">
+                        {t.name.fr} · <span className="font-mono">{t.id}</span>
+                      </p>
+                      <p className="mt-1 text-sm text-ink-3">
+                        {t.availableUntil
+                          ? `Sale ends ${new Date(t.availableUntil).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}`
+                          : "No end date"}
+                        {" · "}
+                        {c.paid} paid{c.pending > 0 && `, ${c.pending} awaiting payment`}
+                      </p>
                     </div>
-                    {editingKey === t.id && draft && (
+                    <p className="font-display text-2xl font-bold text-blue">{formatPrice(t.amountCents, t.currency)}</p>
+                    <div className="flex w-full flex-wrap gap-2 lg:w-auto lg:justify-end">
+                      <Button variant="outline" size="sm" disabled={saving && !editing} onClick={() => (editing ? cancelEdit() : startEdit(t))} aria-expanded={editing}>
+                        {editing ? "Close" : "Edit"}
+                      </Button>
+                      <Button variant="outline" size="sm" disabled={saving} onClick={() => toggleActive(t)}>
+                        {t.active ? "Hide" : "Show"}
+                      </Button>
+                      {isOnSale(t) && (
+                        <Button variant="outline" size="sm" disabled={saving} onClick={() => endSaleNow(t)}>
+                          End sale now
+                        </Button>
+                      )}
+                      {c.total === 0 && (
+                        <Button variant="danger" size="sm" disabled={saving} onClick={() => remove(t)}>
+                          Delete
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  {editing && draft && (
+                    <div className="rounded-lg border border-line bg-canvas p-4 transition-opacity duration-200 starting:opacity-0">
                       <TicketForm
                         draft={draft}
                         setDraft={setDraft}
@@ -405,15 +425,15 @@ export default function TicketManager() {
                         onSubmit={handleSubmit}
                         onCancel={cancelEdit}
                       />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </Card>
-      </div>
-    </main>
+      )}
+    </AdminPage>
   );
 }
 
@@ -439,141 +459,63 @@ function TicketForm({
   onCancel: () => void;
 }) {
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft({ ...draft, [key]: value });
+  const prefix = isNew ? "new" : draft.id;
+  const f = (name: string) => `ticket-${prefix}-${name}`;
+  const aria = (name: string, error?: string, hint?: boolean) => ({
+    "aria-invalid": !!error,
+    "aria-describedby": describedBy(f(name), { hint, error }),
+  });
 
   return (
-    <form
-      onSubmit={onSubmit}
-      className="rounded-xl bg-navy/[0.03] border border-navy/10 p-4 grid grid-cols-1 sm:grid-cols-2 gap-3"
-    >
-      <Field
-        label="Ticket ID"
-        error={errors.id}
-        hint={isNew ? "Permanent, e.g. standard or student. Lowercase, numbers, underscores." : "Can't be changed."}
-      >
-        <input
-          className={`${INPUT} font-mono ${isNew ? "" : "bg-navy/5 text-navy/50"}`}
-          value={draft.id}
-          onChange={(e) => set("id", e.target.value.toLowerCase())}
-          disabled={!isNew}
-          required
-        />
+    <form onSubmit={onSubmit} noValidate className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <Field id={f("id")} label="Ticket ID" required={isNew} error={errors.id} hint={isNew ? "Permanent, e.g. standard or student. Lowercase letters, numbers and underscores." : "Can't be changed."}>
+        <input id={f("id")} className={inputClass(!!errors.id, "font-mono")} value={draft.id} onChange={(e) => set("id", e.target.value.toLowerCase())} disabled={!isNew} required {...aria("id", errors.id, true)} />
       </Field>
-      <Field label="Price (EUR)" error={errors.amountCents} hint={`Minimum €${MIN_PRICE_CENTS / 100}.`}>
-        <input
-          className={INPUT}
-          inputMode="decimal"
-          placeholder="e.g. 500"
-          value={draft.price}
-          onChange={(e) => set("price", e.target.value)}
-          required
-        />
+      <Field id={f("price")} label="Price (EUR)" required error={errors.amountCents} hint={`At least €${MIN_PRICE_CENTS / 100}.`}>
+        <input id={f("price")} className={inputClass(!!errors.amountCents)} inputMode="decimal" value={draft.price} onChange={(e) => set("price", e.target.value)} required {...aria("price", errors.amountCents, true)} />
       </Field>
-      <Field label="Name (English)" error={errors.nameEn}>
-        <input
-          className={INPUT}
-          value={draft.nameEn}
-          onChange={(e) => set("nameEn", e.target.value)}
-          maxLength={80}
-          required
-        />
+      <Field id={f("nameEn")} label="Name (English)" required error={errors.nameEn}>
+        <input id={f("nameEn")} className={inputClass(!!errors.nameEn)} value={draft.nameEn} onChange={(e) => set("nameEn", e.target.value)} maxLength={80} required {...aria("nameEn", errors.nameEn)} />
       </Field>
-      <Field label="Name (French)" error={errors.nameFr}>
-        <input
-          className={INPUT}
-          value={draft.nameFr}
-          onChange={(e) => set("nameFr", e.target.value)}
-          maxLength={80}
-          required
-        />
+      <Field id={f("nameFr")} label="Name (French)" required error={errors.nameFr}>
+        <input id={f("nameFr")} className={inputClass(!!errors.nameFr)} value={draft.nameFr} onChange={(e) => set("nameFr", e.target.value)} maxLength={80} required {...aria("nameFr", errors.nameFr)} />
       </Field>
-      <Field label="Description (English)" error={errors.descriptionEn}>
-        <textarea
-          className={INPUT}
-          rows={2}
-          value={draft.descriptionEn}
-          onChange={(e) => set("descriptionEn", e.target.value)}
-          maxLength={300}
-        />
+      <Field id={f("descriptionEn")} label="Description (English)" optionalLabel="optional" error={errors.descriptionEn}>
+        <textarea id={f("descriptionEn")} className={inputClass(!!errors.descriptionEn)} rows={2} value={draft.descriptionEn} onChange={(e) => set("descriptionEn", e.target.value)} maxLength={300} {...aria("descriptionEn", errors.descriptionEn)} />
       </Field>
-      <Field label="Description (French)" error={errors.descriptionFr}>
-        <textarea
-          className={INPUT}
-          rows={2}
-          value={draft.descriptionFr}
-          onChange={(e) => set("descriptionFr", e.target.value)}
-          maxLength={300}
-        />
+      <Field id={f("descriptionFr")} label="Description (French)" optionalLabel="optional" error={errors.descriptionFr}>
+        <textarea id={f("descriptionFr")} className={inputClass(!!errors.descriptionFr)} rows={2} value={draft.descriptionFr} onChange={(e) => set("descriptionFr", e.target.value)} maxLength={300} {...aria("descriptionFr", errors.descriptionFr)} />
       </Field>
-      <Field
-        label="Sale ends"
-        error={errors.availableUntil}
-        hint={`Optional. Your time zone (${timezone}). Empty = no end date.`}
-      >
+      <Field id={f("until")} label="Sale ends" optionalLabel="optional" error={errors.availableUntil} hint={`In your time zone (${timezone}). Leave empty for no end date.`}>
         <div className="flex gap-2">
-          <input
-            type="datetime-local"
-            className={INPUT}
-            value={draft.availableUntil}
-            onChange={(e) => set("availableUntil", e.target.value)}
-          />
+          <input id={f("until")} type="datetime-local" className={inputClass(!!errors.availableUntil)} value={draft.availableUntil} onChange={(e) => set("availableUntil", e.target.value)} {...aria("until", errors.availableUntil, true)} />
           {draft.availableUntil && (
-            <button
-              type="button"
-              className="text-xs text-navy/60 underline shrink-0"
-              onClick={() => set("availableUntil", "")}
-            >
+            <Button variant="ghost" onClick={() => set("availableUntil", "")}>
               Clear
-            </button>
+            </Button>
           )}
         </div>
       </Field>
-      <Field label="Display order" error={errors.sortOrder} hint="Lower numbers are shown first.">
-        <input
-          className={INPUT}
-          inputMode="numeric"
-          value={draft.sortOrder}
-          onChange={(e) => set("sortOrder", e.target.value)}
-        />
+      <Field id={f("order")} label="Display order" error={errors.sortOrder} hint="Lower numbers are shown first.">
+        <input id={f("order")} className={inputClass(!!errors.sortOrder)} inputMode="numeric" value={draft.sortOrder} onChange={(e) => set("sortOrder", e.target.value)} {...aria("order", errors.sortOrder, true)} />
       </Field>
-      <label className="sm:col-span-2 flex items-center gap-2.5 text-sm text-navy">
-        <input
-          type="checkbox"
-          checked={draft.active}
-          onChange={(e) => set("active", e.target.checked)}
-          className="h-4 w-4 accent-[var(--gold)]"
-        />
+      <label className="flex min-h-11 items-center gap-3 text-base text-ink sm:col-span-2">
+        <input type="checkbox" checked={draft.active} onChange={(e) => set("active", e.target.checked)} className="h-5 w-5" />
         Show on the registration form
       </label>
-      <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
-        <Button type="submit" variant="navy" disabled={saving}>
-          {saving ? "Saving..." : isNew ? "Add ticket" : "Save changes"}
+      {saveError && (
+        <div className="sm:col-span-2">
+          <Alert tone="error">{saveError}</Alert>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+        <Button type="submit" variant="secondary" loading={saving}>
+          {saving ? "Saving" : isNew ? "Add ticket" : "Save changes"}
         </Button>
-        <Button type="button" variant="ghost" onClick={onCancel} disabled={saving}>
+        <Button variant="ghost" onClick={onCancel} disabled={saving}>
           Cancel
         </Button>
-        {saveError && <p className="text-red-600 text-sm">{saveError}</p>}
       </div>
     </form>
-  );
-}
-
-function Field({
-  label,
-  hint,
-  error,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1">
-      <div className="text-xs font-semibold uppercase tracking-wider text-navy/55">{label}</div>
-      {children}
-      {hint && !error && <p className="text-[11px] text-navy/45">{hint}</p>}
-      {error && <p className="text-xs text-red-600">{error}</p>}
-    </div>
   );
 }

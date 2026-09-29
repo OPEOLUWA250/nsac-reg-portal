@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
   if (outcome.status !== "created") {
     return NextResponse.json(
       {
-        error: `${outcome.attendee.full_name} is already registered with this email — use Resend instead.`,
+        error: `${outcome.attendee.full_name} is already registered with this email. Use "Resend QR email" in their details instead.`,
       },
       { status: 409 }
     );

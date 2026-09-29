@@ -49,11 +49,12 @@ export interface FlyerAssets {
   fonts: { display: string; body: string };
 }
 
-const NAVY = "#0A1A31";
-const BRAND_BLUE = "#03416A";
+// The conference website's colours (see DESIGN.md). Flat fills only.
+const BLUE = "#03416A";
+const BLUE_DEEP = "#02314F";
 const GOLD = "#F09F07";
-const GOLD_LIGHT = "#F7C15C";
-const SKY = "#5CB8FF";
+const INK_3 = "#5E6670";
+const LINE = "#D8DCE0";
 
 interface Layout {
   pad: number;
@@ -183,18 +184,6 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
-// Same "random" star field every time.
-function stars(width: number, height: number, count: number) {
-  let seed = 11;
-  const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  return Array.from({ length: count }, () => ({
-    x: rand() * width,
-    y: rand() * height,
-    r: 0.6 + rand() * 1.9,
-    a: 0.15 + rand() * 0.55,
-  }));
-}
-
 // ---------- drawing ----------
 
 export function drawFlyer(
@@ -217,78 +206,23 @@ export function drawFlyer(
   ctx.clearRect(0, 0, W, H);
   ctx.textBaseline = "alphabetic";
 
-  // ---- Deep-space background ----
-  const bg = ctx.createLinearGradient(0, 0, 0, L.panelTop);
-  bg.addColorStop(0, "#040B1E");
-  bg.addColorStop(0.55, NAVY);
-  bg.addColorStop(1, "#06254A");
-  ctx.fillStyle = bg;
+  // ---- Background: brand blue, with the planet's horizon as a flat,
+  // darker curve behind the photo and a thin gold rim ----
+  ctx.fillStyle = BLUE;
   ctx.fillRect(0, 0, W, L.panelTop);
-
-  // Soft blue light from the left edge and a warm glow top right.
-  const leftGlow = ctx.createRadialGradient(-W * 0.1, L.photoCy, 0, -W * 0.1, L.photoCy, W * 0.75);
-  leftGlow.addColorStop(0, "rgba(40,120,220,0.55)");
-  leftGlow.addColorStop(1, "rgba(40,120,220,0)");
-  ctx.fillStyle = leftGlow;
-  ctx.fillRect(0, 0, W, L.panelTop);
-  const warm = ctx.createRadialGradient(W * 0.9, 0, 0, W * 0.9, 0, W * 0.6);
-  warm.addColorStop(0, "rgba(240,159,7,0.14)");
-  warm.addColorStop(1, "rgba(240,159,7,0)");
-  ctx.fillStyle = warm;
-  ctx.fillRect(0, 0, W, L.panelTop);
-
-  for (const s of stars(W, L.panelTop, 110)) {
-    ctx.fillStyle = `rgba(255,255,255,${s.a})`;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // ---- Planet horizon (behind the photo) ----
   const pcy = L.horizonY + L.planetR;
-  const atmosphere = ctx.createRadialGradient(cx, pcy, L.planetR * 0.97, cx, pcy, L.planetR * 1.09);
-  atmosphere.addColorStop(0, "rgba(92,184,255,0)");
-  atmosphere.addColorStop(0.28, "rgba(92,184,255,0.75)");
-  atmosphere.addColorStop(0.45, "rgba(60,140,240,0.35)");
-  atmosphere.addColorStop(1, "rgba(30,90,200,0)");
-  ctx.fillStyle = atmosphere;
-  ctx.fillRect(0, 0, W, L.panelTop);
-  const planet = ctx.createLinearGradient(0, L.horizonY, 0, L.panelTop);
-  planet.addColorStop(0, "#0B2C57");
-  planet.addColorStop(0.25, "#061A36");
-  planet.addColorStop(1, "#030C1C");
-  ctx.fillStyle = planet;
-  ctx.beginPath();
-  ctx.arc(cx, pcy, L.planetR, 0, Math.PI * 2);
-  ctx.fill();
-  // Bright rim + sunrise flare at the top of the curve.
   ctx.save();
   ctx.beginPath();
+  ctx.rect(0, 0, W, L.panelTop);
+  ctx.clip();
+  ctx.fillStyle = BLUE_DEEP;
+  ctx.beginPath();
   ctx.arc(cx, pcy, L.planetR, 0, Math.PI * 2);
-  ctx.strokeStyle = "rgba(170,220,255,0.9)";
+  ctx.fill();
+  ctx.strokeStyle = GOLD;
   ctx.lineWidth = 3;
-  ctx.shadowColor = SKY;
-  ctx.shadowBlur = 30;
   ctx.stroke();
   ctx.restore();
-  const flare = ctx.createRadialGradient(cx, L.horizonY, 0, cx, L.horizonY, W * 0.45);
-  flare.addColorStop(0, "rgba(210,240,255,0.8)");
-  flare.addColorStop(0.35, "rgba(92,184,255,0.28)");
-  flare.addColorStop(1, "rgba(92,184,255,0)");
-  ctx.fillStyle = flare;
-  ctx.fillRect(0, L.horizonY - W * 0.45, W, W * 0.9);
-
-  // Diagonal light beam, bottom right.
-  const beam = ctx.createLinearGradient(W, L.panelTop, W * 0.6, L.photoCy);
-  beam.addColorStop(0, "rgba(3,65,106,0.95)");
-  beam.addColorStop(1, "rgba(28,110,200,0)");
-  ctx.fillStyle = beam;
-  ctx.beginPath();
-  ctx.moveTo(W, L.photoCy - L.photoR * 0.3);
-  ctx.lineTo(W, L.panelTop);
-  ctx.lineTo(W - L.photoR * 1.25, L.panelTop);
-  ctx.closePath();
-  ctx.fill();
 
   // ---- Top row: logo (left) and "DAKAR / 2027" mark (right) ----
   if (assets.logo && assets.logo.naturalWidth) {
@@ -302,37 +236,33 @@ export function drawFlyer(
     ctx.fillText("NewSpace Africa", L.pad, L.logoTop + L.logoH * 0.62);
   }
   ctx.textAlign = "right";
-  setFont(ctx, 700, L.markSize, display);
+  setFont(ctx, 800, L.markSize, display);
   setSpacing(ctx, L.markSize * 0.06);
   ctx.fillStyle = "#FFFFFF";
   ctx.fillText(text.mark[0], W - L.pad, L.logoTop + L.markSize * 0.95);
-  ctx.fillStyle = GOLD_LIGHT;
+  ctx.fillStyle = GOLD;
   ctx.fillText(text.mark[1], W - L.pad, L.logoTop + L.markSize * 1.95);
   setSpacing(ctx, 0);
 
   // ---- Headline + event name ----
   ctx.textAlign = "center";
-  const headSize = fitOneLine(ctx, text.headline, W - L.pad * 2, L.headlineSize, L.headlineMin, 700, display);
+  const headSize = fitOneLine(ctx, text.headline, W - L.pad * 2, L.headlineSize, L.headlineMin, 800, display);
   setSpacing(ctx, -headSize * 0.025);
-  ctx.save();
-  ctx.shadowColor = "rgba(0,0,0,0.35)";
-  ctx.shadowBlur = 24;
   ctx.fillStyle = "#FFFFFF";
   ctx.fillText(text.headline, cx, L.headlineY);
-  ctx.restore();
   setSpacing(ctx, 0);
 
   // Event name: letter-spaced capitals, shrunk (not cut) to fit the width.
   const eventUpper = text.eventName.toUpperCase();
   let eventSize = L.eventSize;
   for (; eventSize > L.eventSize * 0.6; eventSize -= 1) {
-    setFont(ctx, 600, eventSize, body);
+    setFont(ctx, 700, eventSize, body);
     setSpacing(ctx, eventSize * 0.2);
     if (ctx.measureText(eventUpper).width <= W - L.pad * 2) break;
   }
-  setFont(ctx, 600, eventSize, body);
+  setFont(ctx, 700, eventSize, body);
   setSpacing(ctx, eventSize * 0.2);
-  ctx.fillStyle = GOLD_LIGHT;
+  ctx.fillStyle = GOLD;
   ctx.fillText(ellipsize(ctx, eventUpper, W - L.pad * 2), cx + eventSize * 0.1, L.eventY);
   setSpacing(ctx, 0);
 
@@ -358,14 +288,10 @@ export function drawFlyer(
   orbitDot(Math.PI * 0.9, r * 1.34, r * 0.028, "rgba(255,255,255,0.8)");
 
   // White frame + photo.
-  ctx.save();
-  ctx.shadowColor = "rgba(0,0,0,0.45)";
-  ctx.shadowBlur = 40;
   ctx.fillStyle = "#FFFFFF";
   ctx.beginPath();
   ctx.arc(cx, cy, r + r * 0.05, 0, Math.PI * 2);
   ctx.fill();
-  ctx.restore();
 
   ctx.save();
   ctx.beginPath();
@@ -378,10 +304,7 @@ export function drawFlyer(
     const h = assets.photo.height * s;
     ctx.drawImage(assets.photo, cx - w / 2 + f.panX * r, cy - h / 2 + f.panY * r, w, h);
   } else {
-    const ph = ctx.createLinearGradient(0, cy - r, 0, cy + r);
-    ph.addColorStop(0, "#1C4F82");
-    ph.addColorStop(1, "#0A2A4E");
-    ctx.fillStyle = ph;
+    ctx.fillStyle = BLUE_DEEP;
     ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
     // Simple person silhouette.
     ctx.fillStyle = "rgba(255,255,255,0.22)";
@@ -397,32 +320,20 @@ export function drawFlyer(
   // ---- Name card, overlapping the bottom of the photo ----
   const cardX = cx - L.cardW / 2;
   const cardY = cy + r - L.cardOverlap;
-  ctx.save();
-  ctx.shadowColor = "rgba(0,0,0,0.35)";
-  ctx.shadowBlur = 36;
-  ctx.shadowOffsetY = 10;
   ctx.fillStyle = "#FFFFFF";
-  roundRect(ctx, cardX, cardY, L.cardW, L.cardH, L.cardH * 0.22);
+  roundRect(ctx, cardX, cardY, L.cardW, L.cardH, L.cardH * 0.1);
   ctx.fill();
-  ctx.restore();
-  // Gold accent on the card's left edge.
-  ctx.save();
-  roundRect(ctx, cardX, cardY, L.cardW, L.cardH, L.cardH * 0.22);
-  ctx.clip();
-  ctx.fillStyle = GOLD;
-  ctx.fillRect(cardX, cardY, L.cardH * 0.07, L.cardH);
-  ctx.restore();
 
   const inner = L.cardW - L.cardH * 0.7;
   const hasSub = Boolean(text.subtitle.trim());
-  const nameSize = fitOneLine(ctx, text.name || " ", inner, L.nameSize, L.nameMin, 700, display);
+  const nameSize = fitOneLine(ctx, text.name || " ", inner, L.nameSize, L.nameMin, 800, display);
   const nameY = hasSub ? cardY + L.cardH * 0.5 : cardY + L.cardH * 0.5 + nameSize * 0.35;
-  ctx.fillStyle = NAVY;
+  ctx.fillStyle = BLUE;
   ctx.textAlign = "center";
   ctx.fillText(ellipsize(ctx, text.name || " ", inner), cx, nameY);
   if (hasSub) {
     setFont(ctx, 500, L.subSize, body);
-    ctx.fillStyle = "rgba(10,26,49,0.62)";
+    ctx.fillStyle = INK_3;
     ctx.fillText(ellipsize(ctx, text.subtitle, inner), cx, cardY + L.cardH * 0.8);
   }
 
@@ -450,10 +361,10 @@ export function drawFlyer(
   ctx.fillStyle = "#FFFFFF";
   ctx.fillRect(0, pTop, W, pH);
   // Divider.
-  ctx.fillStyle = "rgba(10,26,49,0.85)";
+  ctx.fillStyle = LINE;
   ctx.fillRect(cx - 1.5, pTop + pH * 0.16, 3, pH * 0.68);
 
-  // Left: calendar icon, date and place — sized to fit the left half.
+  // Left: calendar icon, date and place, sized to fit the left half.
   const colL = W * 0.25;
   const colMax = cx - L.pad * 0.6 - L.pad * 0.5; // left edge to divider, with margins
   let ds = L.dateSize;
@@ -464,7 +375,7 @@ export function drawFlyer(
     setSpacing(ctx, ds * 0.04);
     labelW = ctx.measureText(text.dateLabel.toUpperCase()).width;
     setSpacing(ctx, 0);
-    setFont(ctx, 700, ds, display);
+    setFont(ctx, 800, ds, display);
     dateW = ctx.measureText(text.date).width;
     setFont(ctx, 500, ds * 0.5, body);
     placeW = ctx.measureText(text.place).width;
@@ -478,7 +389,7 @@ export function drawFlyer(
 
   // Calendar icon.
   const iy = dateY - iconS * 0.82;
-  ctx.fillStyle = BRAND_BLUE;
+  ctx.fillStyle = BLUE;
   roundRect(ctx, blockX, iy, iconS, iconS, iconS * 0.18);
   ctx.fill();
   ctx.fillStyle = "#FFFFFF";
@@ -486,33 +397,33 @@ export function drawFlyer(
   ctx.fill();
   ctx.fillStyle = GOLD;
   for (let i = 0; i < 3; i++) ctx.fillRect(blockX + iconS * (0.22 + i * 0.2), iy + iconS * 0.46, iconS * 0.12, iconS * 0.12);
-  ctx.fillStyle = BRAND_BLUE;
+  ctx.fillStyle = BLUE;
   ctx.fillRect(blockX + iconS * 0.24, iy - iconS * 0.1, iconS * 0.1, iconS * 0.24);
   ctx.fillRect(blockX + iconS * 0.66, iy - iconS * 0.1, iconS * 0.1, iconS * 0.24);
 
   setFont(ctx, 600, ds * 0.42, body);
   setSpacing(ctx, ds * 0.04);
-  ctx.fillStyle = BRAND_BLUE;
+  ctx.fillStyle = BLUE;
   ctx.fillText(text.dateLabel.toUpperCase(), textX, dateY - ds * 0.95);
   setSpacing(ctx, 0);
-  setFont(ctx, 700, ds, display);
-  ctx.fillStyle = NAVY;
+  setFont(ctx, 800, ds, display);
+  ctx.fillStyle = BLUE;
   ctx.fillText(text.date, textX, dateY);
   setFont(ctx, 500, ds * 0.5, body);
-  ctx.fillStyle = "rgba(10,26,49,0.7)";
+  ctx.fillStyle = INK_3;
   ctx.fillText(text.place, textX, dateY + ds * 0.72);
 
   // Right: "Scan to register" + QR code.
   const qs = L.qrSize;
   const colR = W * 0.75;
-  setFont(ctx, 700, L.dateSize * 0.5, display);
+  setFont(ctx, 800, L.dateSize * 0.5, display);
   const scanLines = wrap(ctx, text.scanLabel, W * 0.15);
   const scanW = Math.max(...scanLines.map((l) => ctx.measureText(l).width));
   const gap = L.dateSize * 0.4;
   const groupW = scanW + gap + qs;
   const gx = colR - groupW / 2;
   const qy = pTop + (pH - qs) / 2;
-  ctx.fillStyle = NAVY;
+  ctx.fillStyle = BLUE;
   ctx.textAlign = "left";
   const lh = L.dateSize * 0.6;
   const scanTop = pTop + pH / 2 - (scanLines.length * lh) / 2 + lh * 0.78;
@@ -525,19 +436,13 @@ export function drawFlyer(
 
   // ---- Bottom strip: blue with gold edge, website ----
   const sTop = pTop + pH;
-  const strip = ctx.createLinearGradient(0, 0, W, 0);
-  strip.addColorStop(0, BRAND_BLUE);
-  strip.addColorStop(1, NAVY);
-  ctx.fillStyle = strip;
+  ctx.fillStyle = BLUE;
   ctx.fillRect(0, sTop, W, H - sTop);
-  const edge = ctx.createLinearGradient(0, 0, W, 0);
-  edge.addColorStop(0, GOLD);
-  edge.addColorStop(1, GOLD_LIGHT);
-  ctx.fillStyle = edge;
+  ctx.fillStyle = GOLD;
   ctx.fillRect(0, sTop, W, 6);
   // Website, centred between two small gold dots.
   const stripMid = sTop + 3 + (H - sTop - 3) / 2;
-  setFont(ctx, 600, 26, body);
+  setFont(ctx, 700, 26, body);
   setSpacing(ctx, 3);
   const site = text.website.toUpperCase();
   const siteW = ctx.measureText(site).width;

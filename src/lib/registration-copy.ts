@@ -8,6 +8,8 @@ type Copy = {
   intro: string;
   helpEmail: string;
   cancelled: string;
+  closedTitle: string;
+  closedBody: string;
   sections: { you: string; organization: string; travel: string; ticket: string; agreements: string };
   optional: string;
   fields: {
@@ -43,6 +45,7 @@ type Copy = {
     optInSponsors: string;
   };
   selectPlaceholder: string;
+  noCountry: (query: string) => string;
   yes: string;
   no: string;
   professionalCategories: Record<ProfessionalCategory, string>;
@@ -68,6 +71,7 @@ type Copy = {
     total: string;
     noTicket: string;
     edit: string;
+    empty: string;
   };
   submit: (price: string) => string;
   submitting: string;
@@ -90,6 +94,7 @@ type Copy = {
     flyerCta: string;
     processingTitle: string;
     processingBody: string;
+    checkAgain: string;
     notFoundTitle: string;
     notFoundBody: string;
     backToForm: string;
@@ -101,9 +106,11 @@ export const COPY: Record<Language, Copy> = {
     kicker: "NewSpace Africa Conference 2027",
     title: "Registration",
     intro:
-      "Hi there, please fill out and submit this registration form. If you have any issues or questions, email",
+      "Three short steps. You pay by card at the end, and your QR ticket arrives by email. Questions? Write to",
     helpEmail: "info@spaceinafrica.com",
-    cancelled: "Payment was cancelled. Your details weren't charged — submit the form again whenever you're ready.",
+    closedTitle: "Registration is closed",
+    closedBody: "The form isn't taking registrations at the moment. For questions, write to",
+    cancelled: "Payment was cancelled. You weren't charged, and your answers are still here. Submit the form again whenever you're ready.",
     sections: {
       you: "About you",
       organization: "Your organisation",
@@ -119,7 +126,7 @@ export const COPY: Record<Language, Copy> = {
       emailHint: "Your QR ticket will be sent here.",
       jobTitle: "Job title",
       phone: "Phone number",
-      phoneHint: "Include your country code, e.g. +241 …",
+      phoneHint: "Include your country code, e.g. +221 …",
       nationality: "Nationality",
       residenceCountry: "Country of residence",
       residenceHint: "Where you will be applying for a visa, if you need one.",
@@ -130,7 +137,7 @@ export const COPY: Record<Language, Copy> = {
       invitationLetter: "Do you require an invitation letter?",
       passport: "Upload your passport",
       passportHint:
-        "Every delegate requires an invitation letter to enter Gabon. Your passport will enable us to process such a letter. Photo or PDF, up to 10 MB.",
+        "Every delegate requires an invitation letter to enter Senegal. Your passport will enable us to process such a letter. Photo or PDF, up to 10 MB.",
       passportChoose: "Choose file",
       passportRemove: "Remove",
       foodAllergies: "Any food allergies?",
@@ -146,7 +153,8 @@ export const COPY: Record<Language, Copy> = {
       optInOrganizer: "I agree to receive further communications from the event organisers",
       optInSponsors: "I agree to receive communications from event sponsors and exhibitors",
     },
-    selectPlaceholder: "Select…",
+    selectPlaceholder: "Type or choose a country",
+    noCountry: (q) => `No country matches “${q}”. Check the spelling, or try its name in English.`,
     yes: "Yes",
     no: "No",
     professionalCategories: {
@@ -179,7 +187,7 @@ export const COPY: Record<Language, Copy> = {
       vat_required: "A VAT number is required for organisations located in Europe.",
       summary: "Please check the highlighted fields.",
       network:
-        "We couldn't reach the server. Check your connection and try again — your answers are still here.",
+        "We couldn't reach the server. Check your connection and try again. Your answers are still here.",
       server: "Something went wrong on our side. Please try again in a moment.",
       spam: "The security check failed. Please try again.",
       closed: "Registration is currently closed.",
@@ -199,6 +207,7 @@ export const COPY: Record<Language, Copy> = {
       total: "Total",
       noTicket: "Choose a ticket above",
       edit: "Edit",
+      empty: "Not given",
     },
     submit: (price) => `Continue to payment · ${price}`,
     submitting: "Saving your registration…",
@@ -206,7 +215,7 @@ export const COPY: Record<Language, Copy> = {
     redirecting: "Taking you to the secure payment page…",
     alreadyRegistered: {
       title: "You're already registered",
-      body: "This email address already has a ticket. We've re-sent your QR code to it — check your inbox (and spam folder).",
+      body: "This email address already has a ticket. We've sent your QR code to it again. Check your inbox and spam folder.",
     },
     passportSkipped:
       "We couldn't attach a passport to an existing registration. Our team will email you to collect it.",
@@ -224,11 +233,12 @@ export const COPY: Record<Language, Copy> = {
         "We couldn't email your ticket just yet, so please download it now. We'll try the email again shortly.",
       addToCalendar: "Add to your calendar",
       flyerTitle: "Tell your network you're coming",
-      flyerBody: "Make an “I'm attending” graphic with your photo for LinkedIn, Instagram or WhatsApp — it takes a minute.",
+      flyerBody: "Make an “I'm attending” graphic with your photo for LinkedIn, Instagram or WhatsApp. It takes a minute.",
       flyerCta: "Create my flyer",
       processingTitle: "Payment processing",
       processingBody:
         "Your payment is still being processed. As soon as it's confirmed, we'll email your QR ticket. You can close this page.",
+      checkAgain: "Check again",
       notFoundTitle: "We couldn't find this payment",
       notFoundBody: "If you completed a payment, check your email for your QR ticket, or contact",
       backToForm: "Back to registration",
@@ -238,16 +248,18 @@ export const COPY: Record<Language, Copy> = {
     kicker: "Conférence NewSpace Africa 2027",
     title: "Inscription",
     intro:
-      "Bonjour, merci de remplir et d'envoyer ce formulaire d'inscription. Pour toute question ou difficulté, écrivez à",
+      "Trois étapes rapides. Vous payez par carte à la fin et votre billet avec QR code arrive par e-mail. Une question\u00a0? Écrivez à",
     helpEmail: "info@spaceinafrica.com",
+    closedTitle: "Les inscriptions sont fermées",
+    closedBody: "Le formulaire n'accepte pas d'inscriptions pour le moment. Pour toute question, écrivez à",
     cancelled:
-      "Le paiement a été annulé. Aucun montant n'a été débité — renvoyez le formulaire quand vous le souhaitez.",
+      "Le paiement a été annulé. Aucun montant n'a été débité et vos réponses sont conservées. Renvoyez le formulaire quand vous le souhaitez.",
     sections: {
       you: "Vos informations",
       organization: "Votre organisation",
       travel: "Voyage et logistique",
       ticket: "Billet",
-      agreements: "Conditions",
+      agreements: "Consentements",
     },
     optional: "facultatif",
     fields: {
@@ -255,42 +267,43 @@ export const COPY: Record<Language, Copy> = {
       lastName: "Nom",
       email: "E-mail",
       emailHint: "Votre billet avec QR code sera envoyé à cette adresse.",
-      jobTitle: "Fonction",
+      jobTitle: "Intitulé du poste",
       phone: "Numéro de téléphone",
-      phoneHint: "Avec l'indicatif du pays, par ex. +241 …",
+      phoneHint: "Avec l'indicatif du pays, par ex. +221 …",
       nationality: "Nationalité",
       residenceCountry: "Pays de résidence",
-      residenceHint: "Le pays où vous demanderez un visa, si nécessaire.",
+      residenceHint: "Le pays où vous demanderez votre visa, le cas échéant.",
       organization: "Entreprise / Institution / Organisation",
       organizationCountry: "Pays de l'entreprise / institution / organisation",
       professionalCategory: "Catégorie professionnelle",
-      jobFunction: "Domaine de votre fonction",
-      invitationLetter: "Avez-vous besoin d'une lettre d'invitation ?",
-      passport: "Téléchargez votre passeport",
+      jobFunction: "Domaine d'activité de votre poste",
+      invitationLetter: "Avez-vous besoin d'une lettre d'invitation\u00a0?",
+      passport: "Joignez votre passeport",
       passportHint:
-        "Chaque délégué a besoin d'une lettre d'invitation pour entrer au Gabon. Votre passeport nous permettra de l'établir. Photo ou PDF, 10 Mo maximum.",
+        "Chaque délégué(e) a besoin d'une lettre d'invitation pour entrer au Sénégal. Votre passeport nous permet de l'établir. Photo ou PDF, 10\u00a0Mo maximum.",
       passportChoose: "Choisir un fichier",
       passportRemove: "Retirer",
-      foodAllergies: "Avez-vous des allergies alimentaires ?",
-      foodAllergiesHint: "Écrivez « Aucune » si ce n'est pas le cas.",
+      foodAllergies: "Avez-vous des allergies alimentaires\u00a0?",
+      foodAllergiesHint: "Écrivez «\u00a0Aucune\u00a0» si vous n'en avez pas.",
       ticket: "Choisissez votre billet",
-      couponHint: "Vous avez un code de réduction ? Saisissez-le sur la page de paiement.",
-      vatNumber: "Numéro de TVA de l'entreprise",
-      vatHint: "Obligatoire si vous vous inscrivez depuis l'Europe.",
+      couponHint: "Vous avez un code de réduction\u00a0? Saisissez-le sur la page de paiement.",
+      vatNumber: "Numéro de TVA intracommunautaire de l'entreprise",
+      vatHint: "Obligatoire pour les organisations situées en Europe.",
       vatRequiredHint: "Obligatoire pour les organisations situées en Europe.",
-      invoiceId: "Numéro de facture",
+      invoiceId: "Référence de facture",
       safetyConsent: (privacyLink) =>
         `En envoyant ce formulaire, j'accepte les consignes de sécurité de la conférence et le traitement de mes données par Space in Africa (y compris mon passeport, le cas échéant) conformément à la ${privacyLink}.`,
-      optInOrganizer: "J'accepte de recevoir d'autres communications des organisateurs",
-      optInSponsors: "J'accepte de recevoir des communications des sponsors et exposants",
+      optInOrganizer: "J'accepte de recevoir d'autres communications de la part des organisateurs",
+      optInSponsors: "J'accepte de recevoir des communications de la part des sponsors et des exposants",
     },
-    selectPlaceholder: "Sélectionner…",
+    selectPlaceholder: "Tapez ou choisissez un pays",
+    noCountry: (q) => `Aucun pays ne correspond à «\u00a0${q}\u00a0». Vérifiez l'orthographe.`,
     yes: "Oui",
     no: "Non",
     professionalCategories: {
-      government: "Fonctionnaire / Agent public",
-      industry: "Professionnel de l'industrie",
-      academia: "Université / Recherche",
+      government: "Représentant(e) du gouvernement",
+      industry: "Professionnel(le) de l'industrie",
+      academia: "Monde universitaire / Recherche",
       student: "Étudiant(e)",
       media: "Médias",
       other: "Autre",
@@ -311,19 +324,19 @@ export const COPY: Record<Language, Copy> = {
       invalid_phone: "Saisissez un numéro valide, avec l'indicatif du pays.",
       invalid_choice: "Veuillez choisir une option dans la liste.",
       consent_required: "Vous devez accepter pour continuer.",
-      file_type: "Téléchargez une photo (JPG, PNG, WebP) ou un PDF.",
-      file_too_large: "Le fichier doit faire 10 Mo maximum.",
+      file_type: "Joignez une photo (JPG, PNG, WebP) ou un PDF.",
+      file_too_large: "Le fichier ne doit pas dépasser 10\u00a0Mo.",
       ticket_unavailable: "Ce billet n'est plus disponible. Veuillez en choisir un autre.",
       vat_required: "Un numéro de TVA est obligatoire pour les organisations situées en Europe.",
       summary: "Veuillez vérifier les champs signalés.",
       network:
-        "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez — vos réponses sont conservées.",
+        "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez. Vos réponses sont conservées.",
       server: "Une erreur s'est produite de notre côté. Veuillez réessayer dans un instant.",
       spam: "La vérification de sécurité a échoué. Veuillez réessayer.",
       closed: "Les inscriptions sont actuellement fermées.",
       payment: "Le service de paiement est indisponible. Veuillez réessayer dans quelques minutes.",
       passportUpload:
-        "Votre passeport n'a pas pu être envoyé. Vous pouvez passer au paiement ; nous vous contacterons par e-mail pour le récupérer.",
+        "Votre passeport n'a pas pu être envoyé. Vous pouvez passer au paiement\u00a0; nous vous contacterons par e-mail pour le récupérer.",
     },
     steps: ["Vos informations", "Organisation et voyage", "Billet et paiement"],
     stepOf: (n, total) => `Étape ${n} sur ${total}`,
@@ -333,24 +346,25 @@ export const COPY: Record<Language, Copy> = {
       title: "Vérifiez votre inscription",
       name: "Nom",
       email: "E-mail",
-      organization: "Fonction",
+      organization: "Poste",
       total: "Total",
       noTicket: "Choisissez un billet ci-dessus",
       edit: "Modifier",
+      empty: "Non renseigné",
     },
-    submit: (price) => `Continuer vers le paiement · ${price}`,
+    submit: (price) => `Passer au paiement · ${price}`,
     submitting: "Enregistrement de votre inscription…",
-    uploading: (pct) => `Envoi de votre passeport… ${pct} %`,
+    uploading: (pct) => `Envoi de votre passeport… ${pct}\u00a0%`,
     redirecting: "Redirection vers la page de paiement sécurisée…",
     alreadyRegistered: {
       title: "Vous êtes déjà inscrit(e)",
-      body: "Cette adresse e-mail a déjà un billet. Nous vous avons renvoyé votre QR code — vérifiez votre boîte de réception (et vos spams).",
+      body: "Cette adresse e-mail a déjà un billet. Nous vous avons renvoyé votre QR code. Vérifiez votre boîte de réception et vos spams.",
     },
     passportSkipped:
       "Nous n'avons pas pu joindre un passeport à une inscription existante. Notre équipe vous contactera par e-mail.",
     securePayment: "Les paiements sont traités de façon sécurisée par Stripe. Nous ne voyons jamais vos données bancaires.",
     success: {
-      title: "Votre inscription est confirmée !",
+      title: "Votre inscription est confirmée\u00a0!",
       paidBody: (first) =>
         `Merci${first ? ` ${first}` : ""}. Votre paiement a été reçu et votre place à la Conférence NewSpace Africa 2027 est confirmée.`,
       qrHelp:
@@ -359,14 +373,15 @@ export const COPY: Record<Language, Copy> = {
       ticketAlt: "Votre billet pour la Conférence NewSpace Africa 2027 avec QR code d'accès",
       emailNote: "Nous vous l'avons aussi envoyé par e-mail. Stripe vous envoie votre reçu séparément.",
       emailPending:
-        "Nous n'avons pas encore pu vous envoyer votre billet par e-mail : téléchargez-le dès maintenant. Nous réessaierons sous peu.",
+        "Nous n'avons pas encore pu vous envoyer votre billet par e-mail\u00a0: téléchargez-le dès maintenant. Nous réessaierons sous peu.",
       addToCalendar: "Ajouter à votre agenda",
       flyerTitle: "Annoncez votre participation",
-      flyerBody: "Créez un visuel « J'y serai » avec votre photo pour LinkedIn, Instagram ou WhatsApp — en une minute.",
+      flyerBody: "Créez un visuel «\u00a0J'y serai\u00a0» avec votre photo pour LinkedIn, Instagram ou WhatsApp. Cela prend une minute.",
       flyerCta: "Créer mon visuel",
       processingTitle: "Paiement en cours",
       processingBody:
         "Votre paiement est en cours de traitement. Dès sa confirmation, nous vous enverrons votre billet par e-mail. Vous pouvez fermer cette page.",
+      checkAgain: "Vérifier à nouveau",
       notFoundTitle: "Paiement introuvable",
       notFoundBody: "Si vous avez effectué un paiement, vérifiez vos e-mails ou contactez",
       backToForm: "Retour à l'inscription",

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
-import { RolePill, StatusPill } from "@/components/ui";
+import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
+import { Button, cx, linkClass, PaymentBadge, RolePill, StatusPill } from "@/components/ui";
+import { IconClose, IconExternal } from "@/components/icons";
 import {
   categoryLabel,
   formatDateTime,
@@ -14,6 +15,8 @@ import type { Attendee } from "@/lib/types";
 
 // Slide-over with everything we know about one registrant, plus the
 // actions staff need (resend QR, check in, passport, Stripe).
+
+const CLOSE_MS = 200;
 
 export default function AttendeeDrawer({
   attendee,
@@ -34,58 +37,130 @@ export default function AttendeeDrawer({
   onToggleCheckIn: () => void;
   onPassport: () => void;
 }) {
+  const [closing, setClosing] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const panel = useRef<HTMLElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
+
+  // Slide out, then unmount.
+  function close() {
+    setClosing(true);
+    setTimeout(onClose, CLOSE_MS);
+  }
+  const onEscape = useEffectEvent(close);
+
+  // Focus moves into the drawer and back to where it was on close; Tab
+  // stays inside while it's open; Escape closes it.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    const previous = document.activeElement as HTMLElement | null;
+    closeButton.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onEscape();
+      if (e.key !== "Tab" || !panel.current) return;
+      const focusable = panel.current.querySelectorAll<HTMLElement>("a[href], button:not([disabled])");
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last?.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = overflow;
+      previous?.focus?.();
+    };
+  }, []);
+
+  async function copyEmail() {
+    try {
+      await navigator.clipboard.writeText(a.email);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard blocked: the address is on screen */
+    }
+  }
 
   const a = attendee;
   const stripeUrl = stripeSessionUrl(a.stripe_session_id);
   const yesNo = (v: boolean | null) => (v == null ? null : v ? "Yes" : "No");
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-label={a.full_name}>
-      <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-navy/40 backdrop-blur-[2px]" />
-      <aside className="relative h-full w-full max-w-xl overflow-y-auto bg-offwhite shadow-2xl">
+    <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+      <div
+        aria-hidden="true"
+        onClick={() => close()}
+        className={cx("absolute inset-0 bg-blue/50 transition-opacity duration-200 starting:opacity-0", closing && "opacity-0")}
+      />
+      <aside
+        ref={panel}
+        className={cx(
+          "relative h-full w-full max-w-xl overflow-y-auto border-l border-line bg-canvas transition-transform duration-200 ease-out starting:translate-x-full",
+          closing && "translate-x-full"
+        )}
+      >
         {/* Header */}
-        <div
-          className="sticky top-0 z-10 px-6 pt-6 pb-5 text-white"
-          style={{ background: "linear-gradient(135deg, var(--navy) 0%, #03416A 100%)" }}
-        >
+        <div className="on-dark sticky top-0 z-10 bg-blue px-5 pb-5 pt-5 text-white sm:px-6">
           <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-3.5 min-w-0">
+            <div className="flex min-w-0 items-center gap-3.5">
               <Avatar name={a.full_name} large />
               <div className="min-w-0">
-                <h2 className="font-display text-xl leading-tight truncate">{a.full_name}</h2>
-                <p className="text-sm text-white/65 truncate">
-                  {[a.job_title, a.organization].filter(Boolean).join(" · ") || a.email}
-                </p>
+                <h2 id="drawer-title" className="truncate font-display text-xl font-bold leading-tight">
+                  {a.full_name}
+                </h2>
+                <p className="truncate text-sm text-white/80">{[a.job_title, a.organization].filter(Boolean).join(" · ") || a.email}</p>
               </div>
             </div>
-            <button type="button" onClick={onClose} className="rounded-full p-1.5 text-white/70 hover:bg-white/10 hover:text-white" aria-label="Close">
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+            <button
+              ref={closeButton}
+              type="button"
+              onClick={() => close()}
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-white/80 transition-colors duration-150 hover:bg-white/10 hover:text-white active:bg-white/15"
+              aria-label="Close details"
+            >
+              <IconClose className="h-5 w-5" />
             </button>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-white px-0.5 py-0.5"><RolePill role={a.role} /></span>
+            <RolePill role={a.role} />
             <PaymentBadge status={a.payment_status} source={a.source} />
-            <span className="rounded-full bg-white px-0.5 py-0.5"><StatusPill checkedIn={a.checked_in} /></span>
-            <span className="text-xs text-white/50 font-mono ml-auto">#{a.id.slice(0, 8).toUpperCase()}</span>
+            <StatusPill checkedIn={a.checked_in} />
+            <span className="ml-auto font-mono text-xs text-white/65">#{a.id.slice(0, 8).toUpperCase()}</span>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            <ActionButton onClick={onResend} disabled={busy}>Resend QR email</ActionButton>
-            <ActionButton onClick={onToggleCheckIn} disabled={busy}>{a.checked_in ? "Undo check-in" : "Mark checked in"}</ActionButton>
-            {a.passport_path && <ActionButton onClick={onPassport} disabled={busy}>View passport</ActionButton>}
-            <ActionButton onClick={() => navigator.clipboard?.writeText(a.email)}>Copy email</ActionButton>
+            <Button variant="on-dark" size="sm" onClick={onToggleCheckIn} loading={busy}>
+              {a.checked_in ? "Undo check-in" : "Mark checked in"}
+            </Button>
+            <Button variant="on-dark" size="sm" onClick={onResend} disabled={busy}>
+              Resend QR email
+            </Button>
+            {a.passport_path && (
+              <Button variant="on-dark" size="sm" onClick={onPassport} disabled={busy}>
+                View passport
+              </Button>
+            )}
+            <Button variant="on-dark" size="sm" onClick={copyEmail}>
+              {copied ? "Email copied" : "Copy email"}
+            </Button>
           </div>
-          {message && <p className="mt-3 text-sm text-gold-light">{message}</p>}
+          {message && (
+            <p role="status" className="mt-3 text-sm text-gold">
+              {message}
+            </p>
+          )}
         </div>
 
-        <div className="p-6 space-y-5">
+        <div className="space-y-4 p-5 sm:p-6">
           <Section title="Contact">
-            <Row label="Email" value={<a className="text-navy underline decoration-gold" href={`mailto:${a.email}`}>{a.email}</a>} />
-            <Row label="Phone" value={a.phone ? <a className="text-navy underline decoration-gold" href={`tel:${a.phone.replace(/\s/g, "")}`}>{a.phone}</a> : null} />
+            <Row label="Email" value={<a className={linkClass} href={`mailto:${a.email}`}>{a.email}</a>} />
+            <Row label="Phone" value={a.phone ? <a className={linkClass} href={`tel:${a.phone.replace(/\s/g, "")}`}>{a.phone}</a> : null} />
             <Row label="Language" value={a.language === "fr" ? "French" : a.language === "en" ? "English" : null} />
           </Section>
 
@@ -97,14 +172,14 @@ export default function AttendeeDrawer({
             <Row label="Job function" value={jobFunctionLabel(a.job_function)} />
           </Section>
 
-          <Section title="Travel & logistics">
+          <Section title="Travel and logistics">
             <Row label="Nationality" value={a.nationality} />
             <Row label="Country of residence" value={a.residence_country} />
             <Row
               label="Invitation letter"
               value={
                 a.needs_invitation_letter == null ? null : a.needs_invitation_letter ? (
-                  <span className="font-semibold text-navy">Needed{a.passport_path ? " · passport uploaded" : " · no passport yet"}</span>
+                  <span className="font-semibold">Needed{a.passport_path ? ", passport uploaded" : ", no passport yet"}</span>
                 ) : (
                   "Not needed"
                 )
@@ -113,7 +188,7 @@ export default function AttendeeDrawer({
             <Row label="Food allergies" value={a.food_allergies} />
           </Section>
 
-          <Section title="Ticket & payment">
+          <Section title="Ticket and payment">
             <Row label="Ticket" value={ticketName || null} />
             <Row label="Amount" value={money(a.amount_cents, a.currency) || null} />
             <Row label="Payment" value={paymentLabel(a.payment_status, a.source)} />
@@ -122,11 +197,17 @@ export default function AttendeeDrawer({
             <Row label="Invoice ID" value={a.invoice_reference} />
             <Row
               label="Stripe"
-              value={stripeUrl ? <a className="text-navy underline decoration-gold" href={stripeUrl} target="_blank" rel="noopener noreferrer">Open payment in Stripe ↗</a> : null}
+              value={
+                stripeUrl ? (
+                  <a className={cx(linkClass, "inline-flex items-center gap-1")} href={stripeUrl} target="_blank" rel="noopener noreferrer">
+                    Open payment in Stripe <IconExternal />
+                  </a>
+                ) : null
+              }
             />
           </Section>
 
-          <Section title="Check-in & badge">
+          <Section title="Check-in and badge">
             <Row label="Status" value={a.checked_in ? "Checked in" : "Not checked in"} />
             <Row label="Checked in at" value={formatDateTime(a.checked_in_at) || null} />
             <Row label="Station" value={a.checked_in_station} />
@@ -134,8 +215,8 @@ export default function AttendeeDrawer({
             <Row label="QR email sent" value={formatDateTime(a.qr_email_sent_at) || "Not sent"} />
           </Section>
 
-          <Section title="Consent & communications">
-            <Row label="Terms & privacy accepted" value={formatDateTime(a.consent_at) || null} />
+          <Section title="Consent and communications">
+            <Row label="Terms and privacy accepted" value={formatDateTime(a.consent_at) || null} />
             <Row label="Organiser updates" value={yesNo(a.opt_in_organizer)} />
             <Row label="Sponsor updates" value={yesNo(a.opt_in_sponsors)} />
           </Section>
@@ -161,9 +242,10 @@ export function Avatar({ name, large = false }: { name: string; large?: boolean 
     .join("");
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center rounded-full font-semibold ${
-        large ? "h-12 w-12 text-base bg-gold text-navy" : "h-9 w-9 text-xs bg-navy/8 text-navy"
-      }`}
+      className={cx(
+        "inline-flex shrink-0 items-center justify-center rounded-full font-semibold",
+        large ? "h-12 w-12 bg-gold text-base text-blue" : "h-9 w-9 bg-subtle text-xs text-blue"
+      )}
       aria-hidden="true"
     >
       {initials || "?"}
@@ -171,51 +253,21 @@ export function Avatar({ name, large = false }: { name: string; large?: boolean 
   );
 }
 
-export function PaymentBadge({ status, source }: { status: Attendee["payment_status"]; source?: string | null }) {
-  const styles: Record<string, string> = {
-    paid: "border-emerald-300 bg-emerald-50 text-emerald-700",
-    pending: "border-red-300 bg-red-50 text-red-700",
-    walk_in: "border-gold/50 bg-gold/10 text-navy",
-  };
-  const key = source === "walk_in" ? "walk_in" : (status ?? "");
-  return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap ${
-        styles[key] ?? "border-navy/15 bg-white text-navy/50"
-      }`}
-    >
-      {paymentLabel(status, source)}
-    </span>
-  );
-}
-
-function ActionButton({ children, onClick, disabled }: { children: ReactNode; onClick: () => void; disabled?: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="rounded-full border border-white/25 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-white/10 disabled:opacity-50 transition-colors"
-    >
-      {children}
-    </button>
-  );
-}
-
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-2xl border border-navy/10 bg-white">
-      <h3 className="px-5 pt-4 pb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-gold">{title}</h3>
-      <dl className="divide-y divide-navy/6 px-5 pb-2">{children}</dl>
+    <section className="rounded-lg border border-line bg-surface">
+      <h3 className="px-5 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-ink-3">{title}</h3>
+      <dl className="divide-y divide-line px-5 pb-2">{children}</dl>
     </section>
   );
 }
 
 function Row({ label, value }: { label: string; value: ReactNode }) {
+  const empty = value === null || value === undefined || value === "";
   return (
-    <div className="grid grid-cols-[10.5rem_1fr] gap-3 py-2.5 text-sm">
-      <dt className="text-navy/50">{label}</dt>
-      <dd className="text-navy break-words">{value === null || value === undefined || value === "" ? <span className="text-navy/30">—</span> : value}</dd>
+    <div className="grid gap-1 py-2.5 text-sm sm:grid-cols-[10rem_1fr] sm:gap-3">
+      <dt className="text-ink-3">{label}</dt>
+      <dd className={cx("wrap-break-word", empty ? "text-ink-3" : "text-ink")}>{empty ? "Not given" : value}</dd>
     </div>
   );
 }

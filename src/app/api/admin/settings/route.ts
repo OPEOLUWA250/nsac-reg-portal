@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { publicBaseUrl } from "@/lib/public-url";
 import { adminCodeRequired, isAdminAuthorized, isStaffAuthorized } from "@/lib/staff-auth";
 import { getSettings, updateSettings } from "@/lib/settings-store";
 import { registrationClosedByEnv } from "@/lib/registration-config";
@@ -28,7 +29,7 @@ function systemStatus() {
       adminCode: Boolean(process.env.ADMIN_ACCESS_CODE),
       spamProtection: Boolean(process.env.TURNSTILE_SECRET_KEY),
     },
-    publicUrl: process.env.PUBLIC_BASE_URL ?? null,
+    publicUrl: publicBaseUrl(),
   };
 }
 

@@ -8,7 +8,7 @@ type Lang = "en" | "fr";
 
 const DESCRIPTION = {
   en: `${EVENT_INFO.name.en}, ${EVENT_INFO.place.en}.\nBring your QR ticket (on your phone or printed) to the registration desk to collect your badge.\n${EVENT_INFO.websiteUrl}`,
-  fr: `${EVENT_INFO.name.fr}, ${EVENT_INFO.place.fr}.\nPrésentez votre billet QR (sur téléphone ou imprimé) à l'accueil pour récupérer votre badge.\n${EVENT_INFO.websiteUrl}`,
+  fr: `${EVENT_INFO.name.fr}, ${EVENT_INFO.place.fr}.\nPrésentez votre billet avec son QR code (sur votre téléphone ou imprimé) à l'accueil pour récupérer votre badge.\n${EVENT_INFO.websiteUrl}`,
 };
 
 /** "2027-04-19" → "20270419" */

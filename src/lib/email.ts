@@ -2,29 +2,30 @@ import nodemailer from "nodemailer";
 import { Resend } from "resend";
 import { escapeHtml } from "@/lib/escape-html";
 import { EVENT_INFO } from "@/lib/event-info";
+import { publicBaseUrl } from "@/lib/public-url";
 import { buildIcs, googleCalendarUrl, icsFilename, outlookCalendarUrl } from "@/lib/calendar";
 
-// Brand colors, duplicated from globals.css — email HTML can't read CSS
-// custom properties, so these are hardcoded here.
-const NAVY = "#0A1A31";
-// Secondary blue of the conference site (newspace.spaceinafrica.com).
-const BRAND_BLUE = "#03416A";
+// Brand colours (the conference website's blue and gold), duplicated from
+// globals.css: email HTML can't read CSS custom properties.
+const BLUE = "#03416A";
 const GOLD = "#F09F07";
-const GOLD_LIGHT = "#f7c15c";
-const OFFWHITE = "#FAFAF8";
+const INK = "#232323";
+const INK_2 = "#454B52";
+const INK_3 = "#5E6670";
+const LINE = "#D8DCE0";
+const CANVAS = "#F5F5F5";
 
 export type EmailLanguage = "en" | "fr";
 
 const COPY = {
   en: {
-    subject: (event: string) => `You're registered for ${event} — your check-in QR code`,
-    kicker: "Registration Portal",
+    subject: (event: string) => `You're registered for the ${event}: your check-in QR code`,
     heading: "Registration confirmed",
     greeting: (first: string) => `Hi ${first},`,
     thanks: (event: string) =>
-      `Thanks for registering for <strong style="color:${NAVY};">${event}</strong>. Your spot is confirmed.`,
+      `Thank you for registering for the <strong style="color:${BLUE};">${event}</strong>. Your place is confirmed.`,
     instructions:
-      "Bring the QR code below (digital or printed) to the registration desk on the day of the event — it will be scanned to check you in and print your badge.",
+      "Bring the QR code below, on your phone or printed, to the registration desk. It is scanned to check you in and print your badge.",
     qrAlt: "Your check-in QR code",
     ticketAttached: "Your ticket is also attached to this email, ready to save or print.",
     calendarTitle: "Add the conference to your calendar",
@@ -33,20 +34,19 @@ const COPY = {
     footer: "Questions? Just reply to this email.",
   },
   fr: {
-    subject: (event: string) => `Votre inscription à ${event} est confirmée — votre QR code d'accès`,
-    kicker: "Portail d'inscription",
+    subject: (event: string) => `Votre inscription à la ${event} est confirmée\u00a0: votre QR code d'accès`,
     heading: "Inscription confirmée",
     greeting: (first: string) => `Bonjour ${first},`,
     thanks: (event: string) =>
-      `Merci pour votre inscription à <strong style="color:${NAVY};">${event}</strong>. Votre place est confirmée.`,
+      `Merci pour votre inscription à la <strong style="color:${BLUE};">${event}</strong>. Votre place est confirmée.`,
     instructions:
-      "Présentez le QR code ci-dessous (sur votre téléphone ou imprimé) à l'accueil le jour de l'événement : il sera scanné pour enregistrer votre arrivée et imprimer votre badge.",
+      "Présentez le QR code ci-dessous, sur votre téléphone ou imprimé, à l'accueil. Il sera scanné pour enregistrer votre arrivée et imprimer votre badge.",
     qrAlt: "Votre QR code d'accès",
-    ticketAttached: "Votre billet est aussi joint à cet e-mail, à enregistrer ou imprimer.",
+    ticketAttached: "Votre billet est également joint à cet e-mail, pour l'enregistrer ou l'imprimer.",
     calendarTitle: "Ajoutez la conférence à votre agenda",
-    calendarAttached: "Une invitation d'agenda est aussi jointe à cet e-mail.",
-    flyerCta: "Créez votre visuel « J’y serai » pour LinkedIn",
-    footer: "Des questions ? Répondez simplement à cet e-mail.",
+    calendarAttached: "Une invitation d'agenda est également jointe à cet e-mail.",
+    flyerCta: "Créez votre visuel «\u00a0J’y serai\u00a0» pour LinkedIn",
+    footer: "Des questions\u00a0? Répondez simplement à cet e-mail.",
   },
 } as const;
 
@@ -72,7 +72,7 @@ export async function sendQrEmail({
   ticketPngBuffer,
   logoPngBuffer,
   flyerUrl,
-  eventName = "NewSpace Africa Conference",
+  eventName,
   role,
   language = "en",
 }: SendQrEmailArgs) {
@@ -82,10 +82,12 @@ export async function sendQrEmail({
   }
 
   const t = COPY[language] ?? COPY.en;
+  // The event's name in the email's language ("Conférence NewSpace Africa 2027").
+  const event = eventName ?? EVENT_INFO.name[language === "fr" ? "fr" : "en"];
 
   // "Add to calendar" buttons. Apple Calendar opens the .ics from our site
   // (only when the public address is configured; the invite is attached too).
-  const base = process.env.PUBLIC_BASE_URL?.replace(/\/$/, "");
+  const base = publicBaseUrl();
   const calendarButtons = [
     { label: "Google", href: googleCalendarUrl(language) },
     { label: "Outlook", href: outlookCalendarUrl(language) },
@@ -94,14 +96,14 @@ export async function sendQrEmail({
 
   // Everything that came from a registrant is escaped before it goes into HTML.
   const firstName = escapeHtml(fullName.trim().split(/\s+/)[0] || fullName);
-  const safeEvent = escapeHtml(eventName);
+  const safeEvent = escapeHtml(event);
   const safeRole = role ? escapeHtml(role) : "";
-  const font = "Helvetica, Arial, 'Segoe UI', sans-serif";
+  const font = "'DM Sans', Helvetica, Arial, 'Segoe UI', sans-serif";
 
   const message: OutgoingEmail = {
     from: fromAddress,
     to: toEmail,
-    subject: t.subject(eventName),
+    subject: t.subject(event),
     attachments: [
       {
         filename: "checkin-qr.png",
@@ -119,39 +121,35 @@ export async function sendQrEmail({
       { filename: icsFilename(), content: Buffer.from(buildIcs(language)), contentType: "text/calendar" },
     ],
     html: `
-<body style="margin:0; padding:32px 16px; background:${OFFWHITE}; font-family:${font};">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px; margin:0 auto; background:#ffffff; border:1px solid rgba(10,26,49,0.08); border-radius:16px; overflow:hidden;">
+<body style="margin:0; padding:32px 16px; background:${CANVAS}; font-family:${font}; color:${INK};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px; margin:0 auto; background:#ffffff; border:1px solid ${LINE}; border-radius:8px; overflow:hidden;">
     <tr>
-      <td style="background:${NAVY}; background-image:linear-gradient(135deg, ${NAVY} 0%, ${BRAND_BLUE} 100%); padding:28px 32px; text-align:center;">
+      <td style="background:${BLUE}; padding:24px 32px; text-align:center;">
         ${
           logoPngBuffer
-            ? `<img src="cid:brand-logo.png" alt="NewSpace Africa Conference" width="170" height="63" style="display:block; margin:0 auto 12px; width:170px; height:63px;" />`
-            : `<div style="color:#ffffff; font-size:20px; font-weight:700; letter-spacing:0.5px; margin-bottom:6px;">NewSpace Africa</div>`
+            ? `<img src="cid:brand-logo.png" alt="NewSpace Africa Conference" width="170" height="63" style="display:block; margin:0 auto; width:170px; height:63px;" />`
+            : `<div style="color:#ffffff; font-size:20px; font-weight:700;">NewSpace Africa Conference</div>`
         }
-        <div style="color:${GOLD_LIGHT}; font-size:11px; font-weight:700; letter-spacing:3px; text-transform:uppercase;">
-          ${t.kicker}
-        </div>
       </td>
     </tr>
     <tr>
-      <td style="padding:36px 32px 8px; text-align:center;">
-        <div style="display:inline-block; width:40px; height:4px; background:${GOLD}; border-radius:2px; margin-bottom:20px;"></div>
-        <h1 style="margin:0 0 16px; color:${NAVY}; font-size:22px; font-weight:700;">
+      <td style="padding:32px 32px 8px; text-align:center;">
+        <h1 style="margin:0 0 16px; color:${BLUE}; font-size:24px; font-weight:800;">
           ${t.heading}
         </h1>
-        <p style="margin:0 0 4px; color:${NAVY}; font-size:15px; line-height:1.6;">
+        <p style="margin:0 0 4px; color:${INK}; font-size:16px; line-height:1.6;">
           ${t.greeting(firstName)}
         </p>
-        <p style="margin:0 0 4px; color:rgba(10,26,49,0.7); font-size:15px; line-height:1.6;">
+        <p style="margin:0 0 4px; color:${INK_2}; font-size:16px; line-height:1.6;">
           ${t.thanks(safeEvent)}
         </p>
-        <p style="margin:14px 0 4px; color:${NAVY}; font-size:15px; font-weight:700; line-height:1.6;">
+        <p style="margin:14px 0 4px; color:${BLUE}; font-size:16px; font-weight:700; line-height:1.6;">
           ${EVENT_INFO.date[language]} &nbsp;·&nbsp; ${EVENT_INFO.place[language]}
         </p>
         ${
           safeRole
             ? `<div style="margin:16px 0 4px;">
-                <span style="display:inline-block; background:rgba(240,159,7,0.12); border:1px solid rgba(240,159,7,0.4); color:${NAVY}; font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; padding:6px 14px; border-radius:999px;">
+                <span style="display:inline-block; border:1px solid ${LINE}; color:${INK}; font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; padding:5px 12px; border-radius:4px;">
                   ${safeRole}
                 </span>
               </div>`
@@ -161,43 +159,43 @@ export async function sendQrEmail({
     </tr>
     <tr>
       <td style="padding:20px 32px 8px; text-align:center;">
-        <p style="margin:0 0 20px; color:rgba(10,26,49,0.7); font-size:14px; line-height:1.6;">
+        <p style="margin:0 0 20px; color:${INK_2}; font-size:15px; line-height:1.6;">
           ${t.instructions}
         </p>
-        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto; background:${OFFWHITE}; border:1px solid rgba(10,26,49,0.1); border-radius:12px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto; background:#ffffff; border:1px solid ${LINE}; border-radius:8px;">
           <tr>
-            <td style="padding:18px;">
+            <td style="padding:16px;">
               <img src="cid:checkin-qr.png" alt="${t.qrAlt}" width="200" height="200" style="display:block; width:200px; height:200px;" />
             </td>
           </tr>
         </table>
         ${
           ticketPngBuffer
-            ? `<p style="margin:18px 0 0; color:rgba(10,26,49,0.55); font-size:13px; line-height:1.6;">${t.ticketAttached}</p>`
+            ? `<p style="margin:18px 0 0; color:${INK_3}; font-size:14px; line-height:1.6;">${t.ticketAttached}</p>`
             : ""
         }
-        <p style="margin:26px 0 10px; color:${NAVY}; font-size:13px; font-weight:700; letter-spacing:1px; text-transform:uppercase;">${t.calendarTitle}</p>
+        <p style="margin:26px 0 10px; color:${BLUE}; font-size:14px; font-weight:700;">${t.calendarTitle}</p>
         <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
           <tr>
             ${calendarButtons
               .map(
                 (b) =>
-                  `<td style="padding:0 4px;"><a href="${escapeHtml(b.href)}" style="display:inline-block; border:1px solid rgba(10,26,49,0.2); border-radius:999px; padding:9px 16px; color:${NAVY}; font-size:13px; font-weight:700; text-decoration:none; white-space:nowrap;">${b.label}</a></td>`
+                  `<td style="padding:0 4px;"><a href="${escapeHtml(b.href)}" style="display:inline-block; border:1px solid ${BLUE}; border-radius:6px; padding:10px 16px; color:${BLUE}; font-size:14px; font-weight:700; text-decoration:none; white-space:nowrap;">${b.label}</a></td>`
               )
               .join("")}
           </tr>
         </table>
-        <p style="margin:8px 0 0; color:rgba(10,26,49,0.5); font-size:12px; line-height:1.6;">${t.calendarAttached}</p>
+        <p style="margin:8px 0 0; color:${INK_3}; font-size:13px; line-height:1.6;">${t.calendarAttached}</p>
         ${
           flyerUrl
-            ? `<p style="margin:24px 0 0;"><a href="${escapeHtml(flyerUrl)}" style="display:inline-block; background:${GOLD}; color:${NAVY}; font-size:14px; font-weight:700; text-decoration:none; padding:12px 22px; border-radius:999px;">${t.flyerCta}</a></p>`
+            ? `<p style="margin:24px 0 0;"><a href="${escapeHtml(flyerUrl)}" style="display:inline-block; background:${GOLD}; color:#000000; font-size:15px; font-weight:700; text-decoration:none; padding:13px 22px; border-radius:6px;">${t.flyerCta}</a></p>`
             : ""
         }
       </td>
     </tr>
     <tr>
-      <td style="padding:28px 32px 32px; text-align:center; border-top:1px solid rgba(10,26,49,0.08); margin-top:24px;">
-        <p style="margin:20px 0 0; color:rgba(10,26,49,0.45); font-size:12px; letter-spacing:0.5px; text-transform:uppercase;">
+      <td style="padding:24px 32px 28px; text-align:center;">
+        <p style="margin:16px 0 0; padding-top:20px; border-top:1px solid ${LINE}; color:${INK_3}; font-size:13px;">
           ${t.footer}
         </p>
       </td>

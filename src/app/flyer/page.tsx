@@ -4,12 +4,13 @@ import { retrieveCheckoutSession } from "@/lib/payments";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { hasValidTicket, type Attendee } from "@/lib/types";
 import { EVENT_INFO } from "@/lib/event-info";
+import { publicBaseUrl } from "@/lib/public-url";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Create your flyer — NewSpace Africa Conference 2027",
-  description: "Make an “I'm attending” graphic for LinkedIn, Instagram or WhatsApp.",
+  title: "Create your flyer",
+  description: "Make an “I'm attending” graphic for LinkedIn, Instagram or WhatsApp, with your photo.",
 };
 
 // Anyone can make a flyer. Coming from /register/success (?session_id=…),
@@ -45,8 +46,8 @@ export default async function FlyerPage(props: PageProps<"/flyer">) {
   }
 
   // The flyer's QR code points people at the registration form.
-  const base = process.env.PUBLIC_BASE_URL?.replace(/\/$/, "");
-  const registerUrl = base ? `${base}/register` : EVENT_INFO.websiteUrl;
+  const base = publicBaseUrl();
+  const registerUrl = base ? `${base}/` : EVENT_INFO.websiteUrl;
 
   return <FlyerMaker prefill={prefill} backHref={backHref} registerUrl={registerUrl} />;
 }

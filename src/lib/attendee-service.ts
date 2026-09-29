@@ -3,6 +3,7 @@ import { generateUniqueCode, generateQrPngBuffer } from "@/lib/qrcode";
 import { sendQrEmail, type EmailLanguage } from "@/lib/email";
 import { hasValidTicket, type Attendee } from "@/lib/types";
 import { brandLogoPng, renderTicketPng } from "@/lib/ticket-image";
+import { publicBaseUrl } from "@/lib/public-url";
 import { describeError } from "@/lib/describe-error";
 
 // Single place that creates attendees, used by the public registration form,
@@ -166,9 +167,7 @@ export async function sendAttendeeQr(attendee: Attendee): Promise<boolean> {
       qrPngBuffer,
       ticketPngBuffer,
       logoPngBuffer,
-      flyerUrl: process.env.PUBLIC_BASE_URL
-        ? `${process.env.PUBLIC_BASE_URL.replace(/\/$/, "")}/flyer`
-        : null,
+      flyerUrl: publicBaseUrl() ? `${publicBaseUrl()}/flyer` : null,
     });
     await supabaseAdmin()
       .from("attendees")

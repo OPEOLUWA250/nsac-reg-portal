@@ -1,6 +1,6 @@
 # NewSpace Africa — Reg Portal
 
-Registration now happens on our own form at **`/register`** (English and
+Registration now happens on our own form, on the home page **`/`** (`/register` redirects there) (English and
 French), which replaces Jotform. Registrants pay by card through **Stripe
 Checkout**; once payment succeeds they get a unique QR check-in code
 (`unique_code`) on screen and by email. Event staff use a camera-based
@@ -11,7 +11,7 @@ Jotform form is closed.
 
 ## Flow
 
-1. Attendee fills in `/register` (same questions as the old Jotform form:
+1. Attendee fills in the form at `/` (same questions as the old Jotform form:
    name, email, job title, phone, nationality, country of residence,
    organisation + location, professional category, job function, invitation
    letter + optional passport upload, food allergies, safety/privacy consent,
@@ -156,7 +156,7 @@ Jotform form is closed.
    into `STRIPE_WEBHOOK_SECRET`. Test the whole flow with Stripe test keys
    and card `4242 4242 4242 4242` before switching to live keys.
 
-4. `npm run dev` and open `/register` or `/checkin` to try the scanner (camera permission
+4. `npm run dev` and open `/` or `/checkin` to try the scanner (camera permission
    required — use `https://` or `localhost`, browsers block camera access on
    plain HTTP elsewhere).
 
