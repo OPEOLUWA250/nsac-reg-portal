@@ -885,15 +885,20 @@ function Review({
     <Card className="space-y-4 p-5 sm:p-6">
       <h2 className="font-display text-xl font-bold text-blue">{t.review.title}</h2>
       <dl className="divide-y divide-line">
+        {/* Label above the value, Edit on the right: a long email address
+            (no spaces to wrap at) breaks inside its column instead of
+            pushing the row off the screen on phones. */}
         {rows.map((r) => (
-          <div key={r.label} className="flex items-center justify-between gap-4 py-2">
-            <dt className="shrink-0 text-sm text-ink-3">{r.label}</dt>
-            <dd className="flex min-w-0 items-center gap-2 text-right font-medium text-ink">
-              <span className={cx("wrap-break-word", !r.value && "font-normal text-ink-3")}>{r.value || t.review.empty}</span>
-              <Button variant="ghost" size="sm" onClick={() => onEdit(r.step)} aria-label={`${t.review.edit}: ${r.label}`}>
-                {t.review.edit}
-              </Button>
-            </dd>
+          <div key={r.label} className="flex items-center gap-3 py-2.5">
+            <div className="min-w-0 flex-1">
+              <dt className="text-sm text-ink-3">{r.label}</dt>
+              <dd className={cx("font-medium text-ink [overflow-wrap:anywhere]", !r.value && "font-normal text-ink-3")}>
+                {r.value || t.review.empty}
+              </dd>
+            </div>
+            <Button variant="ghost" size="sm" className="shrink-0" onClick={() => onEdit(r.step)} aria-label={`${t.review.edit}: ${r.label}`}>
+              {t.review.edit}
+            </Button>
           </div>
         ))}
       </dl>
