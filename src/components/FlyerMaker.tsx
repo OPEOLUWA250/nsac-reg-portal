@@ -86,8 +86,15 @@ export default function FlyerMaker({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
+  // "Adjust photo" mode: on touch screens the preview only captures drags
+  // (and pinches) while this is on, so the page scrolls normally otherwise.
+  const [adjusting, setAdjusting] = useState(false);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drag = useRef<{ x: number; y: number; frame: PhotoFrame } | null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  // Fingers (or the mouse) on the preview, and where each gesture started.
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const gesture = useRef<{ frame: PhotoFrame; x: number; y: number; dist: number } | null>(null);
 
   const captionText = caption ?? t.defaultCaption(headline);
 
@@ -177,35 +184,64 @@ export default function FlyerMaker({
       photo?.close();
       setPhoto(bitmap);
       setFrame(initialFrame(bitmap));
+      setAdjusting(false);
     } catch {
       setPhotoError(true);
     }
   }
 
-  // Drag the photo inside its circle (mouse or touch).
+  // Move the photo inside its circle by dragging; zoom with two fingers.
+  // A mouse can always drag. Touch only in "Adjust photo" mode, so a finger
+  // on the preview scrolls the page the rest of the time.
+  const canAdjust = (e: React.PointerEvent) => Boolean(photo) && (e.pointerType === "mouse" || adjusting);
+
+  // Midpoint and spread of the fingers on the preview.
+  function spread() {
+    const pts = [...pointers.current.values()];
+    const x = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+    const y = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+    const dist = pts.length > 1 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0;
+    return { x, y, dist };
+  }
+
+  function startGesture() {
+    gesture.current = pointers.current.size ? { frame, ...spread() } : null;
+  }
+
   function onPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
-    if (!photo) return;
+    if (!canAdjust(e)) return;
     e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = { x: e.clientX, y: e.clientY, frame };
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    startGesture();
   }
 
   function onPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
-    if (!drag.current || !photo) return;
+    if (!photo || !pointers.current.has(e.pointerId) || !gesture.current) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const now = spread();
+    const start = gesture.current;
     const rect = e.currentTarget.getBoundingClientRect();
     const toCanvas = FLYER_SIZES[FORMAT].width / rect.width;
     const r = photoRadius(FORMAT);
-    const start = drag.current.frame;
+    const zoom = start.dist && now.dist ? Math.min(3, Math.max(1, start.frame.zoom * (now.dist / start.dist))) : start.frame.zoom;
     setFrame(
       clampFrame(photo, {
-        zoom: start.zoom,
-        panX: start.panX + ((e.clientX - drag.current.x) * toCanvas) / r,
-        panY: start.panY + ((e.clientY - drag.current.y) * toCanvas) / r,
+        zoom,
+        panX: start.frame.panX + ((now.x - start.x) * toCanvas) / r,
+        panY: start.frame.panY + ((now.y - start.y) * toCanvas) / r,
       })
     );
   }
 
-  function onPointerUp() {
-    drag.current = null;
+  function onPointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
+    pointers.current.delete(e.pointerId);
+    // The remaining finger (after a pinch) carries on from here.
+    startGesture();
+  }
+
+  function startAdjusting() {
+    setAdjusting(true);
+    previewRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
   // Keyboard: arrow keys move the photo inside its circle, + and - zoom.
@@ -293,10 +329,11 @@ export default function FlyerMaker({
           <div className="min-w-0 flex-1 basis-48 space-y-2">
             <Eyebrow>{t.kicker}</Eyebrow>
             <h1 className="font-display text-3xl font-extrabold text-blue sm:text-4xl">{t.title}</h1>
-            <p className="max-w-2xl text-base text-ink-2">{t.intro}</p>
           </div>
           <LanguageSwitch lang={lang} onChange={chooseLang} />
         </div>
+        {/* Below the title row, so it uses the full width on phones. */}
+        <p className="max-w-2xl text-base text-ink-2">{t.intro}</p>
 
         <div className="grid items-start gap-6 lg:grid-cols-2">
           {/* Controls */}
@@ -308,21 +345,6 @@ export default function FlyerMaker({
                   <input id="flyer-photo" type="file" accept="image/*" className="sr-only" onChange={(e) => onPhoto(e.target.files?.[0])} aria-describedby="flyer-photo-hint" />
                 </label>
               </div>
-              {photo && (
-                <div className="flex items-center gap-3 pt-3">
-                  <span className="w-12 text-sm font-semibold text-ink-2">{t.zoom}</span>
-                  <input
-                    type="range"
-                    min={1}
-                    max={3}
-                    step={0.01}
-                    value={frame.zoom}
-                    onChange={(e) => setFrame((f) => clampFrame(photo, { ...f, zoom: Number(e.target.value) }))}
-                    className="h-11 flex-1"
-                    aria-label={t.zoom}
-                  />
-                </div>
-              )}
             </Field>
 
             <div className="grid gap-5 sm:grid-cols-2">
@@ -361,7 +383,7 @@ export default function FlyerMaker({
 
           {/* Preview + actions */}
           <div className="order-1 space-y-4 lg:sticky lg:top-24 lg:order-2">
-            <div className="mx-auto max-w-md">
+            <div ref={previewRef} className="mx-auto max-w-xs scroll-mt-24 sm:max-w-md">
               <canvas
                 ref={canvasRef}
                 width={width}
@@ -372,16 +394,53 @@ export default function FlyerMaker({
                 onPointerCancel={onPointerUp}
                 tabIndex={photo ? 0 : -1}
                 onKeyDown={onCanvasKey}
-                className={cx("block h-auto w-full touch-none rounded-lg bg-blue", photo && "cursor-grab active:cursor-grabbing")}
+                className={cx(
+                  "block h-auto w-full rounded-lg bg-blue transition-shadow duration-150",
+                  photo && "cursor-grab active:cursor-grabbing",
+                  // While adjusting: fingers move and zoom the photo instead of scrolling.
+                  adjusting && "touch-none ring-4 ring-gold"
+                )}
                 role="img"
                 aria-label={`${t.headlines[headline]} ${EVENT_INFO.name[lang]}: ${name}.${photo ? ` ${t.moveHint}` : ""}`}
               />
             </div>
 
-            {!photo && (
+            {!photo ? (
               <div className="flex justify-center">
                 <label className={buttonClass("secondary", "lg", "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-blue")}>
                   {t.photoChoose}
+                  <input type="file" accept="image/*" className="sr-only" onChange={(e) => onPhoto(e.target.files?.[0])} />
+                </label>
+              </div>
+            ) : adjusting ? (
+              <div className="mx-auto max-w-md space-y-3 rounded-lg border border-line bg-surface p-4 transition-opacity duration-150 starting:opacity-0" role="group" aria-label={t.adjust}>
+                <p className="text-sm text-ink-2">{t.adjustHint}</p>
+                <div className="flex items-center gap-3">
+                  <label htmlFor="flyer-zoom" className="w-12 shrink-0 text-sm font-semibold text-ink-2">
+                    {t.zoom}
+                  </label>
+                  <input
+                    id="flyer-zoom"
+                    type="range"
+                    min={1}
+                    max={3}
+                    step={0.01}
+                    value={frame.zoom}
+                    onChange={(e) => setFrame((f) => clampFrame(photo, { ...f, zoom: Number(e.target.value) }))}
+                    className="h-11 min-w-0 flex-1"
+                  />
+                </div>
+                <Button variant="secondary" className="w-full" onClick={() => setAdjusting(false)}>
+                  {t.adjustDone}
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap justify-center gap-2.5">
+                <Button variant="outline" onClick={startAdjusting}>
+                  {t.adjust}
+                </Button>
+                <label className={buttonClass("ghost", "md", "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-blue")}>
+                  {t.photoChange}
                   <input type="file" accept="image/*" className="sr-only" onChange={(e) => onPhoto(e.target.files?.[0])} />
                 </label>
               </div>
