@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminCodeRequired, isAdminAuthorized, isStaffAuthorized } from "@/lib/staff-auth";
-import { listTickets, saveTicket, validateTicketInput } from "@/lib/ticket-store";
+import { deleteTicket, listTickets, saveTicket, ticketRegistrationCounts, validateTicketInput } from "@/lib/ticket-store";
 
 export const runtime = "nodejs";
 
@@ -11,8 +11,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   try {
-    const tickets = await listTickets();
-    return NextResponse.json({ tickets, adminCodeRequired: adminCodeRequired() });
+    const [tickets, counts] = await Promise.all([listTickets(), ticketRegistrationCounts()]);
+    return NextResponse.json({ tickets, counts, adminCodeRequired: adminCodeRequired() });
   } catch {
     return NextResponse.json(
       { error: "Could not load tickets. Has the tickets migration been run?" },
@@ -65,6 +65,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ticket: saved.ticket });
   } catch (err) {
     console.error("Save ticket error", err);
+    return NextResponse.json({ error: "database error" }, { status: 500 });
+  }
+}
+
+// DELETE /api/admin/tickets?id=standard — only for tickets nobody has
+// registered with (otherwise hide it: past registrations keep their ticket).
+export async function DELETE(req: NextRequest) {
+  if (!isStaffAuthorized(req)) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+  if (!isAdminAuthorized(req)) {
+    return NextResponse.json({ error: "Wrong admin code." }, { status: 403 });
+  }
+  const id = req.nextUrl.searchParams.get("id") ?? "";
+  try {
+    const result = await deleteTicket(id);
+    if (result === "in_use") {
+      return NextResponse.json(
+        { error: "People have registered with this ticket, so it can't be deleted. Hide it instead." },
+        { status: 409 }
+      );
+    }
+    if (result === "not_found") {
+      return NextResponse.json({ error: "Ticket not found." }, { status: 404 });
+    }
+    console.info(`Ticket ${id} deleted`);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("Delete ticket error", err);
     return NextResponse.json({ error: "database error" }, { status: 500 });
   }
 }

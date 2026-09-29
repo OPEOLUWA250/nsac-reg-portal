@@ -32,7 +32,12 @@ Jotform form is closed.
 6. **Print badge** opens the browser print dialog with a badge-sized page
    (defaults to 3.5in × 5.5in — adjust `--badge-width` / `--badge-height` in
    `src/app/globals.css` to match your badge stock/printer).
-7. `/admin` is the event control dashboard (refreshes every 20 seconds):
+7. `/admin` is the event control area, with a sidebar: **Dashboard**,
+   **Tickets & prices** (`/admin/tickets`: add/edit prices, sale end dates
+   that remove a ticket from the form automatically, end sale now,
+   hide/show, delete unused tickets), **Settings** (`/admin/settings`:
+   open/close registration, status of payments, email and security) and
+   **Admins** (placeholder). The dashboard (refreshes every 20 seconds):
    - **Overview** — registrations (and new in the last 24 h), paid, revenue,
      awaiting payment, checked in, invitation letters needed (and how many
      have no passport yet); breakdowns by ticket, nationality and
@@ -79,7 +84,9 @@ Jotform form is closed.
   Choosing "Media" on the form gives a Press badge; everyone else is Delegate.
 - **Passports** are private. In `/admin`, the **Passport** button opens a
   link that expires after 5 minutes.
-- **Closing registration**: set `REGISTRATION_OPEN=false`.
+- **Closing registration**: `/admin/settings` → Public registration switch
+  (no redeploy). `REGISTRATION_OPEN=false` in the environment always
+  forces it closed.
 - **Tickets (PNG)**: after paying, registrants see and can download a
   branded ticket (logo, name, role, organisation, ticket type, QR code),
   and it's attached to the confirmation email. It's drawn by
@@ -137,6 +144,10 @@ Jotform form is closed.
    - `supabase/migrations/20260928140000_attendee_roles.sql` — replaces the
      table's original role check (which rejected `delegate`, so every form
      submission failed) with the roles the app uses.
+   - `supabase/migrations/20260929120000_more_tickets.sql` — Standard and
+     Late tickets, hidden, placeholder prices.
+   - `supabase/migrations/20260929130000_settings.sql` — the `settings`
+     table behind the open/close registration switch.
 
 3. In Stripe → Developers → Webhooks, add
    `https://your-domain.com/api/stripe-webhook` with the events

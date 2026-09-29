@@ -18,7 +18,13 @@ export function useStaffCode() {
     window.dispatchEvent(new Event("nsac-staff-code"));
   }
 
-  return { staffCode, saveStaffCode };
+  function clearStaffCode() {
+    localStorage.removeItem(STAFF_CODE_KEY);
+    setStaffCode(null);
+    window.dispatchEvent(new Event("nsac-staff-code"));
+  }
+
+  return { staffCode, saveStaffCode, clearStaffCode };
 }
 
 export default function StaffGate({

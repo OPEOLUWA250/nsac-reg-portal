@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateRegistration } from "@/lib/registration-fields";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { createAttendee, sendAttendeeQr, canResendQr } from "@/lib/attendee-service";
-import { registrationOpen } from "@/lib/registration-config";
+import { isRegistrationOpen } from "@/lib/registration-config";
 import { createCheckoutSession } from "@/lib/payments";
 import { availableTickets } from "@/lib/ticket-store";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -35,7 +35,7 @@ function baseUrl(req: NextRequest): string {
 //   409 { error: "registration_closed" }
 //   502 { error: "payment_unavailable" }    (Stripe couldn't be reached)
 export async function POST(req: NextRequest) {
-  if (!registrationOpen()) {
+  if (!(await isRegistrationOpen())) {
     return NextResponse.json({ error: "registration_closed" }, { status: 409 });
   }
 

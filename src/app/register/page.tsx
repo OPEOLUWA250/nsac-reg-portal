@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import RegistrationForm from "@/components/RegistrationForm";
 import { availableTickets } from "@/lib/ticket-store";
-import { registrationOpen, PRIVACY_POLICY_URL } from "@/lib/registration-config";
+import { isRegistrationOpen, PRIVACY_POLICY_URL } from "@/lib/registration-config";
 import type { Ticket } from "@/lib/tickets";
 import { describeError } from "@/lib/describe-error";
 
@@ -24,6 +24,7 @@ export default async function RegisterPage(props: PageProps<"/register">) {
     // than an error page.
     console.error(`Could not load tickets for /register: ${describeError(err)}`);
   }
+  const open = await isRegistrationOpen();
   const tickets = onSale.map((t) => ({
     id: t.id,
     name: t.name,
@@ -37,7 +38,7 @@ export default async function RegisterPage(props: PageProps<"/register">) {
       tickets={tickets}
       turnstileSiteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || undefined}
       privacyPolicyUrl={PRIVACY_POLICY_URL}
-      registrationOpen={registrationOpen() && tickets.length > 0}
+      registrationOpen={open && tickets.length > 0}
       paymentCancelled={query.payment === "cancelled"}
     />
   );

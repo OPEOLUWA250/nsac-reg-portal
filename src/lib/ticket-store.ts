@@ -160,3 +160,44 @@ export async function saveTicket(
   if (!data) return { ok: false, notFound: true };
   return { ok: true, ticket: fromRow(data as TicketRow) };
 }
+
+export interface TicketCounts {
+  paid: number;
+  pending: number;
+  /** Every registration using this ticket, whatever its payment state. */
+  total: number;
+}
+
+/** Registrations per ticket id. */
+export async function ticketRegistrationCounts(): Promise<Record<string, TicketCounts>> {
+  const { data, error } = await supabaseAdmin()
+    .from("attendees")
+    .select("ticket_type, payment_status")
+    .not("ticket_type", "is", null);
+  if (error) throw error;
+  const counts: Record<string, TicketCounts> = {};
+  for (const row of data as { ticket_type: string; payment_status: string | null }[]) {
+    const c = (counts[row.ticket_type] ??= { paid: 0, pending: 0, total: 0 });
+    c.total++;
+    if (row.payment_status === "paid") c.paid++;
+    else if (row.payment_status === "pending") c.pending++;
+  }
+  return counts;
+}
+
+/**
+ * Deletes a ticket nobody has registered with. Tickets that were used are
+ * kept (hide them instead) so past registrations still show their ticket.
+ */
+export async function deleteTicket(id: string): Promise<"deleted" | "in_use" | "not_found"> {
+  const supabase = supabaseAdmin();
+  const { count, error: countError } = await supabase
+    .from("attendees")
+    .select("id", { count: "exact", head: true })
+    .eq("ticket_type", id);
+  if (countError) throw countError;
+  if ((count ?? 0) > 0) return "in_use";
+  const { data, error } = await supabase.from("tickets").delete().eq("id", id).select("id");
+  if (error) throw error;
+  return data && data.length ? "deleted" : "not_found";
+}

@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import StaffGate, { useStaffCode } from "@/components/StaffGate";
-import TicketManager, { type TicketCounts } from "@/components/TicketManager";
+import { useAdmin } from "@/components/admin/AdminContext";
 import AttendeeDrawer, { Avatar, PaymentBadge } from "@/components/AttendeeDrawer";
 import { Button, Card, Kicker, RolePill, StatusPill } from "@/components/ui";
 import { buildAttendeeCsv, categoryLabel, money, relativeTime } from "@/lib/admin-format";
@@ -36,10 +35,10 @@ interface RegisterForm {
 
 const EMPTY_FORM: RegisterForm = { fullName: "", email: "", role: "attendee", organization: "", phone: "" };
 
-type Panel = "none" | "tickets" | "walkin";
+type Panel = "none" | "walkin";
 
 export default function AdminDashboard() {
-  const { staffCode, saveStaffCode } = useStaffCode();
+  const { staffCode, apiCall } = useAdmin();
   const [attendees, setAttendees] = useState<Attendee[] | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loadError, setLoadError] = useState("");
@@ -60,31 +59,11 @@ export default function AdminDashboard() {
   const [registerError, setRegisterError] = useState("");
   const [exportOpen, setExportOpen] = useState(false);
 
-  const apiCall = useCallback(
-    async (path: string, options: RequestInit = {}) => {
-      const res = await fetch(path, {
-        ...options,
-        headers: {
-          "Content-Type": "application/json",
-          "x-staff-code": staffCode ?? "",
-          ...options.headers,
-        },
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        // body carries extra detail, e.g. per-field errors from the tickets API.
-        throw Object.assign(new Error(json.error ?? `Request failed (${res.status})`), { body: json });
-      }
-      return json;
-    },
-    [staffCode]
-  );
-
   const loadAttendees = useCallback(async () => {
     setRefreshing(true);
     try {
       const { attendees } = await apiCall("/api/admin/attendees");
-      setAttendees(attendees);
+      setAttendees(attendees as Attendee[]);
       setLoadError("");
       setLastUpdated(new Date());
     } catch (err) {
@@ -102,7 +81,7 @@ export default function AdminDashboard() {
     };
     const first = setTimeout(load, 0);
     const interval = setInterval(load, POLL_INTERVAL_MS);
-    // Ticket names for labels (the prices panel manages them).
+    // Ticket names for labels (managed on the Tickets & prices page).
     apiCall("/api/admin/tickets").then(
       (json) => !cancelled && setTickets(json.tickets as Ticket[]),
       () => {}
@@ -157,17 +136,6 @@ export default function AdminDashboard() {
       byCategory: count((a) => categoryLabel(a.professional_category)),
     };
   }, [attendees, ticketName]);
-
-  const ticketCounts = useMemo(() => {
-    const counts: Record<string, TicketCounts> = {};
-    for (const a of attendees ?? []) {
-      if (!a.ticket_type) continue;
-      const c = (counts[a.ticket_type] ??= { paid: 0, pending: 0 });
-      if (a.payment_status === "paid") c.paid++;
-      else if (a.payment_status === "pending") c.pending++;
-    }
-    return counts;
-  }, [attendees]);
 
   // ---------- filtering ----------
 
@@ -243,7 +211,7 @@ export default function AdminDashboard() {
         method: "POST",
         body: JSON.stringify({ id, checkedIn }),
       });
-      setAttendees((prev) => (prev ? prev.map((a) => (a.id === id ? attendee : a)) : prev));
+      setAttendees((prev) => (prev ? prev.map((a) => (a.id === id ? (attendee as Attendee) : a)) : prev));
       return checkedIn ? "Checked in ✓" : "Check-in undone";
     });
 
@@ -252,7 +220,7 @@ export default function AdminDashboard() {
     const tab = window.open("", "_blank");
     withRow(id, async () => {
       try {
-        const { url } = await apiCall("/api/admin/passport", { method: "POST", body: JSON.stringify({ id }) });
+        const { url } = (await apiCall("/api/admin/passport", { method: "POST", body: JSON.stringify({ id }) })) as { url: string };
         if (tab) tab.location.href = url;
         else window.location.href = url;
       } catch (err) {
@@ -289,29 +257,22 @@ export default function AdminDashboard() {
     setExportOpen(false);
   }
 
-  if (!staffCode) {
-    return <StaffGate onSubmit={saveStaffCode} />;
-  }
-
   const selected = attendees?.find((a) => a.id === selectedId) ?? null;
   const checkInRate = stats.total ? Math.round((stats.checkedIn / stats.total) * 100) : 0;
 
   return (
-    <main className="flex-1 px-4 py-6 sm:px-8 sm:py-10 bg-[#F4F6FA]">
+    <main className="px-4 py-6 sm:px-8 sm:py-10">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Title + actions */}
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="space-y-1">
-            <Kicker>Event control</Kicker>
+            <Kicker>Dashboard</Kicker>
             <h1 className="font-display text-3xl text-navy">Registrations</h1>
             <p className="text-sm text-navy/55">
               {EVENT_INFO.name.en} · {EVENT_INFO.date.en} · {EVENT_INFO.place.en}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" onClick={() => setPanel((p) => (p === "tickets" ? "none" : "tickets"))}>
-              {panel === "tickets" ? "Close prices" : "Tickets & prices"}
-            </Button>
             <Button variant="outline" onClick={() => setPanel((p) => (p === "walkin" ? "none" : "walkin"))}>
               {panel === "walkin" ? "Cancel walk-in" : "+ Walk-in"}
             </Button>
@@ -377,8 +338,6 @@ export default function AdminDashboard() {
             <Breakdown title="By professional category" rows={stats.byCategory} total={stats.total} />
           </div>
         )}
-
-        {panel === "tickets" && <TicketManager apiCall={apiCall} counts={ticketCounts} />}
 
         {panel === "walkin" && (
           <Card className="p-6 space-y-4">

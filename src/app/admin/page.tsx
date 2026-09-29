@@ -1,11 +1,4 @@
-"use client";
-
-import dynamic from "next/dynamic";
-
-// localStorage-backed staff auth only makes sense client-side.
-const AdminDashboard = dynamic(() => import("@/components/AdminDashboard"), {
-  ssr: false,
-});
+import AdminDashboard from "@/components/AdminDashboard";
 
 export default function AdminPage() {
   return <AdminDashboard />;
