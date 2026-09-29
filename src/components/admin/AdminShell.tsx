@@ -24,9 +24,11 @@ import type { ActivityItem } from "@/app/api/admin/activity/route";
 const ACTIVITY_POLL_MS = 30_000;
 const SEEN_KEY = "nsac_admin_activity_seen";
 
+const noSignOut = () => {};
+
 export default function AdminShell({ children }: { children: ReactNode }) {
   return (
-    <AdminProvider staffCode="" onSignOut={() => {}}>
+    <AdminProvider staffCode="" onSignOut={noSignOut}>
       <Frame>{children}</Frame>
     </AdminProvider>
   );

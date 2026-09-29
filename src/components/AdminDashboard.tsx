@@ -55,7 +55,7 @@ interface RegisterForm {
 const EMPTY_FORM: RegisterForm = { fullName: "", email: "", role: "attendee", organization: "", phone: "" };
 
 export default function AdminDashboard() {
-  const { staffCode, apiCall, requestedAttendee, setRequestedAttendee } = useAdmin();
+  const { apiCall, requestedAttendee, setRequestedAttendee } = useAdmin();
   const [attendees, setAttendees] = useState<Attendee[] | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loadError, setLoadError] = useState("");
@@ -92,7 +92,6 @@ export default function AdminDashboard() {
   }, [apiCall]);
 
   useEffect(() => {
-    if (!staffCode) return;
     let cancelled = false;
     const load = () => {
       if (!cancelled) loadAttendees();
@@ -109,7 +108,7 @@ export default function AdminDashboard() {
       clearTimeout(first);
       clearInterval(interval);
     };
-  }, [staffCode, apiCall, loadAttendees]);
+  }, [apiCall, loadAttendees]);
 
   // Opened from a notification: show that person's details once the list is here.
   useEffect(() => {
