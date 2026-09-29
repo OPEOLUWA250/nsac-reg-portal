@@ -113,12 +113,12 @@ export default function FlyerMaker({
     // "Scan to register" QR code, drawn crisp at any size.
     const qr = document.createElement("canvas");
     Promise.allSettled([
-      document.fonts.load(`800 40px ${display}`),
+      document.fonts.load(`700 40px ${display}`),
       document.fonts.load(`500 40px ${body}`),
       document.fonts.load(`600 40px ${body}`),
       document.fonts.load(`700 40px ${body}`),
       logo.decode(),
-      QRCode.toCanvas(qr, registerUrl, { margin: 0, width: 480, errorCorrectionLevel: "M", color: { dark: "#03416A", light: "#FFFFFF" } }),
+      QRCode.toCanvas(qr, registerUrl, { margin: 0, width: 480, errorCorrectionLevel: "M", color: { dark: "#0A1A31", light: "#FFFFFF" } }),
     ]).then(([, , , , , qrResult]) => {
       if (cancelled) return;
       setAssets({

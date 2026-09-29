@@ -188,3 +188,9 @@ Gradients, glows, radial "orbs", star or dot fields, glass or blur, drop
 shadows, coloured left stripes, pastel fills, neon colours, emoji, sparkle
 icons, animated arrows, icon libraries (icons are small inline SVGs with
 `currentColor`).
+
+**Exception: the flyer artwork** (`src/lib/flyer-draw.ts`, the image people
+post on social media) keeps its own deep-space look: starfield, planet
+horizon with glow, shadows and the gold card edge. It is a poster, not the
+interface, and was kept by choice. It still uses the site fonts (Raleway and
+DM Sans), passed in from the flyer maker page.
