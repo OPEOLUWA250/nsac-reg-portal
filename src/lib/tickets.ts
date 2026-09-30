@@ -23,6 +23,10 @@ export interface Ticket {
 
 /** Stripe won't charge less than €0.50. */
 export const MIN_PRICE_CENTS = 50;
+/** Public VIP registrations always require a charge, including after discounts. */
+export function requiresVipPayment(category: string, amountCents: number): boolean {
+  return category === "vip" && (!Number.isFinite(amountCents) || amountCents < MIN_PRICE_CENTS);
+}
 export const MAX_PRICE_CENTS = 10_000_000;
 export const TICKET_ID_RE = /^[a-z0-9_]{2,40}$/;
 

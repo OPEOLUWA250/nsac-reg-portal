@@ -175,7 +175,7 @@ export const COPY: Record<Language, Copy> = {
       promoHint: "Got a code from a sponsor or partner? Enter it here.",
       shareDetails: "Can your details be shared?",
       shareDetailsHint:
-        "If yes, people who scan your QR code at the event, such as exhibitors and other attendees, see your name, job title, organisation, nationality, email and phone number. If no, they only see that you chose not to share.",
+        "If yes, people who scan your QR code at the event see your name, registration category, country of residence, nationality, job title, organisation, email and phone number. If no, they only see that you chose not to share.",
       vatNumber: "Company VAT number",
       vatHint: "This is compulsory if you are registering from Europe.",
       vatRequiredHint: "Required for organisations located in Europe.",
@@ -224,6 +224,7 @@ export const COPY: Record<Language, Copy> = {
       invalid_phone: "Enter a valid phone number, with country code.",
       invalid_choice: "Please choose an option from the list.",
       consent_required: "Please tick this box to agree. It's required to register.",
+      vip_payment_required: "VIP registration requires payment. Choose a paid ticket and remove any code that makes the total free.",
       file_type: "Upload a photo (JPG, PNG, WebP) or a PDF.",
       file_too_large: "The file must be 10 MB or smaller.",
       ticket_unavailable: "This ticket is no longer available. Please choose another.",
@@ -350,7 +351,7 @@ export const COPY: Record<Language, Copy> = {
       promoHint: "Vous avez un code d'un sponsor ou d'un partenaire\u00a0? Saisissez-le ici.",
       shareDetails: "Vos coordonnées peuvent-elles être partagées\u00a0?",
       shareDetailsHint:
-        "Si oui, les personnes qui scannent votre QR code pendant l'événement, comme les exposants et les autres participants, voient vos nom et prénom, votre poste, votre organisation, votre nationalité, votre e-mail et votre numéro de téléphone. Si non, elles voient seulement que vous avez choisi de ne pas les partager.",
+        "Si oui, les personnes qui scannent votre QR code voient vos nom et prénom, catégorie d'inscription, pays de résidence, nationalité, poste, organisation, e-mail et numéro de téléphone. Si non, elles voient seulement que vous avez choisi de ne pas les partager.",
       vatNumber: "Numéro de TVA intracommunautaire de l'entreprise",
       vatHint: "Obligatoire pour les organisations situées en Europe.",
       vatRequiredHint: "Obligatoire pour les organisations situées en Europe.",
@@ -399,6 +400,7 @@ export const COPY: Record<Language, Copy> = {
       invalid_phone: "Saisissez un numéro valide, avec l'indicatif du pays.",
       invalid_choice: "Veuillez choisir une option dans la liste.",
       consent_required: "Cochez cette case pour accepter. C'est obligatoire pour s'inscrire.",
+      vip_payment_required: "L'inscription VIP nécessite un paiement. Choisissez un billet payant et retirez tout code rendant le total gratuit.",
       file_type: "Joignez une photo (JPG, PNG, WebP) ou un PDF.",
       file_too_large: "Le fichier ne doit pas dépasser 10\u00a0Mo.",
       ticket_unavailable: "Ce billet n'est plus disponible. Veuillez en choisir un autre.",

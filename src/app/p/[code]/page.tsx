@@ -6,6 +6,7 @@ import SiteLanguageSync from "@/components/SiteLanguageSync";
 import { legalLanguage } from "@/components/LegalPage";
 import { getPublicContact } from "@/lib/server/public-contact";
 import { EVENT_INFO } from "@/lib/event-info";
+import { roleLabel } from "@/lib/role-style";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,9 @@ const COPY = {
     organisation: "Organisation",
     jobTitle: "Job title",
     nationality: "Nationality",
+    name: "Name",
+    country: "Country of residence",
+    category: "Category",
     save: "Save contact",
     write: "Send an email",
   },
@@ -48,6 +52,9 @@ const COPY = {
     organisation: "Organisation",
     jobTitle: "Poste",
     nationality: "Nationalité",
+    name: "Nom",
+    country: "Pays de résidence",
+    category: "Catégorie",
     save: "Enregistrer le contact",
     write: "Envoyer un e-mail",
   },
@@ -79,6 +86,9 @@ export default async function ContactPage(props: PageProps<"/p/[code]">) {
               )}
             </div>
             <dl className="divide-y divide-line border-y border-line">
+              <Row label={t.name} value={attendee!.full_name} />
+              {attendee!.residence_country && <Row label={t.country} value={attendee!.residence_country} />}
+              <Row label={t.category} value={roleLabel(attendee!.role)} />
               <Row label={t.email} value={<a className={linkClass} href={`mailto:${attendee!.email}`}>{attendee!.email}</a>} />
               {attendee!.phone && <Row label={t.phone} value={<a className={linkClass} href={`tel:${attendee!.phone.replace(/\s/g, "")}`}>{attendee!.phone}</a>} />}
               {attendee!.organization && <Row label={t.organisation} value={attendee!.organization} />}

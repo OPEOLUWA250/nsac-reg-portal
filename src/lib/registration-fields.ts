@@ -91,6 +91,7 @@ export type FieldError =
   | "invalid_phone"
   | "invalid_choice"
   | "consent_required"
+  | "vip_payment_required"
   | "file_type"
   | "file_too_large"
   | "ticket_unavailable"

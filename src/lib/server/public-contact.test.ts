@@ -7,7 +7,7 @@ const mock = vi.hoisted(() => ({ single: vi.fn() }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase-admin", () => ({ supabaseAdmin: () => ({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: mock.single }) }) }) }) }));
 const row = { full_name: "Ada Example", first_name: "Ada", last_name: "Example", email: "ada@example.com", phone: "+2348000000000", organization: "Space Team", job_title: "Engineer", nationality: "Nigeria", role: "delegate", payment_status: "paid", share_details: true, passport_path: "secret" };
-beforeEach(() => mock.single.mockResolvedValue({ data: { ...row }, error: null }));
+beforeEach(() => mock.single.mockResolvedValue({ data: { ...row, residence_country: "Ghana" }, error: null }));
 const context = { params: Promise.resolve({ code: "abcdef12345678" }) };
 const request = new NextRequest("https://example.com/p/abcdef12345678/vcard");
 
@@ -17,10 +17,14 @@ it("returns only consented contact fields for a valid ticket", async () => {
   if (result.status === "shared") {
     expect(result.contact).toMatchObject({ full_name: row.full_name, email: row.email, phone: row.phone, organization: row.organization, job_title: row.job_title, nationality: row.nationality });
     expect(result.contact).not.toHaveProperty("passport_path");
+    expect(result.contact.residence_country).toBe("Ghana");
   }
   const response = await GET(request, context);
   expect(response.status).toBe(200);
-  expect(await response.text()).toContain("EMAIL;TYPE=INTERNET:ada@example.com");
+  const text = await response.text();
+  expect(text).toContain("EMAIL;TYPE=INTERNET:ada@example.com");
+  expect(text).toContain("ADR;TYPE=WORK:;;;;;;Ghana");
+  expect(text).toContain("CATEGORIES:delegate");
   expect(response.headers.get("cache-control")).toBe("private, no-store");
 });
 
