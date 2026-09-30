@@ -15,22 +15,23 @@ it("returns only consented contact fields for a valid ticket", async () => {
   const result = await getPublicContact("abcdef12345678");
   expect(result.status).toBe("shared");
   if (result.status === "shared") {
-    expect(result.contact).toMatchObject({ full_name: row.full_name, email: row.email, phone: row.phone, organization: row.organization, job_title: row.job_title, nationality: row.nationality });
+    expect(result.contact).toMatchObject({ full_name: row.full_name, email: row.email, phone: row.phone, organization: row.organization, job_title: row.job_title });
     expect(result.contact).not.toHaveProperty("passport_path");
-    expect(result.contact.residence_country).toBe("Ghana");
+    expect(result.contact).not.toHaveProperty("residence_country");
+    expect(result.contact).not.toHaveProperty("nationality");
   }
   const response = await GET(request, context);
   expect(response.status).toBe(200);
   const text = await response.text();
   expect(text).toContain("EMAIL;TYPE=INTERNET:ada@example.com");
-  expect(text).toContain("ADR;TYPE=WORK:;;;;;;Ghana");
+  expect(text).not.toContain("ADR;TYPE=WORK");
   expect(text).toContain("CATEGORIES:delegate");
   expect(response.headers.get("cache-control")).toBe("private, no-store");
 });
 
-it.each([false, null, undefined, "true"])("exposes no details or download when consent is %s", async (share_details) => {
+it.each([false, null, undefined, "true"])("limits non-sharing attendees to name, company and designation when consent is %s", async (share_details) => {
   mock.single.mockResolvedValue({ data: { ...row, share_details }, error: null });
-  expect(await getPublicContact("abcdef12345678")).toEqual({ status: "private" });
+  expect(await getPublicContact("abcdef12345678")).toEqual({ status: "private", contact: { full_name: row.full_name, organization: row.organization, job_title: row.job_title } });
   const response = await GET(request, context);
   expect(response.status).toBe(404);
   expect(await response.text()).not.toContain(row.email);

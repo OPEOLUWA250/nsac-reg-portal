@@ -9,13 +9,15 @@ const attendee = {
   nationality: "Nigeria", residence_country: "Ghana", passport_path: "private.pdf", raw_payload: { secret: true },
 } as unknown as Attendee;
 
-it.each([false, null, undefined])("shows only the name and operational state when consent is %s", (consent) => {
+it.each([false, null, undefined])("shows only name, company, designation and operational state when consent is %s", (consent) => {
   const result = scannerAttendee({ ...attendee, share_details: consent } as Attendee);
   expect(result).toEqual({ full_name: attendee.full_name, unique_code: attendee.unique_code,
     checked_in: false, payment_status: "paid", share_details: false,
-    role: "", email: "", phone: null, organization: null, job_title: null, nationality: null, residence_country: null });
+    role: "", email: "", phone: null, organization: attendee.organization, job_title: attendee.job_title, nationality: null, residence_country: null });
   expect(result).not.toHaveProperty("passport_path");
   expect(result).not.toHaveProperty("raw_payload");
+  expect(result.nationality).toBeNull();
+  expect(result.residence_country).toBeNull();
 });
 
 it("includes permitted contact details only with explicit consent", () => {

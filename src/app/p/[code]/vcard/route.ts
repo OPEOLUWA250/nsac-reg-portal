@@ -24,7 +24,6 @@ export async function GET(_req: NextRequest, ctx: RouteContext<"/p/[code]/vcard"
     `FN:${esc(a.full_name)}`,
     a.organization ? `ORG:${esc(a.organization)}` : "",
     a.job_title ? `TITLE:${esc(a.job_title)}` : "",
-    a.residence_country ? `ADR;TYPE=WORK:;;;;;;${esc(a.residence_country)}` : "",
     `CATEGORIES:${esc(a.role)}`,
     `EMAIL;TYPE=INTERNET:${esc(a.email)}`,
     a.phone ? `TEL;TYPE=CELL:${esc(a.phone)}` : "",

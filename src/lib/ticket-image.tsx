@@ -2,7 +2,6 @@ import { ImageResponse } from "next/og";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { generateQrPngDataUrl, ticketQrContent } from "@/lib/qrcode";
-import { listTickets } from "@/lib/ticket-store";
 import { describeError } from "@/lib/describe-error";
 import { compressedPngResponse, compressPng } from "@/lib/png";
 import type { Attendee } from "@/lib/types";
@@ -22,7 +21,6 @@ export const TICKET_SIZE = { width: 900, height: 1460 };
 
 const BLUE = "#03416A";
 const GOLD = "#F09F07";
-const INK = "#232323";
 const INK_3 = "#5E6670";
 const LINE = "#D8DCE0";
 const PAGE_BG = "#F5F5F5";
@@ -30,14 +28,10 @@ const PAGE_BG = "#F5F5F5";
 const COPY = {
   en: {
     pass: "Attendee pass",
-    ticket: "Ticket",
-    reference: "Reference",
     scan: "Show this code at the registration desk to collect your badge.",
   },
   fr: {
     pass: "Billet participant",
-    ticket: "Billet",
-    reference: "Référence",
     scan: "Présentez ce code à l'accueil pour récupérer votre badge.",
   },
 } as const;
@@ -105,17 +99,6 @@ export async function logoDataUrl(): Promise<string | null> {
   return null;
 }
 
-async function ticketName(attendee: Attendee, lang: "en" | "fr"): Promise<string | null> {
-  if (!attendee.ticket_type) return null;
-  try {
-    const ticket = (await listTickets()).find((t) => t.id === attendee.ticket_type);
-    if (ticket) return ticket.name[lang];
-  } catch {
-    /* fall back to the id */
-  }
-  return attendee.ticket_type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
 // ---------- rendering ----------
 
 /** The ticket as an HTTP response (compressed PNG), for /api/ticket. */
@@ -131,16 +114,14 @@ export async function renderTicketPng(attendee: Attendee): Promise<Buffer> {
 async function drawTicket(attendee: Attendee): Promise<ImageResponse> {
   const lang = attendee.language === "fr" ? "fr" : "en";
   const t = COPY[lang];
-  const [fonts, logo, qr, ticket] = await Promise.all([
+  const [fonts, logo, qr] = await Promise.all([
     brandFonts(),
     logoDataUrl(),
     generateQrPngDataUrl(ticketQrContent(attendee.unique_code)),
-    ticketName(attendee, lang),
   ]);
   const display = fonts.length ? "Raleway" : undefined;
   const body = fonts.length ? "DM Sans" : undefined;
   const name = attendee.full_name.trim();
-  const reference = attendee.id.slice(0, 8).toUpperCase();
 
   return new ImageResponse(
     (
@@ -212,23 +193,6 @@ async function drawTicket(attendee: Attendee): Promise<ImageResponse> {
           <div style={{ display: "flex", flexDirection: "column", padding: "52px 64px 0" }}>
             <div
               style={{
-                alignSelf: "flex-start",
-                display: "flex",
-                padding: "10px 22px",
-                borderRadius: 8,
-                background: GOLD,
-                color: BLUE,
-                fontSize: 22,
-                fontWeight: 700,
-                letterSpacing: 4,
-                textTransform: "uppercase",
-              }}
-            >
-              {attendee.role}
-            </div>
-            <div
-              style={{
-                marginTop: 26,
                 fontFamily: display,
                 fontWeight: 800,
                 fontSize: name.length > 26 ? 50 : 62,
@@ -238,27 +202,16 @@ async function drawTicket(attendee: Attendee): Promise<ImageResponse> {
             >
               {name}
             </div>
+            {attendee.job_title && (
+              <div style={{ marginTop: 18, fontSize: 32, fontWeight: 700, color: BLUE }}>
+                {attendee.job_title}
+              </div>
+            )}
             {attendee.organization && (
               <div style={{ marginTop: 14, fontSize: 30, color: INK_3 }}>
                 {attendee.organization}
               </div>
             )}
-            <div style={{ display: "flex", marginTop: 34 }}>
-              {ticket && (
-                <div style={{ display: "flex", flexDirection: "column", marginRight: 64 }}>
-                  <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: 3, textTransform: "uppercase", color: INK_3 }}>
-                    {t.ticket}
-                  </div>
-                  <div style={{ marginTop: 6, fontSize: 28, fontWeight: 700, color: INK }}>{ticket}</div>
-                </div>
-              )}
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: 3, textTransform: "uppercase", color: INK_3 }}>
-                  {t.reference}
-                </div>
-                <div style={{ marginTop: 6, fontSize: 28, fontWeight: 700, color: INK, letterSpacing: 2 }}>{reference}</div>
-              </div>
-            </div>
           </div>
 
           {/* Perforation */}

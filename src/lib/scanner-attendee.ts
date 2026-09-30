@@ -14,9 +14,9 @@ export function scannerAttendee(attendee: Attendee): ScannerAttendee {
     role: shared ? attendee.role : "",
     email: shared ? attendee.email : "",
     phone: shared ? attendee.phone : null,
-    organization: shared ? attendee.organization : null,
-    job_title: shared ? attendee.job_title : null,
-    nationality: shared ? attendee.nationality : null,
-    residence_country: shared ? attendee.residence_country : null,
+    organization: attendee.organization,
+    job_title: attendee.job_title,
+    nationality: null,
+    residence_country: null,
   };
 }

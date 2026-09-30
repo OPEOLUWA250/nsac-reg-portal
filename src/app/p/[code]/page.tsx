@@ -33,9 +33,7 @@ const COPY = {
     phone: "Phone",
     organisation: "Organisation",
     jobTitle: "Job title",
-    nationality: "Nationality",
     name: "Name",
-    country: "Country of residence",
     category: "Category",
     save: "Save contact",
     write: "Send an email",
@@ -51,9 +49,7 @@ const COPY = {
     phone: "Téléphone",
     organisation: "Organisation",
     jobTitle: "Poste",
-    nationality: "Nationalité",
     name: "Nom",
-    country: "Pays de résidence",
     category: "Catégorie",
     save: "Enregistrer le contact",
     write: "Envoyer un e-mail",
@@ -74,7 +70,14 @@ export default async function ContactPage(props: PageProps<"/p/[code]">) {
         {result.status === "invalid" ? (
           <Notice icon={<IconAlert className="h-7 w-7 text-danger" />} eyebrow={EVENT_INFO.name[lang]} title={t.invalid} body={t.invalidBody} />
         ) : result.status === "private" ? (
-          <Notice icon={<IconUser className="h-7 w-7 text-ink-3" />} eyebrow={EVENT_INFO.name[lang]} title={t.notShared} body={t.notSharedBody} />
+          <Card className="space-y-4 p-6 sm:p-8">
+            <IconUser className="h-7 w-7 text-ink-3" />
+            <Eyebrow>{EVENT_INFO.name[lang]}</Eyebrow>
+            <h1 className="font-display text-3xl font-extrabold wrap-break-word text-blue">{result.contact.full_name}</h1>
+            {result.contact.job_title && <p className="font-medium text-ink">{result.contact.job_title}</p>}
+            {result.contact.organization && <p className="text-ink-2">{result.contact.organization}</p>}
+            <p className="border-t border-line pt-4 text-sm text-ink-3">{t.notSharedBody}</p>
+          </Card>
         ) : (
           <Card className="space-y-5 p-6 sm:p-8">
             <div className="space-y-2">
@@ -87,13 +90,11 @@ export default async function ContactPage(props: PageProps<"/p/[code]">) {
             </div>
             <dl className="divide-y divide-line border-y border-line">
               <Row label={t.name} value={attendee!.full_name} />
-              {attendee!.residence_country && <Row label={t.country} value={attendee!.residence_country} />}
               <Row label={t.category} value={roleLabel(attendee!.role)} />
               <Row label={t.email} value={<a className={linkClass} href={`mailto:${attendee!.email}`}>{attendee!.email}</a>} />
               {attendee!.phone && <Row label={t.phone} value={<a className={linkClass} href={`tel:${attendee!.phone.replace(/\s/g, "")}`}>{attendee!.phone}</a>} />}
               {attendee!.organization && <Row label={t.organisation} value={attendee!.organization} />}
               {attendee!.job_title && <Row label={t.jobTitle} value={attendee!.job_title} />}
-              {attendee!.nationality && <Row label={t.nationality} value={attendee!.nationality} />}
             </dl>
             <div className="flex flex-wrap gap-2">
               <ButtonAnchor href={`/p/${code}/vcard`} variant="primary" className="flex-1">

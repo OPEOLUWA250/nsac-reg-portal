@@ -180,19 +180,18 @@ export default function CheckInApp() {
             <div className="space-y-2">
               {attendee.share_details === true && <RolePill role={attendee.role} />}
               <p className="font-display text-3xl font-extrabold text-blue">{attendee.full_name}</p>
-              {attendee.share_details === true && attendee.organization && <p className="text-ink-2">{attendee.organization}</p>}
+              {attendee.job_title && <p className="font-medium text-ink">{attendee.job_title}</p>}
+              {attendee.organization && <p className="text-ink-2">{attendee.organization}</p>}
             </div>
 
             {attendee.share_details === true && <dl className="divide-y divide-line border-y border-line text-sm">
               {[
                 ["Name", attendee.full_name],
-                ["Country of residence", attendee.residence_country],
                 ["Category", roleLabel(attendee.role)],
-                ["Nationality", attendee.nationality],
                 ["Email", attendee.email],
                 ["Phone number", attendee.phone],
                 ["Company / organisation", attendee.organization],
-                ["Job title", attendee.job_title],
+                ["Designation", attendee.job_title],
               ].map(([label, value]) => (
                 <div key={label} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-3 py-3">
                   <dt className="text-ink-3">{label}</dt>
@@ -201,7 +200,7 @@ export default function CheckInApp() {
               ))}
             </dl>}
             <p className="text-xs text-ink-3">
-              {attendee.share_details === true ? "This attendee allows their contact details to be shared through their QR code." : "This attendee chose not to make their personal information public. Only their name is shown."}
+              {attendee.share_details === true ? "This attendee allows their contact details to be shared through their QR code." : "This attendee chose not to make their personal information public."}
             </p>
 
             {attendee.payment_status === "pending" && (
