@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import QrScanner from "@/components/QrScanner";
 import Badge from "@/components/Badge";
 import StationGate, { useStationName } from "@/components/StationGate";
 import { Alert, Button, Card, Eyebrow, RolePill, Spinner } from "@/components/ui";
 import { IconAlert, IconPin } from "@/components/icons";
-import type { Attendee } from "@/lib/types";
+import type { ScannerAttendee } from "@/lib/scanner-attendee";
 import { roleLabel } from "@/lib/role-style";
 
 type Status = "scanning" | "loading" | "found" | "error";
@@ -33,7 +34,7 @@ export default function CheckInApp() {
   const router = useRouter();
   const { stationName, setStationName, clearStationName } = useStationName();
   const [status, setStatus] = useState<Status>("scanning");
-  const [attendee, setAttendee] = useState<Attendee | null>(null);
+  const [attendee, setAttendee] = useState<ScannerAttendee | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [alreadyCheckedIn, setAlreadyCheckedIn] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
@@ -100,7 +101,8 @@ export default function CheckInApp() {
         station: stationName,
       });
       setAlreadyCheckedIn(false);
-      if (result.attendee) setAttendee(result.attendee);
+      // Apply the latest consent-filtered fields before opening the print dialog.
+      if (result.attendee) flushSync(() => setAttendee(result.attendee));
       setDone(true);
       window.print();
       try {
@@ -176,12 +178,12 @@ export default function CheckInApp() {
         {status === "found" && attendee && (
           <Card className="space-y-5 p-6 transition-opacity duration-200 starting:opacity-0">
             <div className="space-y-2">
-              <RolePill role={attendee.role} />
+              {attendee.share_details === true && <RolePill role={attendee.role} />}
               <p className="font-display text-3xl font-extrabold text-blue">{attendee.full_name}</p>
-              {attendee.organization && <p className="text-ink-2">{attendee.organization}</p>}
+              {attendee.share_details === true && attendee.organization && <p className="text-ink-2">{attendee.organization}</p>}
             </div>
 
-            <dl className="divide-y divide-line border-y border-line text-sm">
+            {attendee.share_details === true && <dl className="divide-y divide-line border-y border-line text-sm">
               {[
                 ["Name", attendee.full_name],
                 ["Country of residence", attendee.residence_country],
@@ -197,9 +199,9 @@ export default function CheckInApp() {
                   <dd className="font-medium text-ink [overflow-wrap:anywhere]">{value || "Not provided"}</dd>
                 </div>
               ))}
-            </dl>
+            </dl>}
             <p className="text-xs text-ink-3">
-              {attendee.share_details === true ? "This attendee allows their contact details to be shared through their QR code." : "This attendee chose not to share their details publicly. These details are visible only to signed-in admins for check-in."}
+              {attendee.share_details === true ? "This attendee allows their contact details to be shared through their QR code." : "This attendee chose not to make their personal information public. Only their name is shown."}
             </p>
 
             {attendee.payment_status === "pending" && (

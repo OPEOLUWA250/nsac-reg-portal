@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { codeFromQr } from "@/lib/qrcode";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { adminRoute } from "@/lib/server/admin-auth";
+import { scannerAttendee } from "@/lib/scanner-attendee";
 
 export const runtime = "nodejs";
 
@@ -58,5 +59,5 @@ export const POST = adminRoute(async (req: NextRequest) => {
     return NextResponse.json({ error: "database error" }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, attendee, alreadyCheckedIn: false });
+  return NextResponse.json({ ok: true, attendee: scannerAttendee(attendee), alreadyCheckedIn: false }, { headers: { "Cache-Control": "private, no-store" } });
 });

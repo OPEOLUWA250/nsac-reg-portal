@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { codeFromQr } from "@/lib/qrcode";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { adminRoute } from "@/lib/server/admin-auth";
+import { scannerAttendee } from "@/lib/scanner-attendee";
 
 export const runtime = "nodejs";
 
@@ -31,5 +32,5 @@ export const POST = adminRoute(async (req: NextRequest) => {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ attendee });
+  return NextResponse.json({ attendee: scannerAttendee(attendee) }, { headers: { "Cache-Control": "private, no-store" } });
 });
