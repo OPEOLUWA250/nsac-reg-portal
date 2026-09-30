@@ -7,3 +7,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Git workflow
+
+- The user wants all future pushes for this project to go to `origin/master`.
+- Work on `master` by default. When pushing, target `origin master` explicitly.
+- Preserve remote changes; never force-push to accomplish this.
