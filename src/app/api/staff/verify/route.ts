@@ -1,13 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
-import { isStaffAuthorized } from "@/lib/staff-auth";
+import { NextResponse } from "next/server";
+import { adminRoute } from "@/lib/server/admin-auth";
 
 export const runtime = "nodejs";
 
-// POST /api/staff/verify (x-staff-code header). Lets the sign-in screen tell
-// staff straight away whether the code they typed is right.
-export async function POST(req: NextRequest) {
-  if (!isStaffAuthorized(req)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+// Compatibility endpoint: only a complete admin session grants access.
+export const POST = adminRoute(async () => {
   return NextResponse.json({ ok: true });
-}
+});

@@ -29,7 +29,7 @@ function systemStatus() {
     security: {
       adminSignIn: Boolean(supabaseAuthConfig()),
       owners: ownerEmails().length,
-      staffCode: Boolean(process.env.STAFF_ACCESS_CODE),
+      scannerAdminOnly: true,
       spamProtection: Boolean(process.env.TURNSTILE_SECRET_KEY),
     },
     keepAlive: Boolean(process.env.CRON_SECRET),

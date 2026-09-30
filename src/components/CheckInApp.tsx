@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import QrScanner from "@/components/QrScanner";
 import Badge from "@/components/Badge";
-import StaffGate, { StaffCodeRejected, useStaffCode } from "@/components/StaffGate";
 import StationGate, { useStationName } from "@/components/StationGate";
 import { Alert, Button, Card, Eyebrow, RolePill, Spinner } from "@/components/ui";
 import { IconAlert, IconPin } from "@/components/icons";
@@ -18,7 +18,7 @@ async function apiError(res: Response): Promise<Error & { status: number }> {
     res.status === 404
       ? "This QR code doesn't match any registration. Check it's a NewSpace Africa 2027 ticket, or send them to the help desk."
       : res.status === 401
-        ? "Your access code no longer works."
+        ? "Your sign-in has ended. Sign in again to use the scanner."
         : res.status >= 500
           ? "The server had a problem. Try again in a moment."
           : (json.error ?? `Request failed (${res.status})`);
@@ -29,7 +29,7 @@ async function apiError(res: Response): Promise<Error & { status: number }> {
 // safe to read localStorage directly in the initial state — there's no
 // server render to mismatch against.
 export default function CheckInApp() {
-  const { staffCode, saveStaffCode } = useStaffCode();
+  const router = useRouter();
   const { stationName, setStationName, clearStationName } = useStationName();
   const [status, setStatus] = useState<Status>("scanning");
   const [attendee, setAttendee] = useState<Attendee | null>(null);
@@ -37,7 +37,6 @@ export default function CheckInApp() {
   const [alreadyCheckedIn, setAlreadyCheckedIn] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
   const [done, setDone] = useState(false);
-  const [codeRejected, setCodeRejected] = useState(false);
 
   async function apiCall(path: string, body: unknown) {
     let res: Response;
@@ -46,7 +45,6 @@ export default function CheckInApp() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-staff-code": staffCode ?? "",
         },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(20_000),
@@ -56,7 +54,8 @@ export default function CheckInApp() {
     }
     if (!res.ok) {
       const err = await apiError(res);
-      if (err.status === 401) setCodeRejected(true);
+      if (err.status === 401) router.replace("/admin/login?next=/checkin");
+      if (err.status === 403) router.replace("/admin/reset-password");
       throw err;
     }
     return res.json();
@@ -130,10 +129,6 @@ export default function CheckInApp() {
     }
   }
 
-  if (!staffCode) {
-    return <StaffGate onSubmit={saveStaffCode} />;
-  }
-
   if (!stationName) {
     return <StationGate onSubmit={setStationName} />;
   }
@@ -150,8 +145,6 @@ export default function CheckInApp() {
             <span className="font-normal text-ink-3">Change</span>
           </Button>
         </div>
-
-        {codeRejected && <StaffCodeRejected />}
 
         {(status === "scanning" || status === "loading") && (
           <div className="space-y-3">

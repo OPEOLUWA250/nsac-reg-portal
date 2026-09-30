@@ -25,7 +25,7 @@ Jotform form is closed.
    `paid` and emails the QR code. The success page also shows the QR code.
    **No QR code is ever sent for an unpaid registration**, and the scanner
    refuses to check in anyone whose payment is still pending.
-4. Event day: staff open `/checkin`, enter the shared staff access code once,
+4. Event day: admins open `/checkin`, sign in with their admin account,
    and scan attendee QR codes with the device camera.
 5. A scan looks the attendee up (`/api/checkin/lookup`), shows their name +
    role, and offers **Confirm check-in** and **Print badge**.
@@ -122,9 +122,6 @@ Jotform form is closed.
      server-side only and bypass RLS on purpose.
    - `RESEND_API_KEY` / `EMAIL_FROM` — from [resend.com](https://resend.com).
      `EMAIL_FROM` must be on a domain you've verified with Resend.
-   - `STAFF_ACCESS_CODE` — shared PIN the check-in desk enters once per
-     device. Leave unset to disable the gate entirely (not recommended,
-     since these routes expose attendee names/emails).
    - `JOTFORM_WEBHOOK_SECRET` — optional, appended as `?secret=...` to the
      webhook URL so random internet POSTs can't create fake attendees.
 
@@ -225,10 +222,6 @@ Sponsor).
 
 ## Notes / next steps
 
-- **Staff auth** is a single shared PIN (`STAFF_ACCESS_CODE`), fine for one
-  event with a small check-in team. If you need per-staff accounts or an
-  audit trail of who checked in whom, swap `src/lib/staff-auth.ts` for
-  Supabase Auth.
 - **Duplicate check-ins** are handled — scanning an already-checked-in
   attendee shows a warning but still allows re-printing a badge.
 - **Admin sign-in** (Supabase Auth, email + password). `src/proxy.ts`
@@ -248,8 +241,11 @@ Sponsor).
   an admin, the temporary password forces a password change, regular admins
   cannot manage admins, and removing an admin revokes dashboard/API access.
   Test a reset email using the callback URL for the actual deployment.
-- **The check-in scanner** keeps its shared staff code
-  (`STAFF_ACCESS_CODE`), so volunteers don't need admin accounts.
+- **The check-in scanner** requires a signed-in admin or super admin.
+  `/checkin` redirects to admin login, then returns to the scanner. All
+  `/api/checkin/*` routes and the legacy `/api/staff/verify` endpoint enforce
+  `adminRoute()`, including the temporary-password restriction. A shared
+  staff code no longer grants access; create admin accounts for the check-in team.
 - **Keeping the free database awake**: Supabase's free plan pauses a
   project after 7 days without activity. `vercel.json` has Vercel call
   `/api/cron/keep-alive` every day at 06:00 UTC, which runs one small

@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { safeAdminNext } from "./safe-next";
 
-it.each(["/admin", "/admin/", "/admin/reset-password", "/admin/tickets"])("accepts admin destination %s", (path) => {
+it.each(["/admin", "/admin/", "/admin/reset-password", "/admin/tickets", "/checkin", "/checkin/"])("accepts admin destination %s", (path) => {
   expect(safeAdminNext(path)).toBe(path);
 });
 

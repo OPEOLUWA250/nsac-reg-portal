@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { codeFromQr } from "@/lib/qrcode";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { isStaffAuthorized } from "@/lib/staff-auth";
+import { adminRoute } from "@/lib/server/admin-auth";
 
 export const runtime = "nodejs";
 
 // Looks up an attendee by the token encoded in their QR code. Does NOT mark
 // them checked in — that's a separate confirm step so the UI can show the
 // attendee's details before staff commit to checking them in.
-export async function POST(req: NextRequest) {
-  if (!isStaffAuthorized(req)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+export const POST = adminRoute(async (req: NextRequest) => {
 
   const { token } = await req.json();
   if (!token || typeof token !== "string") {
@@ -35,4 +32,4 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ attendee });
-}
+});

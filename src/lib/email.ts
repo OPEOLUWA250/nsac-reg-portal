@@ -21,6 +21,8 @@ const COPY = {
   en: {
     subject: (event: string) => `You're registered for the ${event}: your check-in QR code`,
     heading: "Registration confirmed",
+    category: "YOUR REGISTRATION CATEGORY",
+    categoryNote: "Your place at NewSpace Africa 2027",
     greeting: (first: string) => `Hi ${first},`,
     thanks: (event: string) =>
       `Thank you for registering for the <strong style="color:${BLUE};">${event}</strong>. Your place is confirmed.`,
@@ -36,6 +38,8 @@ const COPY = {
   fr: {
     subject: (event: string) => `Votre inscription à la ${event} est confirmée\u00a0: votre QR code d'accès`,
     heading: "Inscription confirmée",
+    category: "VOTRE CATÉGORIE D’INSCRIPTION",
+    categoryNote: "Votre place à NewSpace Africa 2027",
     greeting: (first: string) => `Bonjour ${first},`,
     thanks: (event: string) =>
       `Merci pour votre inscription à la <strong style="color:${BLUE};">${event}</strong>. Votre place est confirmée.`,
@@ -148,11 +152,14 @@ export async function sendQrEmail({
         </p>
         ${
           safeRole
-            ? `<div style="margin:16px 0 4px;">
-                <span style="display:inline-block; border:1px solid ${LINE}; color:${INK}; font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; padding:5px 12px; border-radius:4px;">
-                  ${safeRole}
-                </span>
-              </div>`
+            ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 8px; background:${BLUE}; border-radius:10px; border:1px solid ${BLUE};">
+                <tr><td style="height:5px; background:${GOLD}; border-radius:10px 10px 0 0; font-size:1px; line-height:5px;">&nbsp;</td></tr>
+                <tr><td style="padding:22px 16px; text-align:center;">
+                  <p style="margin:0 0 10px; color:${GOLD}; font-size:11px; font-weight:700; letter-spacing:2px;">${t.category}</p>
+                  <p style="margin:0; color:#ffffff; font-size:28px; line-height:1.3; font-weight:800; letter-spacing:2px; text-transform:uppercase;">${safeRole}</p>
+                  <p style="margin:10px 0 0; color:#ffffff; font-size:13px; line-height:1.5;">${t.categoryNote}</p>
+                </td></tr>
+              </table>`
             : ""
         }
       </td>

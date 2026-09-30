@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { LoadingLabel, Skeleton } from "@/components/ui";
 
-// Camera access + localStorage-backed staff auth only make sense client-side.
+// The proxy requires an admin session; camera access runs client-side.
 const CheckInApp = dynamic(() => import("@/components/CheckInApp"), {
   ssr: false,
   loading: () => (

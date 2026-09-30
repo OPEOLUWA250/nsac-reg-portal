@@ -4,8 +4,7 @@ import { ButtonAnchor, Card, Eyebrow, linkClass, RolePill } from "@/components/u
 import { IconAlert, IconUser } from "@/components/icons";
 import SiteLanguageSync from "@/components/SiteLanguageSync";
 import { legalLanguage } from "@/components/LegalPage";
-import { supabaseAdmin } from "@/lib/supabase-admin";
-import { hasValidTicket, type Attendee } from "@/lib/types";
+import { getPublicContact } from "@/lib/server/public-contact";
 import { EVENT_INFO } from "@/lib/event-info";
 
 export const dynamic = "force-dynamic";
@@ -54,33 +53,20 @@ const COPY = {
   },
 };
 
-type Shown = Pick<
-  Attendee,
-  "full_name" | "email" | "phone" | "organization" | "job_title" | "nationality" | "role" | "share_details" | "payment_status"
->;
-
 export default async function ContactPage(props: PageProps<"/p/[code]">) {
   const [{ code }, lang] = await Promise.all([props.params, legalLanguage(props.searchParams)]);
   const t = COPY[lang];
 
-  let attendee: Shown | null = null;
-  if (/^[A-Za-z0-9]{8,64}$/.test(code)) {
-    const { data } = await supabaseAdmin()
-      .from("attendees")
-      .select("full_name, email, phone, organization, job_title, nationality, role, share_details, payment_status")
-      .eq("unique_code", code)
-      .maybeSingle();
-    attendee = (data as Shown | null) ?? null;
-  }
-  const valid = attendee && hasValidTicket(attendee);
+  const result = await getPublicContact(code);
+  const attendee = result.status === "shared" ? result.contact : null;
 
   return (
     <main id="main" lang={lang} className="flex-1 px-4 py-8 sm:px-6 sm:py-12">
       <SiteLanguageSync lang={lang} />
       <div className="mx-auto max-w-md">
-        {!valid ? (
+        {result.status === "invalid" ? (
           <Notice icon={<IconAlert className="h-7 w-7 text-danger" />} eyebrow={EVENT_INFO.name[lang]} title={t.invalid} body={t.invalidBody} />
-        ) : !attendee!.share_details ? (
+        ) : result.status === "private" ? (
           <Notice icon={<IconUser className="h-7 w-7 text-ink-3" />} eyebrow={EVENT_INFO.name[lang]} title={t.notShared} body={t.notSharedBody} />
         ) : (
           <Card className="space-y-5 p-6 sm:p-8">

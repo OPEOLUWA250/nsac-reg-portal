@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { AdminPage, Alert, Button, Card, Chip, cx, EmptyState, ErrorState, Field, inputClass, LoadingLabel, PageHeader, Skeleton } from "@/components/ui";
+import { AdminPage, Alert, Button, Card, Chip, EmptyState, ErrorState, Field, inputClass, LoadingLabel, PageHeader, Skeleton } from "@/components/ui";
 import { useAdmin } from "@/components/admin/AdminContext";
 import PasswordInput from "@/components/admin/PasswordInput";
 import { ADMIN_PASSWORD_MIN } from "@/lib/admin-password";
@@ -48,7 +48,6 @@ function temporaryPassword(length = 16): string {
 export default function AdminsPanel() {
   const { apiCall, me } = useAdmin();
   const [data, setData] = useState<AdminsResponse | null>(null);
-  const [staffCode, setStaffCode] = useState<boolean | null>(null);
   const [loadError, setLoadError] = useState("");
   const [notice, setNotice] = useState<ReactNode>(null);
   const [actionError, setActionError] = useState("");
@@ -58,12 +57,8 @@ export default function AdminsPanel() {
 
   const load = useCallback(async () => {
     try {
-      const [admins, settings] = await Promise.all([
-        apiCall("/api/admin/admins"),
-        apiCall("/api/admin/settings").catch(() => null),
-      ]);
+      const admins = await apiCall("/api/admin/admins");
       setData(admins as unknown as AdminsResponse);
-      if (settings) setStaffCode(Boolean((settings.status as { security: { staffCode: boolean } }).security.staffCode));
       setLoadError("");
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Couldn't load the admins.");
@@ -223,13 +218,11 @@ export default function AdminsPanel() {
       <Card className="p-5 sm:p-6">
         <h2 className="font-display text-xl font-bold text-blue">Check-in scanner</h2>
         <p className="mt-2 flex items-center gap-2 text-sm font-semibold">
-          <span aria-hidden="true" className={cx("h-2 w-2 rounded-full", staffCode ? "bg-success" : "bg-danger")} />
-          <span className={staffCode ? "text-success" : "text-danger"}>{staffCode ? "Staff code set" : "Staff code not set"}</span>
+          <span aria-hidden="true" className="h-2 w-2 rounded-full bg-success" />
+          <span className="text-success">Admin sign-in required</span>
         </p>
         <p className="mt-1 text-sm text-ink-2">
-          {staffCode
-            ? "Volunteers enter the shared staff code once on each device before scanning. They don't need an admin account."
-            : "Anyone with the scanner's address can use it. Set STAFF_ACCESS_CODE on the server."}
+          Only signed-in admins and super admins can use the scanner. Add an admin account above for anyone who needs to check in attendees.
         </p>
       </Card>
     </AdminPage>
