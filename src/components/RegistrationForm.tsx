@@ -15,7 +15,7 @@ import {
   LanguageSwitch,
   linkClass,
 } from "@/components/ui";
-import { IconCheck } from "@/components/icons";
+import { IconAlert, IconCheck } from "@/components/icons";
 import CountryCombobox from "@/components/CountryCombobox";
 import { clearDraft, readDraft, saveDraft } from "@/lib/registration-draft";
 import { preferredLanguage, setSiteLanguage } from "@/lib/site-language";
@@ -208,6 +208,12 @@ export default function RegistrationForm({
   // A promo code the server has confirmed (shown as a discount before payment).
   const [appliedPromo, setAppliedPromo] = useState<{ code: string; percentOff: number } | null>(null);
   const [checkingPromo, setCheckingPromo] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
+  // The email as typed right now, for answers that arrive after it changed.
+  const currentEmail = useRef(form.email);
+  useEffect(() => {
+    currentEmail.current = form.email;
+  }, [form.email]);
   // Set once the visitor changes something, so the empty form on first
   // load never overwrites a saved draft before it's restored.
   const dirty = useRef(false);
@@ -433,10 +439,34 @@ export default function RegistrationForm({
     scrollToFirstError(errs);
   }
 
-  function handleNext() {
+  // One registration per email: ask the server before leaving step 1, so
+  // nobody fills in the whole form to find out at the end. null = couldn't
+  // check (the server checks again when the form is sent).
+  async function emailTaken(email: string): Promise<boolean | null> {
+    try {
+      const res = await fetch("/api/register/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) return null;
+      return (await res.json()).taken === true;
+    } catch {
+      return null;
+    }
+  }
+
+  async function handleNext() {
     if (!submissionId.current) submissionId.current = crypto.randomUUID();
     const check = validateRegistration({ ...payload, id: submissionId.current }, tickets.map((tk) => tk.id));
     const stepErrs = check.ok ? {} : errorsForStep(check.errors, step);
+    if (step === 0 && !stepErrs.email && form.email.trim()) {
+      setCheckingEmail(true);
+      const taken = await emailTaken(form.email);
+      setCheckingEmail(false);
+      if (taken) stepErrs.email = "email_taken";
+    }
     if (Object.keys(stepErrs).length > 0) {
       setErrors(stepErrs);
       setBanner(t.errors.summary);
@@ -578,7 +608,17 @@ export default function RegistrationForm({
     if (typeof value !== "string" || !value.trim()) return;
     const check = validateRegistration({ ...payload, id: submissionId.current }, tickets.map((tk) => tk.id));
     const code = check.ok ? undefined : check.errors[name];
-    if (code) setErrors((e) => ({ ...e, [name]: code }));
+    if (code) {
+      setErrors((e) => ({ ...e, [name]: code }));
+      return;
+    }
+    // A well-formed email: is it already registered?
+    if (name === "email") {
+      const typed = value;
+      emailTaken(typed).then((taken) => {
+        if (taken && currentEmail.current === typed) setErrors((e) => ({ ...e, email: "email_taken" }));
+      });
+    }
   }
 
   const submitLabel =
@@ -904,13 +944,42 @@ export default function RegistrationForm({
                       {t.back}
                     </Button>
                   )}
-                  <Button type="submit" variant="primary" size="lg" className="sm:ml-auto sm:min-w-44">
+                  <Button type="submit" variant="primary" size="lg" className="sm:ml-auto sm:min-w-44" loading={checkingEmail}>
                     {t.next}
                   </Button>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <Button type="submit" variant="primary" size="lg" className="w-full" loading={busy}>
+                  {/* Payment only opens once the agreement box is ticked (the
+                      server checks it too). The note says why it's locked. */}
+                  {!form.safetyConsent && (
+                    <p id="agree-first" className="flex items-start justify-center gap-1.5 text-center text-sm font-medium text-ink-2">
+                      <IconAlert className="mt-0.5 h-4 w-4 shrink-0 text-gold-ink" />
+                      <span>
+                        {t.agreeFirst}{" "}
+                        <button
+                          type="button"
+                          className={linkClass}
+                          onClick={() => {
+                            const box = document.querySelector<HTMLInputElement>("#field-safetyConsent input");
+                            box?.scrollIntoView({ behavior: "smooth", block: "center" });
+                            box?.focus({ preventScroll: true });
+                          }}
+                        >
+                          {t.agreeFirstLink}
+                        </button>
+                      </span>
+                    </p>
+                  )}
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="lg"
+                    className="w-full"
+                    loading={busy}
+                    disabled={!form.safetyConsent}
+                    aria-describedby={form.safetyConsent ? undefined : "agree-first"}
+                  >
                     {submitLabel}
                   </Button>
                   <Button variant="ghost" size="lg" className="w-full" onClick={() => goToStep(step - 1)} disabled={busy}>

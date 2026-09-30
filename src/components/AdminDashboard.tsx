@@ -240,6 +240,23 @@ export default function AdminDashboard() {
       return checkedIn ? "Checked in." : "Check-in undone.";
     });
 
+  async function handleDelete(a: Attendee) {
+    const ok = window.confirm(
+      `Delete ${a.full_name}'s registration permanently?\n\nTheir ticket and QR code stop working and their passport file is deleted. A payment isn't refunded: do that in Stripe. This can't be undone.`
+    );
+    if (!ok) return;
+    setRowBusy((s) => ({ ...s, [a.id]: true }));
+    try {
+      await apiCall(`/api/admin/attendees?id=${encodeURIComponent(a.id)}`, { method: "DELETE" });
+      setSelectedId(null);
+      setAttendees((prev) => (prev ? prev.filter((x) => x.id !== a.id) : prev));
+    } catch (err) {
+      setRowMessage((s) => ({ ...s, [a.id]: err instanceof Error ? err.message : "Couldn't delete." }));
+    } finally {
+      setRowBusy((s) => ({ ...s, [a.id]: false }));
+    }
+  }
+
   function handleViewPassport(id: string) {
     // Open the tab first (inside the click) so pop-up blockers allow it.
     const tab = window.open("", "_blank");
@@ -601,6 +618,7 @@ export default function AdminDashboard() {
           onResend={() => handleResend(selected.id)}
           onToggleCheckIn={() => handleToggleCheckIn(selected.id, !selected.checked_in)}
           onPassport={() => handleViewPassport(selected.id)}
+          onDelete={() => handleDelete(selected)}
         />
       )}
     </AdminPage>

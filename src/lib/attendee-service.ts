@@ -63,6 +63,16 @@ async function findByEmail(email: string): Promise<Attendee | null> {
   return data as Attendee | null;
 }
 
+/**
+ * True when someone already holds a ticket with this email (paid, free or
+ * walk-in). A registration started but never paid doesn't count: that person
+ * may come back and finish it.
+ */
+export async function isEmailRegistered(email: string): Promise<boolean> {
+  const existing = await findByEmail(normalizeEmail(email));
+  return Boolean(existing && existing.payment_status !== "pending");
+}
+
 async function findBy(column: "id" | "jotform_submission_id", value: string) {
   const supabase = supabaseAdmin();
   const { data, error } = await supabase

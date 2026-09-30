@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { AdminPage, Alert, Card, cx, ErrorState, Field, inputClass, linkClass, LoadingLabel, PageHeader, Skeleton, Spinner } from "@/components/ui";
+import { AdminPage, Alert, Button, Card, cx, ErrorState, Field, inputClass, linkClass, LoadingLabel, PageHeader, Skeleton, Spinner } from "@/components/ui";
 import { useAdmin } from "@/components/admin/AdminContext";
 import { EVENT_INFO } from "@/lib/event-info";
 
@@ -28,6 +28,29 @@ export default function SettingsPanel() {
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  async function deleteAll() {
+    const typed = window.prompt(
+      "This deletes EVERY registration and passport file, and can't be undone.\n\nType DELETE to confirm."
+    );
+    if (typed === null) return;
+    if (typed.trim() !== "DELETE") {
+      window.alert("Nothing was deleted: you need to type DELETE exactly.");
+      return;
+    }
+    setDeleting(true);
+    setSaveError("");
+    setNotice("");
+    try {
+      const json = await apiCall("/api/admin/attendees?all=1&confirm=DELETE", { method: "DELETE" });
+      setNotice(`Deleted ${json.deleted} registration${json.deleted === 1 ? "" : "s"}.`);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Couldn't delete.");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   const load = useCallback(
     () =>
@@ -162,6 +185,18 @@ export default function SettingsPanel() {
         <p className="text-sm text-ink-3">
           Event details appear on the form, tickets, flyers, emails and calendar invites. Ask your developer to change them.
         </p>
+      </Card>
+
+      {/* Danger zone */}
+      <Card className="space-y-3 border-danger p-5 sm:p-6">
+        <h2 className="font-display text-xl font-bold text-danger">Delete all registrations</h2>
+        <p className="text-sm text-ink-2">
+          For starting again after testing. Deletes every registration and passport file for good; tickets and prices
+          stay. Payments aren&apos;t refunded: do that in Stripe. To delete one person, open them on the dashboard instead.
+        </p>
+        <Button variant="danger" onClick={deleteAll} loading={deleting}>
+          Delete all registrations
+        </Button>
       </Card>
 
       {/* System status */}

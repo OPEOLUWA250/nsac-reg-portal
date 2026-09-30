@@ -36,7 +36,9 @@ function localApiOverride(): ConstructorParameters<typeof Stripe>[1] {
 export const EVENT_TITLE = "NewSpace Africa Conference 2027";
 
 interface CheckoutArgs {
-  attendee: Pick<Attendee, "id" | "email" | "vat_number" | "invoice_reference" | "organization">;
+  attendee: Pick<Attendee, "id" | "email" | "vat_number" | "invoice_reference" | "organization"> & {
+    stripe_session_id?: string | null;
+  };
   ticket: Ticket;
   /** Promo code entered on the form, already checked. */
   promo?: PromoCode | null;
@@ -56,6 +58,18 @@ export async function createCheckoutSession({
   if (attendee.organization) customFields.push({ name: "Organisation", value: attendee.organization.slice(0, 140) });
   if (attendee.vat_number) customFields.push({ name: "Company VAT number", value: attendee.vat_number });
   if (attendee.invoice_reference) customFields.push({ name: "Reference", value: attendee.invoice_reference });
+
+  // Someone starting again (another tab, or back after closing the payment
+  // page) gets a new payment page: close the old one, so the same
+  // registration can never be paid twice.
+  if (attendee.stripe_session_id) {
+    try {
+      const previous = await stripe().checkout.sessions.retrieve(attendee.stripe_session_id);
+      if (previous.status === "open") await stripe().checkout.sessions.expire(previous.id);
+    } catch (err) {
+      console.warn(`Couldn't close the previous payment page ${attendee.stripe_session_id}`, err);
+    }
+  }
 
   const session = await stripe().checkout.sessions.create({
     mode: "payment",

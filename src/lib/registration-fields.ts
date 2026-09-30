@@ -93,6 +93,7 @@ export type FieldError =
   | "file_too_large"
   | "ticket_unavailable"
   | "vat_required"
+  | "email_taken"
   | "promo_invalid"
   | "promo_unknown"
   | "promo_expired"

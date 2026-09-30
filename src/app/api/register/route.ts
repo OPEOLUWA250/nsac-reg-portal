@@ -155,10 +155,11 @@ export async function POST(req: NextRequest) {
 
   if (outcome.status === "duplicate_email") {
     if (attendee.payment_status !== "pending") {
-      // Already has a ticket. Don't reveal anything on screen; re-send the
-      // QR code to the address on file (rate-limited).
+      // One registration per email: ask for another address (the form
+      // normally catches this on step 1). The ticket is re-sent to the
+      // address on file, in case it's the owner looking for it (rate-limited).
       if (canResendQr(attendee)) await sendAttendeeQr(attendee);
-      return NextResponse.json({ status: "already_registered" });
+      return NextResponse.json({ error: "validation", fields: { email: "email_taken" } }, { status: 400 });
     }
     // Registered before but never paid (e.g. closed the payment page):
     // let them pay now, for the ticket and code they just picked. Only the

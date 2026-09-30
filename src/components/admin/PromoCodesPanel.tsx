@@ -19,6 +19,8 @@ import {
 } from "@/components/ui";
 import { useAdmin } from "@/components/admin/AdminContext";
 import type { Ticket } from "@/lib/tickets";
+import { relativeTime } from "@/lib/admin-format";
+import { IconRefresh } from "@/components/icons";
 
 // /admin/promo-codes: create and manage promo codes (e.g. complimentary
 // passes for sponsors). The codes live in Stripe; people type them on the
@@ -31,6 +33,8 @@ interface PromoCode {
   percentOff: number;
   maxUses: number | null;
   used: number;
+  /** From our own registrations: completed (paid or free) and started, not finished. */
+  registrations?: { completed: number; started: number };
   expiresAt: string | null;
   active: boolean;
   ticketIds: string[] | null;
@@ -45,6 +49,8 @@ interface Draft {
   expiresAt: string;
   ticketIds: string[]; // empty = all tickets
 }
+
+const POLL_MS = 10_000;
 
 const EMPTY: Draft = { label: "", code: "", percentOff: "100", maxUses: "", expiresAt: "", ticketIds: [] };
 
@@ -72,22 +78,52 @@ export default function PromoCodesPanel() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
+  const [checkedAt, setCheckedAt] = useState<Date | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [, setTick] = useState(0); // re-renders "updated … ago"
+
+  const loadCodes = useCallback(() => {
+    setRefreshing(true);
+    return apiCall("/api/admin/promo-codes")
+      .then(
+        (json) => {
+          setCodes(json.codes as PromoCode[]);
+          setCheckedAt(new Date());
+          setLoadError("");
+        },
+        (err) => setLoadError(err instanceof Error ? err.message : "Couldn't load promo codes.")
+      )
+      .finally(() => setRefreshing(false));
+  }, [apiCall]);
+
   const load = useCallback(() => {
-    apiCall("/api/admin/promo-codes").then(
-      (json) => setCodes(json.codes as PromoCode[]),
-      (err) => setLoadError(err instanceof Error ? err.message : "Couldn't load promo codes.")
-    );
+    loadCodes();
     apiCall("/api/admin/tickets").then(
       (json) => setTickets(json.tickets as Ticket[]),
       () => {}
     );
-  }, [apiCall]);
+  }, [apiCall, loadCodes]);
 
+  // Live: check again every 10 seconds while this tab is open, and as soon
+  // as you come back to it.
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once
-  }, []);
+    const first = setTimeout(load, 0);
+    const poll = setInterval(() => {
+      if (document.visibilityState === "visible") loadCodes();
+      setTick((n) => n + 1);
+    }, POLL_MS);
+    const onVisible = () => document.visibilityState === "visible" && loadCodes();
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      clearTimeout(first);
+      clearInterval(poll);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [load, loadCodes]);
 
+  const timeZone = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "local time";
   const ticketName = (id: string) => tickets.find((t) => t.id === id)?.name.en ?? id;
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
     setDraft((d) => ({ ...d, [key]: value }));
@@ -159,9 +195,17 @@ export default function PromoCodesPanel() {
         title="Promo codes"
         description="Discounts and complimentary passes, e.g. for sponsors. People type the code on the form's ticket step. 100% off is a free pass: no card needed."
         actions={
-          <Button variant="primary" onClick={() => { setFormOpen((o) => !o); setCreated(null); }} aria-expanded={formOpen}>
-            {formOpen ? "Close" : "Create a code"}
-          </Button>
+          <>
+            <span className="text-sm text-ink-3" aria-live="polite">
+              {checkedAt ? `Updated ${relativeTime(checkedAt.toISOString())}` : ""}
+            </span>
+            <Button variant="outline" onClick={() => loadCodes()} disabled={refreshing} aria-label="Refresh promo codes" title="Refresh" className="px-3">
+              <IconRefresh className={cx("h-4 w-4", refreshing && "animate-spin")} />
+            </Button>
+            <Button variant="primary" onClick={() => { setFormOpen((o) => !o); setCreated(null); }} aria-expanded={formOpen}>
+              {formOpen ? "Close" : "Create a code"}
+            </Button>
+          </>
         }
       />
 
@@ -217,10 +261,10 @@ export default function PromoCodesPanel() {
                 </label>
               </div>
             </Field>
-            <Field id="promo-max" label="How many people can use it?" optionalLabel="optional" error={err("maxUses")} hint="Empty = no limit. Each completed registration counts once.">
+            <Field id="promo-max" label="How many people can use it?" required error={err("maxUses")} hint="E.g. 10 for a sponsor with 10 passes. Each completed registration counts as one use.">
               <input id="promo-max" className={inputClass(!!err("maxUses"))} inputMode="numeric" value={draft.maxUses} onChange={(e) => set("maxUses", e.target.value.replace(/[^0-9]/g, ""))} {...aria("promo-max", err("maxUses"), true)} />
             </Field>
-            <Field id="promo-expires" label="Valid until" optionalLabel="optional" error={err("expiresAt")} hint="Empty = no end date. Your time zone.">
+            <Field id="promo-expires" label="Valid until" optionalLabel="optional" error={err("expiresAt")} hint={`Leave it empty if the code should never expire. The time is in your time zone (${timeZone}).`}>
               <input id="promo-expires" type="datetime-local" className={inputClass(!!err("expiresAt"))} value={draft.expiresAt} onChange={(e) => set("expiresAt", e.target.value)} {...aria("promo-expires", err("expiresAt"), true)} />
             </Field>
             <Field id="promo-tickets" as="div" label="Works with" hint="Leave all unticked to allow every ticket.">
@@ -312,6 +356,11 @@ export default function PromoCodesPanel() {
                       {p.maxUses !== null && <span className="text-ink-3"> / {p.maxUses}</span>}
                     </p>
                     <p className="text-sm text-ink-3">{p.maxUses !== null ? "used" : "used, no limit"}</p>
+                    {p.registrations && p.registrations.started > 0 && (
+                      <p className="text-sm font-semibold text-gold-ink">
+                        +{p.registrations.started} started, not finished
+                      </p>
+                    )}
                   </div>
                   <div className="flex w-full gap-2 lg:w-auto">
                     <Button size="sm" variant="outline" onClick={() => copy(p.code)}>

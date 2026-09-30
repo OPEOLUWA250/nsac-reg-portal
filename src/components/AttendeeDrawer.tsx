@@ -27,6 +27,7 @@ export default function AttendeeDrawer({
   onResend,
   onToggleCheckIn,
   onPassport,
+  onDelete,
 }: {
   attendee: Attendee;
   ticketName: string;
@@ -36,6 +37,8 @@ export default function AttendeeDrawer({
   onResend: () => void;
   onToggleCheckIn: () => void;
   onPassport: () => void;
+  /** Deletes this registration (asks for confirmation first). */
+  onDelete: () => void;
 }) {
   const [closing, setClosing] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -229,6 +232,17 @@ export default function AttendeeDrawer({
             <Row label="Source" value={a.source === "web" ? "Registration form" : a.source === "walk_in" ? "Walk-in (admin)" : a.source === "jotform" ? "Jotform" : a.source} />
             <Row label="Jotform submission" value={a.jotform_submission_id} />
           </Section>
+
+          <section className="space-y-3 rounded-lg border border-danger bg-surface p-5">
+            <h3 className="font-semibold text-danger">Delete this registration</h3>
+            <p className="text-sm text-ink-2">
+              Removes {a.full_name} and their passport file for good. Their ticket and QR code stop working. A payment
+              isn&apos;t refunded: do that in Stripe.
+            </p>
+            <Button variant="danger" size="sm" onClick={onDelete} disabled={busy}>
+              Delete registration
+            </Button>
+          </section>
         </div>
       </aside>
     </div>

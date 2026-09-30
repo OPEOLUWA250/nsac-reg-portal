@@ -18,6 +18,7 @@ export const SITE_COPY: Record<
     contact: string;
     website: string;
     organisedBy: string;
+    organiserSite: string;
   }
 > = {
   en: {
@@ -32,7 +33,8 @@ export const SITE_COPY: Record<
     terms: "Terms",
     contact: "Contact",
     website: "Conference website",
-    organisedBy: "NewSpace Africa Conference 2027 is organised by Space in Africa.",
+    organisedBy: "Organised by",
+    organiserSite: "Space in Africa website",
   },
   fr: {
     skip: "Aller au contenu",
@@ -46,6 +48,7 @@ export const SITE_COPY: Record<
     terms: "Conditions",
     contact: "Contact",
     website: "Site de la conférence",
-    organisedBy: "La Conférence NewSpace Africa 2027 est organisée par Space in Africa.",
+    organisedBy: "Organisé par",
+    organiserSite: "Site de Space in Africa",
   },
 };

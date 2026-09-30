@@ -18,10 +18,24 @@ export default function SiteFooter() {
 
   return (
     <footer className="border-t border-line bg-canvas">
-      {/* Phones: links in a two-column grid (easy to tap), the organiser line
-          underneath. Wider screens: one row, organiser line on the left. */}
+      {/* Phones: links in a two-column grid (easy to tap), the organiser's
+          logo underneath. Wider screens: one row, organiser on the left. */}
       <div className="mx-auto flex max-w-6xl flex-col-reverse gap-4 px-4 py-6 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
-        <p className="border-t border-line pt-4 text-ink-3 sm:border-0 sm:pt-0">{t.organisedBy}</p>
+        <div className="flex items-center gap-3 border-t border-line pt-4 sm:border-0 sm:pt-0">
+          <span className="text-ink-3">{t.organisedBy}</span>
+          <a href="https://spaceinafrica.com" className="rounded-sm transition-opacity duration-150 hover:opacity-80" title={t.organiserSite}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- pre-sized 2x/3x files, served as they are */}
+            <img
+              src="/brand/space-in-africa-80.png"
+              srcSet="/brand/space-in-africa-80.png 2x, /brand/space-in-africa-120.png 3x"
+              alt="Space in Africa"
+              width={103}
+              height={40}
+              className="block h-10 w-auto"
+              loading="lazy"
+            />
+          </a>
+        </div>
         <nav aria-label={lang === "fr" ? "Pied de page" : "Footer"} className="grid grid-cols-2 gap-x-6 sm:flex sm:gap-x-5">
           <Link href={`/privacy?lang=${lang}`} className={linkClass}>{t.privacy}</Link>
           <Link href={`/terms?lang=${lang}`} className={linkClass}>{t.terms}</Link>

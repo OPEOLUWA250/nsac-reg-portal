@@ -93,6 +93,8 @@ type Copy = {
   };
   submit: (price: string) => string;
   submitFree: string;
+  agreeFirst: string;
+  agreeFirstLink: string;
   submitting: string;
   uploading: (pct: number) => string;
   redirecting: string;
@@ -218,6 +220,7 @@ export const COPY: Record<Language, Copy> = {
       required: "This field is required.",
       too_long: "This is too long.",
       invalid_email: "Enter a valid email address.",
+      email_taken: "This email is already registered for the conference. Please use a different email address.",
       invalid_phone: "Enter a valid phone number, with country code.",
       invalid_choice: "Please choose an option from the list.",
       consent_required: "Please tick this box to agree. It's required to register.",
@@ -258,6 +261,8 @@ export const COPY: Record<Language, Copy> = {
     },
     submit: (price) => `Continue to payment · ${price}`,
     submitFree: "Continue · Free pass",
+    agreeFirst: "Tick the agreement box to continue to payment.",
+    agreeFirstLink: "Go to the box",
     submitting: "Saving your registration…",
     uploading: (pct) => `Uploading your passport… ${pct}%`,
     redirecting: "Taking you to the secure payment page…",
@@ -390,6 +395,7 @@ export const COPY: Record<Language, Copy> = {
       required: "Ce champ est obligatoire.",
       too_long: "Ce texte est trop long.",
       invalid_email: "Saisissez une adresse e-mail valide.",
+      email_taken: "Cette adresse e-mail est déjà inscrite à la conférence. Veuillez utiliser une autre adresse.",
       invalid_phone: "Saisissez un numéro valide, avec l'indicatif du pays.",
       invalid_choice: "Veuillez choisir une option dans la liste.",
       consent_required: "Cochez cette case pour accepter. C'est obligatoire pour s'inscrire.",
@@ -430,6 +436,8 @@ export const COPY: Record<Language, Copy> = {
     },
     submit: (price) => `Passer au paiement · ${price}`,
     submitFree: "Continuer · Accès gratuit",
+    agreeFirst: "Cochez la case d'accord pour passer au paiement.",
+    agreeFirstLink: "Aller à la case",
     submitting: "Enregistrement de votre inscription…",
     uploading: (pct) => `Envoi de votre passeport… ${pct}\u00a0%`,
     redirecting: "Redirection vers la page de paiement sécurisée…",

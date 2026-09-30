@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { AdminProvider, useAdmin } from "@/components/admin/AdminContext";
 import { ADMIN_NAV, ADMIN_NAV_BOTTOM, isAdminPathActive } from "@/components/admin/admin-nav";
-import { usePopover } from "@/components/admin/usePopover";
+import { usePopover } from "@/components/usePopover";
 import { IconBell, IconChevronDown, IconClose, IconCog, IconMenu, IconScan, IconUser } from "@/components/icons";
 import { Button, cx, Skeleton } from "@/components/ui";
 import { relativeTime } from "@/lib/admin-format";
