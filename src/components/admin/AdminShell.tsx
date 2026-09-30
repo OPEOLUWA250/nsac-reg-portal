@@ -7,28 +7,22 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { AdminProvider, useAdmin } from "@/components/admin/AdminContext";
 import { ADMIN_NAV, ADMIN_NAV_BOTTOM, isAdminPathActive } from "@/components/admin/admin-nav";
 import { usePopover } from "@/components/usePopover";
-import { IconBell, IconChevronDown, IconClose, IconCog, IconMenu, IconScan, IconUser } from "@/components/icons";
-import { Button, cx, Skeleton } from "@/components/ui";
+import { IconBell, IconChevronDown, IconClose, IconCog, IconKey, IconLogout, IconMenu, IconScan, IconUser } from "@/components/icons";
+import { Button, cx, Skeleton, Spinner } from "@/components/ui";
 import { relativeTime } from "@/lib/admin-format";
 import type { ActivityItem } from "@/app/api/admin/activity/route";
 
 // Layout for every /admin page: a blue sidebar (logo top left, page links)
 // and a white top bar with notifications and the profile menu. On phones the
-// sidebar slides in from a menu button.
-//
-// TEMPORARY: no sign-in while admin login is being built (see
-// ADMIN_SIGN_IN_ENABLED in src/lib/staff-auth.ts). To bring the staff code
-// back, wrap this in StaffGate / useStaffCode from @/components/StaffGate as
-// the check-in scanner does.
+// sidebar slides in from a menu button. Only signed-in admins get here:
+// src/proxy.ts sends everyone else to /admin/login.
 
 const ACTIVITY_POLL_MS = 30_000;
 const SEEN_KEY = "nsac_admin_activity_seen";
 
-const noSignOut = () => {};
-
 export default function AdminShell({ children }: { children: ReactNode }) {
   return (
-    <AdminProvider staffCode="" onSignOut={noSignOut}>
+    <AdminProvider>
       <Frame>{children}</Frame>
     </AdminProvider>
   );
@@ -83,6 +77,8 @@ function Frame({ children }: { children: ReactNode }) {
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const { me } = useAdmin();
+  const bottom = ADMIN_NAV_BOTTOM.filter((item) => !item.superAdminOnly || me?.role === "super_admin");
   return (
     <div className="on-dark flex h-full flex-col bg-blue text-white">
       <div className="flex h-16 shrink-0 items-center px-6">
@@ -97,7 +93,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           ))}
         </div>
         <div className="mt-auto space-y-1 border-t border-white/15 py-3">
-          {ADMIN_NAV_BOTTOM.map((item) => (
+          {bottom.map((item) => (
             <SidebarLink key={item.href} item={item} active={isAdminPathActive(pathname, item.href)} onNavigate={onNavigate} />
           ))}
         </div>
@@ -330,6 +326,9 @@ function NotificationBell() {
 
 function ProfileMenu() {
   const { open, setOpen, wrap, trigger } = usePopover();
+  const { me, signOut } = useAdmin();
+  const [signingOut, setSigningOut] = useState(false);
+  const roleName = me ? (me.role === "super_admin" ? "Super admin" : "Admin") : "";
 
   return (
     <div ref={wrap} className="relative">
@@ -344,9 +343,18 @@ function ProfileMenu() {
         <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue text-white">
           <IconUser className="h-4 w-4" />
         </span>
-        <span className="hidden text-left leading-tight sm:block">
-          <span className="block text-sm font-semibold text-ink">Event admin</span>
-          <span className="block text-xs text-ink-3">No sign-in yet</span>
+        <span className="hidden max-w-48 text-left leading-tight sm:block">
+          {me ? (
+            <>
+              <span className="block truncate text-sm font-semibold text-ink">{me.email}</span>
+              <span className="block text-xs text-ink-3">{roleName}</span>
+            </>
+          ) : (
+            <>
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="mt-1 h-3 w-16" />
+            </>
+          )}
         </span>
         <IconChevronDown className="hidden h-4 w-4 text-ink-3 sm:block" />
         <span className="sr-only sm:hidden">Profile</span>
@@ -360,16 +368,34 @@ function ProfileMenu() {
           className="absolute right-0 top-full z-40 mt-2 w-64 rounded-lg border border-line bg-surface p-1.5 transition-[opacity,translate] duration-200 starting:-translate-y-1 starting:opacity-0"
         >
           <div className="border-b border-line px-3 pb-3 pt-2">
-            <p className="text-sm font-semibold text-ink">Event admin</p>
-            <p className="text-xs text-ink-3">The admin has no sign-in yet: anyone with its address can open it.</p>
+            <p className="text-xs text-ink-3">Signed in as</p>
+            <p className="wrap-break-word text-sm font-semibold text-ink">{me?.email ?? "…"}</p>
+            {me && <p className="text-xs text-ink-3">{roleName}</p>}
           </div>
-          <div className="py-1.5">
+          <div className="border-b border-line py-1.5">
             <MenuLink href="/admin/settings" onClick={() => setOpen(false)} icon={<IconCog />}>
               Settings
             </MenuLink>
             <MenuLink href="/checkin" onClick={() => setOpen(false)} icon={<IconScan />}>
               Check-in scanner
             </MenuLink>
+            <MenuLink href="/admin/reset-password" onClick={() => setOpen(false)} icon={<IconKey />}>
+              Change password
+            </MenuLink>
+          </div>
+          <div className="pt-1.5">
+            <button
+              type="button"
+              disabled={signingOut}
+              onClick={() => {
+                setSigningOut(true);
+                signOut();
+              }}
+              className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm text-ink transition-colors duration-150 hover:bg-subtle active:bg-line disabled:opacity-60"
+            >
+              <span className="text-ink-3">{signingOut ? <Spinner /> : <IconLogout />}</span>
+              {signingOut ? "Signing out…" : "Sign out"}
+            </button>
           </div>
         </div>
       )}

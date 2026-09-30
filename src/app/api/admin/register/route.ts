@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminAreaAuthorized } from "@/lib/staff-auth";
+import { adminRoute } from "@/lib/server/admin-auth";
 import { createAttendee, sendAttendeeQr } from "@/lib/attendee-service";
 import { ATTENDEE_ROLES, isAttendeeRole } from "@/lib/types";
 import { describeError } from "@/lib/describe-error";
@@ -9,11 +9,7 @@ export const runtime = "nodejs";
 // On-site walk-in registration, for attendees who show up without having
 // registered online. Creates the attendee record and emails their QR code
 // immediately, same as the public form does.
-export async function POST(req: NextRequest) {
-  if (!isAdminAreaAuthorized(req)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-
+export const POST = adminRoute(async (req: NextRequest) => {
   const body = await req.json();
   const fullName = typeof body.fullName === "string" ? body.fullName.trim() : "";
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
@@ -65,4 +61,4 @@ export async function POST(req: NextRequest) {
   const emailSent = await sendAttendeeQr(outcome.attendee);
   // Attendee is created even if the email failed — admin can hit Resend.
   return NextResponse.json({ ok: true, attendee: outcome.attendee, emailSent });
-}
+});

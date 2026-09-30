@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { isAdminAreaAuthorized } from "@/lib/staff-auth";
+import { adminRoute } from "@/lib/server/admin-auth";
 
 export const runtime = "nodejs";
 
 // Returns a link to an attendee's passport scan that expires after 5
 // minutes, for preparing invitation letters. Passports are never public.
-export async function POST(req: NextRequest) {
-  if (!isAdminAreaAuthorized(req)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-
+export const POST = adminRoute(async (req: NextRequest) => {
   const { id } = await req.json();
   if (!id || typeof id !== "string") {
     return NextResponse.json({ error: "missing id" }, { status: 400 });
@@ -36,4 +32,4 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ url: data.signedUrl });
-}
+});

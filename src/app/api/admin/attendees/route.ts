@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { isAdminAreaAuthorized, isAdminAuthorized } from "@/lib/staff-auth";
+import { adminRoute } from "@/lib/server/admin-auth";
 import { describeError } from "@/lib/describe-error";
 
 export const runtime = "nodejs";
 
-export async function GET(req: NextRequest) {
-  if (!isAdminAreaAuthorized(req)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-
+export const GET = adminRoute(async (req: NextRequest) => {
   const supabase = supabaseAdmin();
   const { data: attendees, error } = await supabase
     .from("attendees")
@@ -22,18 +18,18 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({ attendees });
-}
+});
 
 // DELETE /api/admin/attendees?id=<uuid>          one registration
 // DELETE /api/admin/attendees?all=1&confirm=DELETE every registration
 // Also deletes their passport files. Stripe payments are not refunded (do
 // that in the Stripe dashboard). This can't be undone.
-export async function DELETE(req: NextRequest) {
-  if (!isAdminAreaAuthorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  if (!isAdminAuthorized(req)) return NextResponse.json({ error: "Wrong admin code." }, { status: 403 });
-
+export const DELETE = adminRoute(async (req: NextRequest, _context: unknown, session) => {
   const id = req.nextUrl.searchParams.get("id");
   const all = req.nextUrl.searchParams.get("all") === "1";
+  if (all && session.role !== "super_admin") {
+    return NextResponse.json({ error: "Only super admins can delete every registration." }, { status: 403 });
+  }
   if (all && req.nextUrl.searchParams.get("confirm") !== "DELETE") {
     return NextResponse.json({ error: "Type DELETE to confirm deleting every registration." }, { status: 400 });
   }
@@ -64,4 +60,4 @@ export async function DELETE(req: NextRequest) {
     console.error(`Delete registrations failed: ${describeError(err)}`);
     return NextResponse.json({ error: "Couldn't delete. Try again." }, { status: 500 });
   }
-}
+});

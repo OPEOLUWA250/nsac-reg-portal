@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { AdminPage, Alert, Button, Card, cx, ErrorState, Field, inputClass, linkClass, LoadingLabel, PageHeader, Skeleton, Spinner } from "@/components/ui";
+import { AdminPage, Alert, Button, Card, cx, ErrorState, linkClass, LoadingLabel, PageHeader, Skeleton, Spinner } from "@/components/ui";
+import DeleteDialog from "@/components/admin/DeleteDialog";
 import { useAdmin } from "@/components/admin/AdminContext";
 import { EVENT_INFO } from "@/lib/event-info";
 
@@ -12,44 +13,29 @@ interface SettingsResponse {
   settings: { registrationOpen: boolean };
   closedByEnv: boolean;
   ticketsOnSale: number;
-  adminCodeRequired: boolean;
   status: {
     payments: { configured: boolean; mode: "live" | "test" | null; webhook: boolean };
     email: { provider: string | null; sender: string | null; testSender: boolean };
-    security: { staffCode: boolean; adminCode: boolean; spamProtection: boolean };
+    security: { adminSignIn: boolean; owners: number; staffCode: boolean; spamProtection: boolean };
+    keepAlive: boolean;
     publicUrl: string | null;
   };
 }
 
 export default function SettingsPanel() {
-  const { apiCall, adminCode, setAdminCode } = useAdmin();
+  const { apiCall, me } = useAdmin();
   const [data, setData] = useState<SettingsResponse | null>(null);
   const [loadError, setLoadError] = useState("");
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
-  const [deleting, setDeleting] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   async function deleteAll() {
-    const typed = window.prompt(
-      "This deletes EVERY registration and passport file, and can't be undone.\n\nType DELETE to confirm."
-    );
-    if (typed === null) return;
-    if (typed.trim() !== "DELETE") {
-      window.alert("Nothing was deleted: you need to type DELETE exactly.");
-      return;
-    }
-    setDeleting(true);
     setSaveError("");
     setNotice("");
-    try {
-      const json = await apiCall("/api/admin/attendees?all=1&confirm=DELETE", { method: "DELETE" });
-      setNotice(`Deleted ${json.deleted} registration${json.deleted === 1 ? "" : "s"}.`);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Couldn't delete.");
-    } finally {
-      setDeleting(false);
-    }
+    const json = await apiCall("/api/admin/attendees?all=1&confirm=DELETE", { method: "DELETE" });
+    setNotice(`Deleted ${json.deleted} registration${json.deleted === 1 ? "" : "s"}.`);
   }
 
   const load = useCallback(
@@ -130,24 +116,6 @@ export default function SettingsPanel() {
       {notice && <Alert tone="success">{notice}</Alert>}
       {saveError && <Alert tone="error">{saveError}</Alert>}
 
-      {data.adminCodeRequired && (
-        <Card className="p-4 sm:p-5">
-          <div className="max-w-xs">
-            <Field id="admin-code" label="Admin code" hint="Needed to change settings and prices.">
-              <input
-                id="admin-code"
-                type="password"
-                autoComplete="off"
-                className={inputClass()}
-                value={adminCode}
-                onChange={(e) => setAdminCode(e.target.value)}
-                aria-describedby="admin-code-hint"
-              />
-            </Field>
-          </div>
-        </Card>
-      )}
-
       {/* Registration switch */}
       <Card className="p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -187,19 +155,26 @@ export default function SettingsPanel() {
         </p>
       </Card>
 
-      {/* Danger zone */}
+      {/* Danger zone (super admins only) */}
+      {me?.role === "super_admin" && (
       <Card className="space-y-3 border-danger p-5 sm:p-6">
         <h2 className="font-display text-xl font-bold text-danger">Delete all registrations</h2>
         <p className="text-sm text-ink-2">
           For starting again after testing. Deletes every registration and passport file for good; tickets and prices
           stay. Payments aren&apos;t refunded: do that in Stripe. To delete one person, open them on the dashboard instead.
         </p>
-        <Button variant="danger" onClick={deleteAll} loading={deleting}>
+        <Button variant="danger" onClick={() => setDeleteOpen(true)}>
           Delete all registrations
         </Button>
       </Card>
+      )}
 
       {/* System status */}
+      {deleteOpen && (
+        <DeleteDialog title="Delete all registrations?" confirmLabel="Delete all registrations" confirmation="DELETE" onConfirm={deleteAll} onClose={() => setDeleteOpen(false)}>
+          <p>Every registration and passport file will be permanently deleted. This cannot be undone.</p>
+        </DeleteDialog>
+      )}
       <Card className="p-5 sm:p-6">
         <h2 className="font-display text-xl font-bold text-blue">System status</h2>
         <div className="mt-2 divide-y divide-line">
@@ -221,9 +196,29 @@ export default function SettingsPanel() {
             />
           </StatusGroup>
           <StatusGroup title="Security">
-            <Check ok={false} label="Admin sign-in (not built yet: the admin is open)" />
+            <Check
+              ok={data.status.security.adminSignIn && data.status.security.owners > 0}
+              label={
+                !data.status.security.adminSignIn
+                  ? "Admin sign-in not set up (NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY)"
+                  : data.status.security.owners
+                    ? `Admin sign-in with email and password (${data.status.security.owners} owner${data.status.security.owners === 1 ? "" : "s"})`
+                    : "Admin sign-in: no owner set (ADMIN_EMAILS)"
+              }
+            />
             <Check ok={data.status.security.staffCode} label="Staff code for the check-in scanner" />
             <Check ok={data.status.security.spamProtection} warn={!data.status.security.spamProtection} label="Spam protection (Turnstile)" />
+          </StatusGroup>
+          <StatusGroup title="Database">
+            <Check
+              ok={data.status.keepAlive}
+              warn={!data.status.keepAlive}
+              label={
+                data.status.keepAlive
+                  ? "Daily keep-alive: the free Supabase plan won't pause it"
+                  : "Daily keep-alive runs, but CRON_SECRET isn't set (anyone can trigger it)"
+              }
+            />
           </StatusGroup>
         </div>
       </Card>

@@ -37,7 +37,10 @@ Jotform form is closed.
    that remove a ticket from the form automatically, end sale now,
    hide/show, delete unused tickets), **Settings** (`/admin/settings`:
    open/close registration, status of payments, email and security) and
-   **Admins** (placeholder). The dashboard (refreshes every 20 seconds):
+   **Admins** (`/admin/admins`, super admins only: add admins with a
+   temporary password, change roles, remove them). Everyone signs in at
+   `/admin/login` with email and password (see **Admin sign-in** below).
+   The dashboard (refreshes every 20 seconds):
    - **Overview** — registrations (and new in the last 24 h), paid, revenue,
      awaiting payment, checked in, invitation letters needed (and how many
      have no passport yet); breakdowns by ticket, nationality and
@@ -64,9 +67,7 @@ Jotform form is closed.
   add a new one (e.g. Standard, before Early Bird ends). Changes apply to the
   form and to Stripe from the next page load; people who already registered
   keep the price they were charged. The starting tickets are Early Bird €500
-  (until 31 Dec 2026) and Virtual €300. If `ADMIN_ACCESS_CODE` is set, saving
-  ticket changes also needs that code, so check-in volunteers who only have
-  the staff code can't change prices.
+  (until 31 Dec 2026) and Virtual €300.
 - **Discount codes** are created in the Stripe dashboard (Products →
   Coupons → Promotion codes); registrants enter them on the Stripe page. A
   100% code registers them without a charge.
@@ -131,8 +132,11 @@ Jotform form is closed.
      for payments (see `.env.local.example`).
    - `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` — optional
      spam protection.
-   - `ADMIN_ACCESS_CODE` — optional, recommended: a second code needed to
-     change ticket prices in `/admin`.
+   - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` — admin
+     sign-in (public values, Supabase → Project Settings → API).
+   - `ADMIN_EMAILS` — the owners: always super admins, comma-separated.
+   - `CRON_SECRET` — any long random string; protects the daily
+     keep-alive job (see **Keeping the free database awake**).
 
 2. Run these in the Supabase SQL editor, in order, **before deploying**:
    - `supabase/migrations/20260928120000_registration_form.sql` — the form's
@@ -151,6 +155,9 @@ Jotform form is closed.
    - `supabase/migrations/20260930120000_categories_and_sharing.sql`:
      registration categories (delegate, speaker, media, exhibitor, VIP),
      the "Can your details be shared?" answer, and the promo code used.
+   - `supabase/migrations/20261001090000_admin_users.sql` — the
+     `admin_users` table behind **Admins** (owners in `ADMIN_EMAILS` can
+     sign in without it).
 
 3. In Stripe → Developers → Webhooks, add
    `https://your-domain.com/api/stripe-webhook` with the events
@@ -224,11 +231,30 @@ Sponsor).
   Supabase Auth.
 - **Duplicate check-ins** are handled — scanning an already-checked-in
   attendee shows a warning but still allows re-printing a badge.
-- **`/admin` and `/checkin` share the same staff code** (same localStorage
-  key) — entering it once on either page unlocks both. If you want the admin
-  dashboard behind a separate, stronger secret, split `STAFF_ACCESS_CODE`
-  into two env vars and two `x-staff-code`-style checks in
-  `src/lib/staff-auth.ts`.
+- **Admin sign-in** (Supabase Auth, email + password). `src/proxy.ts`
+  sends anyone who isn't an admin from `/admin/*` to `/admin/login`, and
+  every `/api/admin/*` route is wrapped in `adminRoute()`
+  (`src/lib/server/admin-auth.ts`). Owners are the `ADMIN_EMAILS`; other
+  admins are rows in `admin_users`. A new admin gets a temporary password
+  and must set their own on first sign-in. Forgot password sends a link
+  to `/api/auth/callback`: add `https://your-domain.com/api/auth/callback`
+  under Supabase → Authentication → URL Configuration → Redirect URLs.
+  To create the first owner's account: Supabase → Authentication → Users
+  → Add user (tick auto-confirm), with the email in `ADMIN_EMAILS`.
+  Open password-reset links in the same browser that requested them (PKCE).
+  Run `npm test` for authentication regression tests, `npx tsc --noEmit`
+  for type checking, and `npm run build` before deploying.
+  With a configured Supabase project, verify an owner can sign in and add
+  an admin, the temporary password forces a password change, regular admins
+  cannot manage admins, and removing an admin revokes dashboard/API access.
+  Test a reset email using the callback URL for the actual deployment.
+- **The check-in scanner** keeps its shared staff code
+  (`STAFF_ACCESS_CODE`), so volunteers don't need admin accounts.
+- **Keeping the free database awake**: Supabase's free plan pauses a
+  project after 7 days without activity. `vercel.json` has Vercel call
+  `/api/cron/keep-alive` every day at 06:00 UTC, which runs one small
+  query. Check it in Vercel → Project → Settings → Cron Jobs (you can
+  also run it by hand there).
 - **RLS**: the `attendees` table has Row Level Security enabled with no
   public policies — all access goes through server-side API routes using the
   service role key. Don't use the Supabase anon key for this table.

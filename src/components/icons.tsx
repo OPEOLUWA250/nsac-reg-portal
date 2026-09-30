@@ -138,6 +138,23 @@ export const IconTag = ({ className = "h-[18px] w-[18px]" }: P) => (
     <circle cx="8" cy="8" r="1.5" />
   </Svg>
 );
+export const IconEye = ({ className = "h-5 w-5" }: P) => (
+  <Svg className={className}>
+    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+    <circle cx="12" cy="12" r="3" />
+  </Svg>
+);
+export const IconEyeOff = ({ className = "h-5 w-5" }: P) => (
+  <Svg className={className}>
+    <path d="M10.6 5.1A10.7 10.7 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-2.9 3.9M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18" />
+  </Svg>
+);
+export const IconKey = ({ className = "h-[18px] w-[18px]" }: P) => (
+  <Svg className={className}>
+    <circle cx="7.5" cy="15.5" r="4.5" />
+    <path d="M10.7 12.3L20 3M16 7l3 3M14 9l2 2" />
+  </Svg>
+);
 export const IconShare = ({ className = "h-4 w-4" }: P) => (
   <Svg className={className} strokeWidth={2}>
     <circle cx="18" cy="5" r="2.5" />

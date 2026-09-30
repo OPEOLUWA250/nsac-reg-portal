@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminAreaAuthorized, isAdminAuthorized } from "@/lib/staff-auth";
+import { adminRoute } from "@/lib/server/admin-auth";
 import { createPromoCode, listPromoCodes, setPromoCodeActive } from "@/lib/promo-codes";
 import { PROMO_CODE_RE } from "@/lib/registration-fields";
 import { describeError } from "@/lib/describe-error";
@@ -9,8 +9,7 @@ export const runtime = "nodejs";
 
 // /admin/promo-codes: list (GET), create (POST), switch on/off (PATCH).
 
-export async function GET(req: NextRequest) {
-  if (!isAdminAreaAuthorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+export const GET = adminRoute(async (req: NextRequest) => {
   try {
     const [codes, counts] = await Promise.all([listPromoCodes(), registrationsPerCode()]);
     return NextResponse.json({
@@ -21,12 +20,9 @@ export async function GET(req: NextRequest) {
     console.error(`List promo codes failed: ${describeError(err)}`);
     return NextResponse.json({ error: "Couldn't reach Stripe. Check STRIPE_SECRET_KEY and try again." }, { status: 502 });
   }
-}
+});
 
-export async function POST(req: NextRequest) {
-  if (!isAdminAreaAuthorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  if (!isAdminAuthorized(req)) return NextResponse.json({ error: "Wrong admin code." }, { status: 403 });
-
+export const POST = adminRoute(async (req: NextRequest) => {
   const body = await req.json().catch(() => ({}));
   const fields: Record<string, string> = {};
   const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
@@ -56,11 +52,9 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ error: "Couldn't create the code in Stripe. Try again." }, { status: 502 });
   }
-}
+});
 
-export async function PATCH(req: NextRequest) {
-  if (!isAdminAreaAuthorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  if (!isAdminAuthorized(req)) return NextResponse.json({ error: "Wrong admin code." }, { status: 403 });
+export const PATCH = adminRoute(async (req: NextRequest) => {
   const body = await req.json().catch(() => ({}));
   if (typeof body.id !== "string" || typeof body.active !== "boolean") {
     return NextResponse.json({ error: "Missing id or active." }, { status: 400 });
@@ -72,7 +66,7 @@ export async function PATCH(req: NextRequest) {
     console.error(`Update promo code failed: ${describeError(err)}`);
     return NextResponse.json({ error: "Couldn't update the code in Stripe. Try again." }, { status: 502 });
   }
-}
+});
 
 // Our own view of each code's use: completed registrations (paid, including
 // free passes) and ones started but not paid yet. Stripe's own count only

@@ -3,8 +3,9 @@
 import dynamic from "next/dynamic";
 import { LoadingLabel, Skeleton } from "@/components/ui";
 
-// The staff sign-in lives in localStorage, so the admin shell only renders
-// in the browser. The loading screen has the same frame: blue sidebar,
+// Every signed-in admin page (sign-in pages live in ../(auth)). src/proxy.ts
+// has already checked the sign-in before this renders. The shell renders in
+// the browser only; its loading screen has the same frame: blue sidebar,
 // white top bar.
 const AdminShell = dynamic(() => import("@/components/admin/AdminShell"), {
   ssr: false,

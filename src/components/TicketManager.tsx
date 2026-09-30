@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import DeleteDialog from "@/components/admin/DeleteDialog";
 import {
   AdminPage,
   Alert,
@@ -116,11 +117,10 @@ function statusOf(t: Ticket): { label: string; tone: "on" | "off" } {
 }
 
 export default function TicketManager() {
-  const { apiCall, adminCode, setAdminCode } = useAdmin();
+  const { apiCall } = useAdmin();
   const [tickets, setTickets] = useState<Ticket[] | null>(null);
   const [counts, setCounts] = useState<Record<string, TicketCounts>>({});
   const [loadError, setLoadError] = useState("");
-  const [adminCodeRequired, setAdminCodeRequired] = useState(false);
 
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -128,6 +128,7 @@ export default function TicketManager() {
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Ticket | null>(null);
 
   const load = useCallback(
     () =>
@@ -135,7 +136,6 @@ export default function TicketManager() {
         (json) => {
           setTickets(json.tickets as Ticket[]);
           setCounts((json.counts as Record<string, TicketCounts>) ?? {});
-          setAdminCodeRequired(json.adminCodeRequired === true);
           setLoadError("");
         },
         (err) => setLoadError(err instanceof Error ? err.message : "Couldn't load tickets."),
@@ -245,7 +245,6 @@ export default function TicketManager() {
   }
 
   async function remove(t: Ticket) {
-    if (!window.confirm(`Delete "${t.name.en}" permanently? This can't be undone.`)) return;
     setSaving(true);
     setSaveError("");
     setNotice("");
@@ -253,8 +252,6 @@ export default function TicketManager() {
       await apiCall(`/api/admin/tickets?id=${encodeURIComponent(t.id)}`, { method: "DELETE" });
       setTickets((prev) => (prev ?? []).filter((x) => x.id !== t.id));
       setNotice(`"${t.name.en}" deleted.`);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Couldn't delete.");
     } finally {
       setSaving(false);
     }
@@ -265,6 +262,12 @@ export default function TicketManager() {
 
   return (
     <AdminPage>
+      {deleteTarget && (
+        <DeleteDialog title="Delete this ticket?" confirmLabel="Delete ticket" onConfirm={() => remove(deleteTarget)} onClose={() => setDeleteTarget(null)}>
+          <p><strong className="text-ink">{deleteTarget.name.en}</strong> will be permanently removed. This cannot be undone.</p>
+          <p>Only tickets with no registrations can be deleted.</p>
+        </DeleteDialog>
+      )}
       <PageHeader
         eyebrow="Registration form"
         title="Tickets & prices"
@@ -292,24 +295,6 @@ export default function TicketManager() {
           ))}
         </dl>
       </details>
-
-      {adminCodeRequired && (
-        <Card className="p-4 sm:p-5">
-          <div className="max-w-xs">
-            <Field id="admin-code" label="Admin code" hint="Needed to save changes to tickets and prices.">
-              <input
-                id="admin-code"
-                type="password"
-                autoComplete="off"
-                className={inputClass()}
-                value={adminCode}
-                onChange={(e) => setAdminCode(e.target.value)}
-                aria-describedby="admin-code-hint"
-              />
-            </Field>
-          </div>
-        </Card>
-      )}
 
       {notice && <Alert tone="success">{notice}</Alert>}
       {saveError && !editingKey && <Alert tone="error">{saveError}</Alert>}
@@ -406,7 +391,7 @@ export default function TicketManager() {
                         </Button>
                       )}
                       {c.total === 0 && (
-                        <Button variant="danger" size="sm" disabled={saving} onClick={() => remove(t)}>
+                        <Button variant="danger" size="sm" disabled={saving} onClick={() => setDeleteTarget(t)}>
                           Delete
                         </Button>
                       )}

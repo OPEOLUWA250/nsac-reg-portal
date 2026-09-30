@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publicBaseUrl } from "@/lib/public-url";
-import { adminCodeRequired, isAdminAuthorized, isAdminAreaAuthorized } from "@/lib/staff-auth";
+import { adminRoute } from "@/lib/server/admin-auth";
+import { ownerEmails } from "@/lib/server/admin-emails";
+import { supabaseAuthConfig } from "@/lib/server/admin-roles";
 import { getSettings, updateSettings } from "@/lib/settings-store";
 import { registrationClosedByEnv } from "@/lib/registration-config";
 import { availableTickets } from "@/lib/ticket-store";
@@ -25,18 +27,17 @@ function systemStatus() {
       testSender: from.includes("resend.dev"),
     },
     security: {
+      adminSignIn: Boolean(supabaseAuthConfig()),
+      owners: ownerEmails().length,
       staffCode: Boolean(process.env.STAFF_ACCESS_CODE),
-      adminCode: Boolean(process.env.ADMIN_ACCESS_CODE),
       spamProtection: Boolean(process.env.TURNSTILE_SECRET_KEY),
     },
+    keepAlive: Boolean(process.env.CRON_SECRET),
     publicUrl: publicBaseUrl(),
   };
 }
 
-export async function GET(req: NextRequest) {
-  if (!isAdminAreaAuthorized(req)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+export const GET = adminRoute(async (req: NextRequest) => {
   const [settings, onSale] = await Promise.all([
     getSettings(),
     availableTickets().catch(() => []),
@@ -46,18 +47,11 @@ export async function GET(req: NextRequest) {
     closedByEnv: registrationClosedByEnv(),
     ticketsOnSale: onSale.length,
     status: systemStatus(),
-    adminCodeRequired: adminCodeRequired(),
   });
-}
+});
 
 // Body: { registrationOpen?: boolean }
-export async function POST(req: NextRequest) {
-  if (!isAdminAreaAuthorized(req)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-  if (!isAdminAuthorized(req)) {
-    return NextResponse.json({ error: "Wrong admin code." }, { status: 403 });
-  }
+export const POST = adminRoute(async (req: NextRequest) => {
   let body: { registrationOpen?: unknown };
   try {
     body = await req.json();
@@ -78,4 +72,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

@@ -1,36 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminCodeRequired, isAdminAuthorized, isAdminAreaAuthorized } from "@/lib/staff-auth";
+import { adminRoute } from "@/lib/server/admin-auth";
 import { deleteTicket, listTickets, saveTicket, ticketRegistrationCounts, validateTicketInput } from "@/lib/ticket-store";
 
 export const runtime = "nodejs";
 
 // Tickets & prices, edited from /admin. Changes show on /register straight
 // away. Registrations already made keep the price they were charged.
-export async function GET(req: NextRequest) {
-  if (!isAdminAreaAuthorized(req)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+export const GET = adminRoute(async (req: NextRequest) => {
   try {
     const [tickets, counts] = await Promise.all([listTickets(), ticketRegistrationCounts()]);
-    return NextResponse.json({ tickets, counts, adminCodeRequired: adminCodeRequired() });
+    return NextResponse.json({ tickets, counts });
   } catch {
     return NextResponse.json(
       { error: "Could not load tickets. Has the tickets migration been run?" },
       { status: 500 }
     );
   }
-}
+});
 
 // Body: { isNew: boolean, ticket: { id, nameEn, nameFr, descriptionEn,
 // descriptionFr, amountCents, availableUntil, active, sortOrder } }
-export async function POST(req: NextRequest) {
-  if (!isAdminAreaAuthorized(req)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-  if (!isAdminAuthorized(req)) {
-    return NextResponse.json({ error: "Wrong admin code." }, { status: 403 });
-  }
-
+export const POST = adminRoute(async (req: NextRequest) => {
   let body: { isNew?: unknown; ticket?: unknown };
   try {
     body = await req.json();
@@ -67,17 +57,11 @@ export async function POST(req: NextRequest) {
     console.error("Save ticket error", err);
     return NextResponse.json({ error: "database error" }, { status: 500 });
   }
-}
+});
 
 // DELETE /api/admin/tickets?id=standard — only for tickets nobody has
 // registered with (otherwise hide it: past registrations keep their ticket).
-export async function DELETE(req: NextRequest) {
-  if (!isAdminAreaAuthorized(req)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-  if (!isAdminAuthorized(req)) {
-    return NextResponse.json({ error: "Wrong admin code." }, { status: 403 });
-  }
+export const DELETE = adminRoute(async (req: NextRequest) => {
   const id = req.nextUrl.searchParams.get("id") ?? "";
   try {
     const result = await deleteTicket(id);
@@ -96,4 +80,4 @@ export async function DELETE(req: NextRequest) {
     console.error("Delete ticket error", err);
     return NextResponse.json({ error: "database error" }, { status: 500 });
   }
-}
+});

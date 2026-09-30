@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { isAdminAreaAuthorized } from "@/lib/staff-auth";
+import { adminRoute } from "@/lib/server/admin-auth";
 
 export const runtime = "nodejs";
 
 // Manual override for edge cases (attendee lost their QR, staff verifies
 // identity by hand, or an accidental scan needs undoing).
-export async function POST(req: NextRequest) {
-  if (!isAdminAreaAuthorized(req)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-
+export const POST = adminRoute(async (req: NextRequest) => {
   const { id, checkedIn } = await req.json();
   if (!id || typeof id !== "string" || typeof checkedIn !== "boolean") {
     return NextResponse.json({ error: "missing id/checkedIn" }, { status: 400 });
@@ -38,4 +34,4 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, attendee });
-}
+});

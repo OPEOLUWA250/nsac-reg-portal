@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { isAdminAreaAuthorized } from "@/lib/staff-auth";
+import { adminRoute } from "@/lib/server/admin-auth";
 
 export const runtime = "nodejs";
 
@@ -15,11 +15,7 @@ export interface ActivityItem {
 // GET /api/admin/activity
 // Recent events for the admin's notification bell: new registrations,
 // payments, walk-ins and check-ins, newest first.
-export async function GET(req: NextRequest) {
-  if (!isAdminAreaAuthorized(req)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-
+export const GET = adminRoute(async (req: NextRequest) => {
   const { data, error } = await supabaseAdmin()
     .from("attendees")
     .select("id, full_name, source, payment_status, created_at, paid_at, checked_in, checked_in_at")
@@ -47,4 +43,4 @@ export async function GET(req: NextRequest) {
   items.sort((x, y) => new Date(y.at).getTime() - new Date(x.at).getTime());
 
   return NextResponse.json({ items: items.slice(0, 20) });
-}
+});
