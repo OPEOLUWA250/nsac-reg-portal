@@ -3,6 +3,7 @@
 // NewSpace Africa Conference 2027 Jotform form.
 
 import { isCountryCode, countryNameEn, EUROPEAN_VAT_COUNTRIES } from "@/lib/countries";
+import { REGISTRATION_CATEGORIES, type RegistrationCategory } from "@/lib/types";
 
 export const LANGUAGES = ["en", "fr"] as const;
 
@@ -46,7 +47,11 @@ export const LIMITS = {
   foodAllergies: 500,
   vatNumber: 40,
   invoiceId: 60,
+  promoCode: 40,
 } as const;
+
+/** Promo codes: letters, digits, dashes and underscores (Stripe's rules). */
+export const PROMO_CODE_RE = /^[A-Za-z0-9_-]{3,40}$/;
 
 // Deliberately simple: something@something.tld, no spaces.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -54,6 +59,7 @@ const PHONE_RE = /^\+?[\d\s().-]{6,}$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export type FieldName =
+  | "category"
   | "firstName"
   | "lastName"
   | "email"
@@ -69,6 +75,8 @@ export type FieldName =
   | "passport"
   | "foodAllergies"
   | "safetyConsent"
+  | "shareDetails"
+  | "promoCode"
   | "ticket"
   | "vatNumber"
   | "invoiceId";
@@ -84,7 +92,13 @@ export type FieldError =
   | "file_type"
   | "file_too_large"
   | "ticket_unavailable"
-  | "vat_required";
+  | "vat_required"
+  | "promo_invalid"
+  | "promo_unknown"
+  | "promo_expired"
+  | "promo_used_up"
+  | "promo_not_for_ticket"
+  | "promo_unavailable";
 
 export type ValidationErrors = Partial<Record<FieldName, FieldError>>;
 
@@ -95,7 +109,7 @@ export interface CleanRegistration {
   fullName: string;
   email: string;
   jobTitle: string;
-  phone: string | null;
+  phone: string;
   nationality: string;
   residenceCountry: string;
   organization: string;
@@ -112,8 +126,12 @@ export interface CleanRegistration {
   vatNumber: string | null;
   invoiceId: string | null;
   language: Language;
-  /** Badge role, derived from the professional category. */
-  role: "delegate" | "press";
+  /** Registration category, stored as the attendee's role (badge colour). */
+  role: RegistrationCategory;
+  /** "Can your details be shared?" when their QR code is scanned. */
+  shareDetails: boolean;
+  /** Promo code typed on the form (checked against Stripe by the server). */
+  promoCode: string | null;
 }
 
 // Collapses runs of whitespace so "  Ama   Owusu " is stored as "Ama Owusu".
@@ -168,6 +186,12 @@ export function validateRegistration(
   const vatNumber = clean(raw.vatNumber);
   const invoiceId = clean(raw.invoiceId);
   const language: Language = clean(raw.language) === "fr" ? "fr" : "en";
+  const category = clean(raw.category);
+  const shareDetails = clean(raw.shareDetails);
+  const promoCode = clean(raw.promoCode).toUpperCase();
+
+  if (!category) errors.category = "required";
+  else if (!(REGISTRATION_CATEGORIES as readonly string[]).includes(category)) errors.category = "invalid_choice";
 
   requireText(errors, "firstName", firstName, LIMITS.name);
   requireText(errors, "lastName", lastName, LIMITS.name);
@@ -178,10 +202,9 @@ export function validateRegistration(
 
   requireText(errors, "jobTitle", jobTitle, LIMITS.jobTitle);
 
-  if (phone) {
-    if (phone.length > LIMITS.phone) errors.phone = "too_long";
-    else if (!PHONE_RE.test(phone)) errors.phone = "invalid_phone";
-  }
+  if (!phone) errors.phone = "required";
+  else if (phone.length > LIMITS.phone) errors.phone = "too_long";
+  else if (!PHONE_RE.test(phone)) errors.phone = "invalid_phone";
 
   requireCountry(errors, "nationality", nationality);
   requireCountry(errors, "residenceCountry", residenceCountry);
@@ -214,6 +237,11 @@ export function validateRegistration(
 
   if (raw.safetyConsent !== true) errors.safetyConsent = "consent_required";
 
+  if (!shareDetails) errors.shareDetails = "required";
+  else if (shareDetails !== "yes" && shareDetails !== "no") errors.shareDetails = "invalid_choice";
+
+  if (promoCode && !PROMO_CODE_RE.test(promoCode)) errors.promoCode = "promo_invalid";
+
   if (!ticketId) errors.ticket = "required";
   else if (!availableTicketIds.includes(ticketId)) errors.ticket = "ticket_unavailable";
 
@@ -237,7 +265,7 @@ export function validateRegistration(
       fullName: `${firstName} ${lastName}`,
       email,
       jobTitle,
-      phone: phone || null,
+      phone,
       nationality: countryNameEn(nationality),
       residenceCountry: countryNameEn(residenceCountry),
       organization,
@@ -253,7 +281,9 @@ export function validateRegistration(
       vatNumber: vatNumber || null,
       invoiceId: invoiceId || null,
       language,
-      role: professionalCategory === "media" ? "press" : "delegate",
+      role: category as RegistrationCategory,
+      shareDetails: shareDetails === "yes",
+      promoCode: promoCode || null,
     },
   };
 }

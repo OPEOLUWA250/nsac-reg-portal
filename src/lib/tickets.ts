@@ -31,6 +31,11 @@ export function isOnSale(ticket: Ticket, now: Date = new Date()): boolean {
   return !ticket.availableUntil || now.getTime() <= new Date(ticket.availableUntil).getTime();
 }
 
+/** Price after a promo code's discount, in cents (never below 0). */
+export function discountedCents(amountCents: number, percentOff: number): number {
+  return Math.max(0, Math.round(amountCents * (1 - percentOff / 100)));
+}
+
 export function formatPrice(amountCents: number, currency: string, locale = "en"): string {
   return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-GB", {
     style: "currency",

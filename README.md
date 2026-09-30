@@ -148,6 +148,9 @@ Jotform form is closed.
      Late tickets, hidden, placeholder prices.
    - `supabase/migrations/20260929130000_settings.sql` — the `settings`
      table behind the open/close registration switch.
+   - `supabase/migrations/20260930120000_categories_and_sharing.sql`:
+     registration categories (speaker, delegate, media, exhibitor, VIP),
+     the "Can your details be shared?" answer, and the promo code used.
 
 3. In Stripe → Developers → Webhooks, add
    `https://your-domain.com/api/stripe-webhook` with the events

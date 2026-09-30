@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendAttendeeQr } from "@/lib/attendee-service";
 import type { Attendee } from "@/lib/types";
 import type { Ticket } from "@/lib/tickets";
+import type { PromoCode } from "@/lib/promo-codes";
 
 // Stripe Checkout: we create a Checkout Session and send the registrant to
 // Stripe's hosted payment page. Card details never touch our server. When
@@ -37,6 +38,8 @@ export const EVENT_TITLE = "NewSpace Africa Conference 2027";
 interface CheckoutArgs {
   attendee: Pick<Attendee, "id" | "email" | "vat_number" | "invoice_reference" | "organization">;
   ticket: Ticket;
+  /** Promo code entered on the form, already checked. */
+  promo?: PromoCode | null;
   language: "en" | "fr";
   baseUrl: string;
 }
@@ -44,6 +47,7 @@ interface CheckoutArgs {
 export async function createCheckoutSession({
   attendee,
   ticket,
+  promo,
   language,
   baseUrl,
 }: CheckoutArgs): Promise<string> {
@@ -67,10 +71,12 @@ export async function createCheckoutSession({
     ],
     customer_email: attendee.email,
     client_reference_id: attendee.id,
-    metadata: { attendee_id: attendee.id, ticket_type: ticket.id },
+    metadata: { attendee_id: attendee.id, ticket_type: ticket.id, promo_code: promo?.code ?? "" },
     payment_intent_data: { metadata: { attendee_id: attendee.id, ticket_type: ticket.id } },
-    // Discount codes created in the Stripe dashboard can be entered on the payment page.
-    allow_promotion_codes: true,
+    // Promo codes are entered on our form (so the price shown there is the
+    // price charged) and applied here. With a 100% code Stripe asks for no
+    // card and the session completes as "no_payment_required".
+    ...(promo ? { discounts: [{ promotion_code: promo.id }] } : {}),
     // Stripe emails a paid invoice (PDF) — useful for company reimbursement.
     invoice_creation: {
       enabled: true,

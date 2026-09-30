@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { codeFromQr } from "@/lib/qrcode";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isStaffAuthorized } from "@/lib/staff-auth";
 
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
   const { data: attendee, error } = await supabase
     .from("attendees")
     .select("*")
-    .eq("unique_code", token.trim())
+    .eq("unique_code", codeFromQr(token))
     .maybeSingle();
 
   if (error) {

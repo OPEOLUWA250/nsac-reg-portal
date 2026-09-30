@@ -62,9 +62,12 @@ export default function FlyerMaker({
   prefill,
   backHref,
   registerUrl,
+  partnerLogos = [],
 }: {
   prefill: FlyerPrefill;
   backHref?: string;
+  /** Image URLs for the partner-logo row (from public/brand/partners). */
+  partnerLogos?: string[];
   /** Where the flyer's QR code points. */
   registerUrl: string;
 }) {
@@ -90,6 +93,7 @@ export default function FlyerMaker({
   // (and pinches) while this is on, so the page scrolls normally otherwise.
   const [adjusting, setAdjusting] = useState(false);
 
+  const partnerLogosKey = partnerLogos.join("|");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   // Fingers (or the mouse) on the preview, and where each gesture started.
@@ -117,6 +121,11 @@ export default function FlyerMaker({
     const body = cssFont("--font-dm-sans", "Arial, sans-serif");
     const logo = new Image();
     logo.src = "/brand/logo.png";
+    const partners = partnerLogos.map((src) => {
+      const img = new Image();
+      img.src = src;
+      return img;
+    });
     // "Scan to register" QR code, drawn crisp at any size.
     const qr = document.createElement("canvas");
     Promise.allSettled([
@@ -125,11 +134,14 @@ export default function FlyerMaker({
       document.fonts.load(`600 40px ${body}`),
       document.fonts.load(`700 40px ${body}`),
       logo.decode(),
+      ...partners.map((img) => img.decode()),
       QRCode.toCanvas(qr, registerUrl, { margin: 0, width: 480, errorCorrectionLevel: "M", color: { dark: "#0A1A31", light: "#FFFFFF" } }),
-    ]).then(([, , , , , qrResult]) => {
+    ]).then((results) => {
       if (cancelled) return;
+      const qrResult = results[results.length - 1];
       setAssets({
         logo: logo.complete && logo.naturalWidth ? logo : null,
+        partners: partners.filter((img) => img.complete && img.naturalWidth > 0),
         qr: qrResult.status === "fulfilled" ? qr : null,
         fonts: { display, body },
       });
@@ -145,7 +157,9 @@ export default function FlyerMaker({
     return () => {
       cancelled = true;
     };
-  }, [registerUrl]);
+    // partnerLogosKey stands in for the list (a new array each render).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registerUrl, partnerLogosKey]);
 
   const text: FlyerText = {
     name,

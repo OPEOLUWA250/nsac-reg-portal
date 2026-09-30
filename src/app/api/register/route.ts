@@ -9,6 +9,7 @@ import { availableTickets } from "@/lib/ticket-store";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import type { Attendee } from "@/lib/types";
 import { describeError } from "@/lib/describe-error";
+import { checkPromoCode, discountedCents, type PromoCode } from "@/lib/promo-codes";
 
 export const runtime = "nodejs";
 
@@ -31,7 +32,7 @@ function baseUrl(req: NextRequest): string {
 //   200 { status: "payment_required", checkoutUrl, passportUploadUrl? }
 //        → browser uploads the passport (if any), then goes to Stripe.
 //   200 { status: "already_registered" }   (QR re-emailed to the address on file)
-//   400 { error: "validation", fields }     (field -> error code)
+//   400 { error: "validation", fields }     (field -> error code, incl. promo codes)
 //   403 { error: "spam_check_failed" }
 //   409 { error: "registration_closed" }
 //   502 { error: "payment_unavailable" }    (Stripe couldn't be reached)
@@ -86,6 +87,47 @@ export async function POST(req: NextRequest) {
   const input = result.value;
   const ticket = tickets.find((t) => t.id === input.ticketId)!; // validated above
 
+  // Promo code (e.g. a sponsor's complimentary pass), checked with Stripe.
+  let promo: PromoCode | null = null;
+  if (input.promoCode) {
+    try {
+      const check = await checkPromoCode(input.promoCode, ticket.id);
+      if (!check.ok) {
+        return NextResponse.json({ error: "validation", fields: { promoCode: `promo_${check.problem}` } }, { status: 400 });
+      }
+      promo = check.promo;
+    } catch (err) {
+      console.error(`Promo code check failed: ${describeError(err)}`);
+      return NextResponse.json({ error: "validation", fields: { promoCode: "promo_unavailable" } }, { status: 400 });
+    }
+  }
+  const amountCents = promo ? discountedCents(ticket.amountCents, promo.percentOff) : ticket.amountCents;
+
+  // Everything the form collected (besides name, email, role, organisation,
+  // phone and language, which createAttendee takes separately).
+  const details = {
+    first_name: input.firstName,
+    last_name: input.lastName,
+    job_title: input.jobTitle,
+    nationality: input.nationality,
+    residence_country: input.residenceCountry,
+    organization_country: input.organizationCountry,
+    professional_category: input.professionalCategory,
+    job_function: input.jobFunction,
+    needs_invitation_letter: input.needsInvitationLetter,
+    food_allergies: input.foodAllergies,
+    opt_in_organizer: input.optInOrganizer,
+    opt_in_sponsors: input.optInSponsors,
+    vat_number: input.vatNumber,
+    invoice_reference: input.invoiceId,
+    consent_at: new Date().toISOString(),
+    share_details: input.shareDetails,
+    promo_code: promo?.code ?? null,
+    ticket_type: ticket.id,
+    amount_cents: amountCents,
+    currency: ticket.currency,
+  };
+
   let outcome;
   try {
     outcome = await createAttendee({
@@ -98,27 +140,7 @@ export async function POST(req: NextRequest) {
       language: input.language,
       source: "web",
       raw_payload: { form: "nsac-web", version: 1 },
-      details: {
-        first_name: input.firstName,
-        last_name: input.lastName,
-        job_title: input.jobTitle,
-        nationality: input.nationality,
-        residence_country: input.residenceCountry,
-        organization_country: input.organizationCountry,
-        professional_category: input.professionalCategory,
-        job_function: input.jobFunction,
-        needs_invitation_letter: input.needsInvitationLetter,
-        food_allergies: input.foodAllergies,
-        opt_in_organizer: input.optInOrganizer,
-        opt_in_sponsors: input.optInSponsors,
-        vat_number: input.vatNumber,
-        invoice_reference: input.invoiceId,
-        consent_at: new Date().toISOString(),
-        ticket_type: ticket.id,
-        amount_cents: ticket.amountCents,
-        currency: ticket.currency,
-        payment_status: "pending",
-      },
+      details: { ...details, payment_status: "pending" },
     });
   } catch (err) {
     console.error(`Registration failed: ${describeError(err)}`);
@@ -139,10 +161,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: "already_registered" });
     }
     // Registered before but never paid (e.g. closed the payment page):
-    // let them pay now, for the ticket they just picked.
+    // let them pay now, for the ticket and code they just picked. Only the
+    // purchase changes: whoever typed this email may not be the person on
+    // file, so their answers (category, consent to share…) stay as they were.
     const { data } = await supabase
       .from("attendees")
-      .update({ ticket_type: ticket.id, amount_cents: ticket.amountCents, currency: ticket.currency })
+      .update({ ticket_type: ticket.id, amount_cents: amountCents, currency: ticket.currency, promo_code: promo?.code ?? null })
       .eq("id", attendee.id)
       .eq("payment_status", "pending")
       .select()
@@ -152,6 +176,25 @@ export async function POST(req: NextRequest) {
   } else if (attendee.payment_status !== "pending") {
     // A retry of a submission that has since been paid.
     return NextResponse.json({ status: "already_registered" });
+  } else if (outcome.status === "retry") {
+    // The same browser coming back (it knows this registration's private id)
+    // with changed answers, e.g. a different ticket or a promo code after
+    // closing the payment page: save them, so the record matches the payment.
+    const { data } = await supabase
+      .from("attendees")
+      .update({
+        ...details,
+        full_name: input.fullName,
+        role: input.role,
+        organization: input.organization,
+        phone: input.phone,
+        language: input.language,
+      })
+      .eq("id", attendee.id)
+      .eq("payment_status", "pending")
+      .select()
+      .maybeSingle();
+    if (data) attendee = data as Attendee;
   }
 
   let passportUploadUrl: string | undefined;
@@ -174,11 +217,16 @@ export async function POST(req: NextRequest) {
     checkoutUrl = await createCheckoutSession({
       attendee,
       ticket,
+      promo,
       language: input.language,
       baseUrl: baseUrl(req),
     });
   } catch (err) {
     console.error("Stripe Checkout Session failed", err);
+    // Stripe refuses a code that ran out (or was switched off) since the check.
+    if (promo && /promotion code|coupon/i.test(describeError(err))) {
+      return NextResponse.json({ error: "validation", fields: { promoCode: "promo_used_up" } }, { status: 400 });
+    }
     return NextResponse.json({ error: "payment_unavailable" }, { status: 502 });
   }
 

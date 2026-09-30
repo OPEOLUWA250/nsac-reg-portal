@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { generateUniqueCode, generateQrPngBuffer } from "@/lib/qrcode";
+import { generateUniqueCode, generateQrPngBuffer, ticketQrContent } from "@/lib/qrcode";
 import { sendQrEmail, type EmailLanguage } from "@/lib/email";
 import { hasValidTicket, type Attendee } from "@/lib/types";
 import { brandLogoPng, renderTicketPng } from "@/lib/ticket-image";
@@ -151,7 +151,7 @@ export async function sendAttendeeQr(attendee: Attendee): Promise<boolean> {
   }
   try {
     const [qrPngBuffer, ticketPngBuffer, logoPngBuffer] = await Promise.all([
-      generateQrPngBuffer(attendee.unique_code),
+      generateQrPngBuffer(ticketQrContent(attendee.unique_code)),
       // The branded ticket is a nice extra: never let it block the email.
       renderTicketPng(attendee).catch((err) => {
         console.error(`Could not render ticket for attendee ${attendee.id}: ${describeError(err)}`);

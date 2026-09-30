@@ -27,7 +27,7 @@ export const FLYER_COPY = {
     jobTitle: "Job title",
     organization: "Organisation",
     headline: "Headline",
-    tagline: "The gathering of Africa's space industry leaders, innovators and partners.",
+    tagline: "The gathering of Africa's space and satellite industry leaders, innovators and partners.",
     dateLabel: "Save the date",
     scanLabel: "Scan to register",
     headlines: {
@@ -39,9 +39,9 @@ export const FLYER_COPY = {
     captionHint: "Edit it as you like. It's copied for you when you share.",
     defaultCaption: (headline: Headline) =>
       ({
-        attending: `I'm excited to be attending the ${EVENT_INFO.name.en} in ${EVENT_INFO.place.en} ${EVENT_INFO.dateInSentence.en}!\n\nLooking forward to connecting with leaders shaping Africa's space industry. Will I see you there?`,
-        speaking: `I'm honoured to be speaking at the ${EVENT_INFO.name.en} in ${EVENT_INFO.place.en} ${EVENT_INFO.dateInSentence.en}!\n\nLooking forward to the conversations on the future of Africa's space industry. Come and join us.`,
-        join: `Join me at the ${EVENT_INFO.name.en} in ${EVENT_INFO.place.en} ${EVENT_INFO.dateInSentence.en}!\n\nThe gathering for everyone building Africa's space industry.`,
+        attending: `I'm excited to be attending the ${EVENT_INFO.name.en} in ${EVENT_INFO.place.en} ${EVENT_INFO.dateInSentence.en}!\n\nLooking forward to connecting with leaders shaping Africa's space and satellite industry. Will I see you there?`,
+        speaking: `I'm honoured to be speaking at the ${EVENT_INFO.name.en} in ${EVENT_INFO.place.en} ${EVENT_INFO.dateInSentence.en}!\n\nLooking forward to the conversations on the future of Africa's space and satellite industry. Come and join us.`,
+        join: `Join me at the ${EVENT_INFO.name.en} in ${EVENT_INFO.place.en} ${EVENT_INFO.dateInSentence.en}!\n\nThe gathering for everyone building Africa's space and satellite industry.`,
       })[headline] + `\n\nRegister: ${EVENT_INFO.websiteUrl}\n\n${EVENT_INFO.hashtags}`,
     share: "Share",
     shareLinkedIn: "Share on LinkedIn",
@@ -74,7 +74,7 @@ export const FLYER_COPY = {
     jobTitle: "Intitulé du poste",
     organization: "Organisation",
     headline: "Accroche",
-    tagline: "Le rendez-vous des leaders, innovateurs et partenaires de l'industrie spatiale africaine.",
+    tagline: "Le rendez-vous des leaders, innovateurs et partenaires de l'industrie spatiale et satellitaire africaine.",
     dateLabel: "À vos agendas",
     scanLabel: "Scannez pour vous inscrire",
     headlines: {
@@ -86,9 +86,9 @@ export const FLYER_COPY = {
     captionHint: "Modifiez-le comme vous le souhaitez. Il est copié automatiquement au moment du partage.",
     defaultCaption: (headline: Headline) =>
       ({
-        attending: `Ravi(e) de participer à la ${EVENT_INFO.name.fr} à ${EVENT_INFO.place.fr} ${EVENT_INFO.dateInSentence.fr}\u00a0!\n\nHâte d'échanger avec les acteurs qui façonnent l'industrie spatiale africaine. Vous y serez\u00a0?`,
-        speaking: `Honoré(e) d'intervenir à la ${EVENT_INFO.name.fr} à ${EVENT_INFO.place.fr} ${EVENT_INFO.dateInSentence.fr}\u00a0!\n\nAu programme\u00a0: l'avenir de l'industrie spatiale africaine. Rejoignez-nous.`,
-        join: `Rejoignez-moi à la ${EVENT_INFO.name.fr} à ${EVENT_INFO.place.fr} ${EVENT_INFO.dateInSentence.fr}\u00a0!\n\nLe rendez-vous de tous ceux qui construisent l'industrie spatiale africaine.`,
+        attending: `Ravi(e) de participer à la ${EVENT_INFO.name.fr} à ${EVENT_INFO.place.fr} ${EVENT_INFO.dateInSentence.fr}\u00a0!\n\nHâte d'échanger avec les acteurs qui façonnent l'industrie spatiale et satellitaire africaine. Vous y serez\u00a0?`,
+        speaking: `Honoré(e) d'intervenir à la ${EVENT_INFO.name.fr} à ${EVENT_INFO.place.fr} ${EVENT_INFO.dateInSentence.fr}\u00a0!\n\nAu programme\u00a0: l'avenir de l'industrie spatiale et satellitaire africaine. Rejoignez-nous.`,
+        join: `Rejoignez-moi à la ${EVENT_INFO.name.fr} à ${EVENT_INFO.place.fr} ${EVENT_INFO.dateInSentence.fr}\u00a0!\n\nLe rendez-vous de tous ceux qui construisent l'industrie spatiale et satellitaire africaine.`,
       })[headline] + `\n\nInscription\u00a0: ${EVENT_INFO.websiteUrl}\n\n${EVENT_INFO.hashtags}`,
     share: "Partager",
     shareLinkedIn: "Partager sur LinkedIn",

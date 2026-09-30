@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { IconCog, IconGrid, IconTicket, IconUser } from "@/components/icons";
+import { IconCog, IconGrid, IconTag, IconTicket, IconUser } from "@/components/icons";
 
 type NavItem = { href: string; label: string; icon: ReactNode };
 
@@ -8,6 +8,7 @@ type NavItem = { href: string; label: string; icon: ReactNode };
 export const ADMIN_NAV: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: <IconGrid /> },
   { href: "/admin/tickets", label: "Tickets & prices", icon: <IconTicket /> },
+  { href: "/admin/promo-codes", label: "Promo codes", icon: <IconTag /> },
 ];
 
 export const ADMIN_NAV_BOTTOM: NavItem[] = [

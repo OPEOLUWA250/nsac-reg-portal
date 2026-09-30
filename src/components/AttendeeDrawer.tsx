@@ -191,6 +191,7 @@ export default function AttendeeDrawer({
           <Section title="Ticket and payment">
             <Row label="Ticket" value={ticketName || null} />
             <Row label="Amount" value={money(a.amount_cents, a.currency) || null} />
+            <Row label="Promo code" value={a.promo_code} />
             <Row label="Payment" value={paymentLabel(a.payment_status, a.source)} />
             <Row label="Paid at" value={formatDateTime(a.paid_at) || null} />
             <Row label="VAT number" value={a.vat_number} />
@@ -219,6 +220,7 @@ export default function AttendeeDrawer({
             <Row label="Terms and privacy accepted" value={formatDateTime(a.consent_at) || null} />
             <Row label="Organiser updates" value={yesNo(a.opt_in_organizer)} />
             <Row label="Sponsor updates" value={yesNo(a.opt_in_sponsors)} />
+            <Row label="Details shared on QR scan" value={a.share_details == null ? "Not asked" : yesNo(a.share_details)} />
           </Section>
 
           <Section title="Record">

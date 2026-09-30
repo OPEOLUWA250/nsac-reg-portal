@@ -44,6 +44,8 @@ type Drawable = CanvasImageSource & { width: number; height: number };
 export interface FlyerAssets {
   photo: Drawable | null;
   logo: HTMLImageElement | null;
+  /** Partner logos for the row above the bottom strip (none = original layout). */
+  partners?: HTMLImageElement[];
   /** QR code (dark on white) pointing at the registration page. */
   qr: Drawable | null;
   fonts: { display: string; body: string };
@@ -83,6 +85,11 @@ interface Layout {
   dateSize: number;
   qrSize: number;
 }
+
+// With partner logos: the info panel gets shorter (smaller date and QR) to
+// make room for a white row of logos above the bottom strip.
+const WITH_PARTNERS: Partial<Layout> = { panelTop: 1030, panelH: 172, dateSize: 40, qrSize: 124 };
+const PARTNER_ROW_H = 78;
 
 const LAYOUTS: Record<FlyerFormat, Layout> = {
   portrait: {
@@ -205,7 +212,8 @@ export function drawFlyer(
   frame: PhotoFrame
 ) {
   const { width: W, height: H } = FLYER_SIZES[format];
-  const L = LAYOUTS[format];
+  const partners = (assets.partners ?? []).filter((img) => img.naturalWidth > 0);
+  const L: Layout = partners.length ? { ...LAYOUTS[format], ...WITH_PARTNERS } : LAYOUTS[format];
   if (canvas.width !== W) canvas.width = W;
   if (canvas.height !== H) canvas.height = H;
   const ctx = canvas.getContext("2d");
@@ -523,8 +531,34 @@ export function drawFlyer(
     ctx.imageSmoothingEnabled = true;
   }
 
+  // ---- Partner logos (only when there are any) ----
+  let sTop = pTop + pH;
+  if (partners.length) {
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, sTop, W, PARTNER_ROW_H);
+    ctx.fillStyle = "rgba(10,26,49,0.12)";
+    ctx.fillRect(L.pad, sTop, W - L.pad * 2, 2);
+    // Same height for every logo (wide ones capped), centred as a row, and
+    // scaled down together if they don't fit the width.
+    const gapX = 56;
+    let h = 46;
+    const widths = partners.map((img) => Math.min(240, (img.naturalWidth / img.naturalHeight) * h));
+    let total = widths.reduce((sum, w) => sum + w, 0) + gapX * (partners.length - 1);
+    const scale = Math.min(1, (W - L.pad * 2) / total);
+    h *= scale;
+    total *= scale;
+    let x = (W - total) / 2;
+    const midY = sTop + PARTNER_ROW_H / 2 + 1;
+    partners.forEach((img, i) => {
+      const w = widths[i] * scale;
+      const ih = Math.min(h, w / (img.naturalWidth / img.naturalHeight));
+      ctx.drawImage(img, x, midY - ih / 2, w, ih);
+      x += w + gapX * scale;
+    });
+    sTop += PARTNER_ROW_H;
+  }
+
   // ---- Bottom strip: blue with gold edge, website ----
-  const sTop = pTop + pH;
   const strip = ctx.createLinearGradient(0, 0, W, 0);
   strip.addColorStop(0, BRAND_BLUE);
   strip.addColorStop(1, NAVY);

@@ -54,12 +54,13 @@ function PrivacyEn() {
     >
       <LegalSection title="What we collect">
         <ul>
-          <li>Your name, email address, job title and, if you give it, your phone number.</li>
+          <li>Your registration category (speaker, delegate, media, exhibitor or VIP), name, email address, phone number and job title.</li>
           <li>Your nationality, country of residence, organisation, its country, your professional category and job function.</li>
           <li>Whether you need an invitation letter and, if you upload it, a copy of your passport.</li>
           <li>Food allergies, so the catering can plan for them.</li>
           <li>Your ticket, the amount paid, and a VAT number or invoice ID if you give one.</li>
-          <li>Your answers to the consent and communication questions, and the time you gave them.</li>
+          <li>Your answers to the consent, communication and sharing questions, and the time you gave them.</li>
+          <li>A promo code, if you used one.</li>
           <li>On the day: when and where you checked in, and how many badges were printed for you.</li>
         </ul>
       </LegalSection>
@@ -81,6 +82,18 @@ function PrivacyEn() {
           <li>Our email provider sends your ticket and confirmation.</li>
           <li>Cloudflare Turnstile checks that the form is sent by a person, not a bot.</li>
         </ul>
+      </LegalSection>
+
+      <LegalSection title="When someone scans your QR code">
+        <p>
+          Your QR code opens a contact page when it&apos;s scanned with a phone. If you answered yes to &quot;Can your
+          details be shared?&quot;, that page shows your name, category, job title, organisation, nationality, email
+          and phone number, so people you meet (for example exhibitors) can contact you. If you answered no, it only
+          says you chose not to share. Event staff checking you in always see your registration.
+        </p>
+        <p>
+          To change your answer, write to <MailLink />.
+        </p>
       </LegalSection>
 
       <LegalSection title="What stays on your device">
@@ -120,12 +133,13 @@ function PrivacyFr() {
     >
       <LegalSection title="Ce que nous recueillons">
         <ul>
-          <li>Vos nom et prénom, votre adresse e-mail, l&apos;intitulé de votre poste et, si vous l&apos;indiquez, votre numéro de téléphone.</li>
+          <li>Votre catégorie d&apos;inscription (intervenant, délégué, médias, exposant ou VIP), vos nom et prénom, votre adresse e-mail, votre numéro de téléphone et l&apos;intitulé de votre poste.</li>
           <li>Votre nationalité, votre pays de résidence, votre organisation et son pays, votre catégorie professionnelle et le domaine d&apos;activité de votre poste.</li>
           <li>Si vous avez besoin d&apos;une lettre d&apos;invitation et, si vous la joignez, une copie de votre passeport.</li>
           <li>Vos allergies alimentaires, pour que le traiteur puisse en tenir compte.</li>
           <li>Votre billet, le montant payé et, si vous les indiquez, un numéro de TVA ou une référence de facture.</li>
-          <li>Vos réponses aux questions de consentement et de communication, avec leur date.</li>
+          <li>Vos réponses aux questions de consentement, de communication et de partage, avec leur date.</li>
+          <li>Un code promo, si vous en avez utilisé un.</li>
           <li>Le jour de l&apos;événement&nbsp;: l&apos;heure et le lieu de votre enregistrement, et le nombre de badges imprimés à votre nom.</li>
         </ul>
       </LegalSection>
@@ -147,6 +161,20 @@ function PrivacyFr() {
           <li>Notre service d&apos;e-mail envoie votre billet et votre confirmation.</li>
           <li>Cloudflare Turnstile vérifie que le formulaire est envoyé par une personne et non par un robot.</li>
         </ul>
+      </LegalSection>
+
+      <LegalSection title="Quand quelqu'un scanne votre QR code">
+        <p>
+          Scanné avec un téléphone, votre QR code ouvre une page de contact. Si vous avez répondu oui à «&nbsp;Vos
+          coordonnées peuvent-elles être partagées&nbsp;?&nbsp;», cette page affiche vos nom et prénom, votre catégorie,
+          votre poste, votre organisation, votre nationalité, votre e-mail et votre numéro de téléphone, pour que les
+          personnes rencontrées (par exemple les exposants) puissent vous contacter. Si vous avez répondu non, elle
+          indique seulement que vous avez choisi de ne pas les partager. L&apos;équipe qui enregistre votre arrivée voit
+          toujours votre inscription.
+        </p>
+        <p>
+          Pour modifier votre réponse, écrivez à <MailLink />.
+        </p>
       </LegalSection>
 
       <LegalSection title="Ce qui reste sur votre appareil">

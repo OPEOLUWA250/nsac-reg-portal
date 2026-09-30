@@ -1,4 +1,5 @@
 import type { FieldError, JobFunction, Language, ProfessionalCategory } from "@/lib/registration-fields";
+import type { RegistrationCategory } from "@/lib/types";
 
 // All text shown on the registration pages, in English and French.
 
@@ -14,6 +15,8 @@ type Copy = {
   sections: { you: string; organization: string; travel: string; ticket: string; agreements: string };
   optional: string;
   fields: {
+    category: string;
+    categoryHint: string;
     firstName: string;
     lastName: string;
     email: string;
@@ -36,7 +39,10 @@ type Copy = {
     foodAllergies: string;
     foodAllergiesHint: string;
     ticket: string;
-    couponHint: string;
+    promoCode: string;
+    promoHint: string;
+    shareDetails: string;
+    shareDetailsHint: string;
     vatNumber: string;
     vatHint: string;
     vatRequiredHint: string;
@@ -46,6 +52,16 @@ type Copy = {
     optInSponsors: string;
   };
   selectPlaceholder: string;
+  categories: Record<RegistrationCategory, string>;
+  shareYes: string;
+  shareNo: string;
+  promo: {
+    apply: string;
+    checking: string;
+    remove: string;
+    applied: (code: string, percent: number) => string;
+    free: string;
+  };
   noCountry: (query: string) => string;
   yes: string;
   no: string;
@@ -72,9 +88,11 @@ type Copy = {
     total: string;
     noTicket: string;
     edit: string;
+    discount: string;
     empty: string;
   };
   submit: (price: string) => string;
+  submitFree: string;
   submitting: string;
   uploading: (pct: number) => string;
   redirecting: string;
@@ -126,6 +144,8 @@ export const COPY: Record<Language, Copy> = {
     },
     optional: "optional",
     fields: {
+      category: "Registration category",
+      categoryHint: "Choose the one that describes how you're taking part.",
       firstName: "First name",
       lastName: "Last name",
       email: "Email",
@@ -149,7 +169,11 @@ export const COPY: Record<Language, Copy> = {
       foodAllergies: "Any food allergies?",
       foodAllergiesHint: "Write “None” if you have none.",
       ticket: "Choose your ticket",
-      couponHint: "Have a discount code? You can enter it on the payment page.",
+      promoCode: "Promo code",
+      promoHint: "Got a code from a sponsor or partner? Enter it here.",
+      shareDetails: "Can your details be shared?",
+      shareDetailsHint:
+        "If yes, people who scan your QR code at the event, such as exhibitors and other attendees, see your name, job title, organisation, nationality, email and phone number. If no, they only see that you chose not to share.",
       vatNumber: "Company VAT number",
       vatHint: "This is compulsory if you are registering from Europe.",
       vatRequiredHint: "Required for organisations located in Europe.",
@@ -160,6 +184,16 @@ export const COPY: Record<Language, Copy> = {
       optInSponsors: "I agree to receive communications from event sponsors and exhibitors",
     },
     selectPlaceholder: "Type or choose a country",
+    categories: { speaker: "Speaker", delegate: "Delegate", media: "Media", exhibitor: "Exhibitor", vip: "VIP" },
+    shareYes: "Yes, share my details",
+    shareNo: "No, keep them private",
+    promo: {
+      apply: "Apply",
+      checking: "Checking",
+      remove: "Remove code",
+      applied: (code, percent) => `Code ${code} applied: ${percent}% off.`,
+      free: "Free",
+    },
     noCountry: (q) => `No country matches “${q}”. Check the spelling, or try its name in English.`,
     yes: "Yes",
     no: "No",
@@ -186,11 +220,17 @@ export const COPY: Record<Language, Copy> = {
       invalid_email: "Enter a valid email address.",
       invalid_phone: "Enter a valid phone number, with country code.",
       invalid_choice: "Please choose an option from the list.",
-      consent_required: "You need to agree to continue.",
+      consent_required: "Please tick this box to agree. It's required to register.",
       file_type: "Upload a photo (JPG, PNG, WebP) or a PDF.",
       file_too_large: "The file must be 10 MB or smaller.",
       ticket_unavailable: "This ticket is no longer available. Please choose another.",
       vat_required: "A VAT number is required for organisations located in Europe.",
+      promo_invalid: "Codes only use letters, numbers and dashes.",
+      promo_unknown: "We couldn't find this code. Check the spelling and try again.",
+      promo_expired: "This code has expired or has been switched off.",
+      promo_used_up: "This code has already been used the maximum number of times.",
+      promo_not_for_ticket: "This code can't be used with the ticket you chose.",
+      promo_unavailable: "We couldn't check the code just now. Try again in a moment.",
       summary: "Please check the highlighted fields.",
       network:
         "We couldn't reach the server. Check your connection and try again. Your answers are still here.",
@@ -213,9 +253,11 @@ export const COPY: Record<Language, Copy> = {
       total: "Total",
       noTicket: "Choose a ticket above",
       edit: "Edit",
+      discount: "Discount",
       empty: "Not given",
     },
     submit: (price) => `Continue to payment · ${price}`,
+    submitFree: "Continue · Free pass",
     submitting: "Saving your registration…",
     uploading: (pct) => `Uploading your passport… ${pct}%`,
     redirecting: "Taking you to the secure payment page…",
@@ -274,6 +316,8 @@ export const COPY: Record<Language, Copy> = {
     },
     optional: "facultatif",
     fields: {
+      category: "Catégorie d'inscription",
+      categoryHint: "Choisissez celle qui correspond à votre participation.",
       firstName: "Prénom",
       lastName: "Nom",
       email: "E-mail",
@@ -297,7 +341,11 @@ export const COPY: Record<Language, Copy> = {
       foodAllergies: "Avez-vous des allergies alimentaires\u00a0?",
       foodAllergiesHint: "Écrivez «\u00a0Aucune\u00a0» si vous n'en avez pas.",
       ticket: "Choisissez votre billet",
-      couponHint: "Vous avez un code de réduction\u00a0? Saisissez-le sur la page de paiement.",
+      promoCode: "Code promo",
+      promoHint: "Vous avez un code d'un sponsor ou d'un partenaire\u00a0? Saisissez-le ici.",
+      shareDetails: "Vos coordonnées peuvent-elles être partagées\u00a0?",
+      shareDetailsHint:
+        "Si oui, les personnes qui scannent votre QR code pendant l'événement, comme les exposants et les autres participants, voient vos nom et prénom, votre poste, votre organisation, votre nationalité, votre e-mail et votre numéro de téléphone. Si non, elles voient seulement que vous avez choisi de ne pas les partager.",
       vatNumber: "Numéro de TVA intracommunautaire de l'entreprise",
       vatHint: "Obligatoire pour les organisations situées en Europe.",
       vatRequiredHint: "Obligatoire pour les organisations situées en Europe.",
@@ -308,6 +356,16 @@ export const COPY: Record<Language, Copy> = {
       optInSponsors: "J'accepte de recevoir des communications de la part des sponsors et des exposants",
     },
     selectPlaceholder: "Tapez ou choisissez un pays",
+    categories: { speaker: "Intervenant(e)", delegate: "Délégué(e)", media: "Médias", exhibitor: "Exposant(e)", vip: "VIP" },
+    shareYes: "Oui, partager mes coordonnées",
+    shareNo: "Non, les garder privées",
+    promo: {
+      apply: "Appliquer",
+      checking: "Vérification",
+      remove: "Retirer le code",
+      applied: (code, percent) => `Code ${code} appliqué\u00a0: ${percent}\u00a0% de réduction.`,
+      free: "Gratuit",
+    },
     noCountry: (q) => `Aucun pays ne correspond à «\u00a0${q}\u00a0». Vérifiez l'orthographe.`,
     yes: "Oui",
     no: "Non",
@@ -334,11 +392,17 @@ export const COPY: Record<Language, Copy> = {
       invalid_email: "Saisissez une adresse e-mail valide.",
       invalid_phone: "Saisissez un numéro valide, avec l'indicatif du pays.",
       invalid_choice: "Veuillez choisir une option dans la liste.",
-      consent_required: "Vous devez accepter pour continuer.",
+      consent_required: "Cochez cette case pour accepter. C'est obligatoire pour s'inscrire.",
       file_type: "Joignez une photo (JPG, PNG, WebP) ou un PDF.",
       file_too_large: "Le fichier ne doit pas dépasser 10\u00a0Mo.",
       ticket_unavailable: "Ce billet n'est plus disponible. Veuillez en choisir un autre.",
       vat_required: "Un numéro de TVA est obligatoire pour les organisations situées en Europe.",
+      promo_invalid: "Un code ne contient que des lettres, des chiffres et des tirets.",
+      promo_unknown: "Code introuvable. Vérifiez l'orthographe et réessayez.",
+      promo_expired: "Ce code a expiré ou a été désactivé.",
+      promo_used_up: "Ce code a déjà été utilisé le nombre maximum de fois.",
+      promo_not_for_ticket: "Ce code ne s'applique pas au billet choisi.",
+      promo_unavailable: "Impossible de vérifier le code pour le moment. Réessayez dans un instant.",
       summary: "Veuillez vérifier les champs signalés.",
       network:
         "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez. Vos réponses sont conservées.",
@@ -361,9 +425,11 @@ export const COPY: Record<Language, Copy> = {
       total: "Total",
       noTicket: "Choisissez un billet ci-dessus",
       edit: "Modifier",
+      discount: "Réduction",
       empty: "Non renseigné",
     },
     submit: (price) => `Passer au paiement · ${price}`,
+    submitFree: "Continuer · Accès gratuit",
     submitting: "Enregistrement de votre inscription…",
     uploading: (pct) => `Envoi de votre passeport… ${pct}\u00a0%`,
     redirecting: "Redirection vers la page de paiement sécurisée…",

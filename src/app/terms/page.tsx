@@ -59,7 +59,7 @@ function TermsEn() {
       <LegalSection title="Prices and payment">
         <ul>
           <li>Prices are shown on the form in euros. You pay the price shown when you register.</li>
-          <li>Payment is taken by card through Stripe. Discount codes are entered on the Stripe payment page.</li>
+          <li>Payment is taken by card through Stripe. Promo codes, for example from a sponsor, are entered on the form&apos;s ticket step. A 100% code gives a free pass with no payment.</li>
           <li>Organisations based in Europe must give a company VAT number.</li>
           <li>Stripe emails your receipt. If you need an invoice, write to us.</li>
         </ul>
@@ -125,7 +125,7 @@ function TermsFr() {
       <LegalSection title="Prix et paiement">
         <ul>
           <li>Les prix sont indiqués en euros sur le formulaire. Vous payez le prix affiché au moment de votre inscription.</li>
-          <li>Le paiement se fait par carte, via Stripe. Les codes de réduction se saisissent sur la page de paiement Stripe.</li>
+          <li>Le paiement se fait par carte, via Stripe. Les codes promo, par exemple d&apos;un sponsor, se saisissent à l&apos;étape du billet. Un code à 100&nbsp;% donne un accès gratuit, sans paiement.</li>
           <li>Les organisations situées en Europe doivent indiquer leur numéro de TVA intracommunautaire.</li>
           <li>Stripe vous envoie votre reçu par e-mail. Si vous avez besoin d&apos;une facture, écrivez-nous.</li>
         </ul>

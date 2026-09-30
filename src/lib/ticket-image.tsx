@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { generateQrPngDataUrl } from "@/lib/qrcode";
+import { generateQrPngDataUrl, ticketQrContent } from "@/lib/qrcode";
 import { listTickets } from "@/lib/ticket-store";
 import { describeError } from "@/lib/describe-error";
 import { compressedPngResponse, compressPng } from "@/lib/png";
@@ -134,7 +134,7 @@ async function drawTicket(attendee: Attendee): Promise<ImageResponse> {
   const [fonts, logo, qr, ticket] = await Promise.all([
     brandFonts(),
     logoDataUrl(),
-    generateQrPngDataUrl(attendee.unique_code),
+    generateQrPngDataUrl(ticketQrContent(attendee.unique_code)),
     ticketName(attendee, lang),
   ]);
   const display = fonts.length ? "Raleway" : undefined;

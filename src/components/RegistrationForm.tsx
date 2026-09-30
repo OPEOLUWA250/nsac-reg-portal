@@ -32,7 +32,8 @@ import {
   type ValidationErrors,
 } from "@/lib/registration-fields";
 import { COUNTRY_CODES, EUROPEAN_VAT_COUNTRIES } from "@/lib/countries";
-import { formatPrice } from "@/lib/tickets";
+import { discountedCents, formatPrice } from "@/lib/tickets";
+import { REGISTRATION_CATEGORIES, type RegistrationCategory } from "@/lib/types";
 import { EVENT_INFO } from "@/lib/event-info";
 
 export interface TicketOption {
@@ -54,6 +55,7 @@ interface Props {
 }
 
 interface FormState {
+  category: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -71,12 +73,15 @@ interface FormState {
   vatNumber: string;
   invoiceId: string;
   safetyConsent: boolean;
+  shareDetails: string;
+  promoCode: string;
   optInOrganizer: boolean;
   optInSponsors: boolean;
   website: string; // honeypot — must stay empty
 }
 
 const EMPTY: FormState = {
+  category: "",
   firstName: "",
   lastName: "",
   email: "",
@@ -94,6 +99,8 @@ const EMPTY: FormState = {
   vatNumber: "",
   invoiceId: "",
   safetyConsent: false,
+  shareDetails: "",
+  promoCode: "",
   optInOrganizer: false,
   optInSponsors: false,
   website: "",
@@ -109,9 +116,9 @@ type Phase =
 // The three steps, and the fields each one asks for — used to check a step
 // before moving on, and to jump back to the step that has an error.
 const STEP_FIELDS: FieldName[][] = [
-  ["firstName", "lastName", "email", "jobTitle", "phone", "nationality", "residenceCountry"],
+  ["category", "firstName", "lastName", "email", "jobTitle", "phone", "nationality", "residenceCountry"],
   ["organization", "organizationCountry", "professionalCategory", "jobFunction", "invitationLetter", "passport", "foodAllergies"],
-  ["ticket", "vatNumber", "invoiceId", "safetyConsent"],
+  ["ticket", "promoCode", "vatNumber", "invoiceId", "safetyConsent", "shareDetails"],
 ];
 const LAST_STEP = STEP_FIELDS.length - 1;
 
@@ -198,6 +205,9 @@ export default function RegistrationForm({
   const [step, setStep] = useState(0);
   // True when answers from an earlier visit were restored ("Welcome back").
   const [resumed, setResumed] = useState(false);
+  // A promo code the server has confirmed (shown as a discount before payment).
+  const [appliedPromo, setAppliedPromo] = useState<{ code: string; percentOff: number } | null>(null);
+  const [checkingPromo, setCheckingPromo] = useState(false);
   // Set once the visitor changes something, so the empty form on first
   // load never overwrites a saved draft before it's restored.
   const dirty = useRef(false);
@@ -252,6 +262,7 @@ export default function RegistrationForm({
     setBanner("");
     setNotice("");
     setResumed(false);
+    setAppliedPromo(null);
     setStep(0);
     setPhase({ kind: "editing" });
   }
@@ -331,21 +342,70 @@ export default function RegistrationForm({
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     dirty.current = true;
+    if (key === "promoCode") setAppliedPromo(null);
+    // Some codes only work with certain tickets: check again for the new one.
+    if (key === "ticket" && appliedPromo && value !== form.ticket) applyPromo(appliedPromo.code, value as string);
     setForm((f) => ({ ...f, [key]: value }));
     setErrors((e) => (key in e ? { ...e, [key]: undefined } : e));
   }
 
   const selectedTicket = tickets.find((tk) => tk.id === form.ticket);
+  const priceCents = selectedTicket
+    ? appliedPromo
+      ? discountedCents(selectedTicket.amountCents, appliedPromo.percentOff)
+      : selectedTicket.amountCents
+    : null;
+
+  async function applyPromo(code = form.promoCode, ticket = form.ticket) {
+    const typed = code.trim().toUpperCase();
+    if (!typed) return;
+    setCheckingPromo(true);
+    setErrors((e) => ({ ...e, promoCode: undefined }));
+    try {
+      const res = await fetch("/api/promo/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: typed, ticket }),
+        signal: AbortSignal.timeout(20_000),
+      });
+      const json = await res.json();
+      if (json.ok) setAppliedPromo({ code: json.code, percentOff: json.percentOff });
+      else {
+        setAppliedPromo(null);
+        setErrors((e) => ({ ...e, promoCode: json.error ?? "promo_unknown" }));
+      }
+    } catch {
+      setAppliedPromo(null);
+      setErrors((e) => ({ ...e, promoCode: "promo_unavailable" }));
+    } finally {
+      setCheckingPromo(false);
+    }
+  }
+
+  function removePromo() {
+    setAppliedPromo(null);
+    update("promoCode", "");
+  }
+
+  // A code saved from an earlier visit is checked again when the ticket step shows.
+  const restoredPromoChecked = useRef(false);
+  useEffect(() => {
+    if (step !== LAST_STEP || restoredPromoChecked.current || !form.promoCode || appliedPromo) return;
+    restoredPromoChecked.current = true;
+    applyPromo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when reaching the ticket step
+  }, [step]);
   const vatRequired = EUROPEAN_VAT_COUNTRIES.has(form.organizationCountry);
   const busy = phase.kind !== "editing" && phase.kind !== "already_registered";
 
   const payload = useMemo(
     () => ({
       ...form,
+      promoCode: appliedPromo?.code ?? form.promoCode,
       language: lang,
       passport: passportFile ? { mime: passportFile.type, size: passportFile.size } : null,
     }),
-    [form, lang, passportFile]
+    [form, lang, passportFile, appliedPromo]
   );
 
   function scrollToFirstError(errs: ValidationErrors) {
@@ -528,7 +588,9 @@ export default function RegistrationForm({
         ? t.uploading(phase.pct)
         : phase.kind === "redirecting"
           ? t.redirecting
-          : t.submit(selectedTicket ? formatPrice(selectedTicket.amountCents, selectedTicket.currency, lang) : "").replace(/ · $/, "");
+          : selectedTicket && priceCents === 0
+            ? t.submitFree
+            : t.submit(selectedTicket && priceCents !== null ? formatPrice(priceCents, selectedTicket.currency, lang) : "").replace(/ · $/, "");
 
   return (
     <main id="main" className="flex-1 px-4 py-8 sm:px-6 sm:py-12">
@@ -596,13 +658,23 @@ export default function RegistrationForm({
               <div key={step} className="space-y-6 transition-opacity duration-150 starting:opacity-0">
                 {step === 0 && (
                   <Section title={t.sections.you}>
+                    <RadioGroup
+                      name="category"
+                      label={t.fields.category}
+                      hint={t.fields.categoryHint}
+                      value={form.category}
+                      onChange={(v) => update("category", v)}
+                      options={REGISTRATION_CATEGORIES.map((c) => ({ value: c, label: t.categories[c] }))}
+                      error={err("category")}
+                      columns
+                    />
                     <div className="grid gap-5 sm:grid-cols-2">
                       <TextField name="firstName" label={t.fields.firstName} value={form.firstName} onChange={(v) => update("firstName", v)} error={err("firstName")} autoComplete="given-name" />
                       <TextField name="lastName" label={t.fields.lastName} value={form.lastName} onChange={(v) => update("lastName", v)} error={err("lastName")} autoComplete="family-name" />
                     </div>
                     <TextField name="email" type="email" label={t.fields.email} hint={t.fields.emailHint} value={form.email} onChange={(v) => update("email", v)} onBlur={() => checkField("email")} error={err("email")} autoComplete="email" inputMode="email" />
                     <TextField name="jobTitle" label={t.fields.jobTitle} value={form.jobTitle} onChange={(v) => update("jobTitle", v)} error={err("jobTitle")} autoComplete="organization-title" />
-                    <TextField name="phone" type="tel" label={t.fields.phone} optionalLabel={t.optional} hint={t.fields.phoneHint} value={form.phone} onChange={(v) => update("phone", v)} onBlur={() => checkField("phone")} error={err("phone")} autoComplete="tel" inputMode="tel" />
+                    <TextField name="phone" type="tel" label={t.fields.phone} hint={t.fields.phoneHint} value={form.phone} onChange={(v) => update("phone", v)} onBlur={() => checkField("phone")} error={err("phone")} autoComplete="tel" inputMode="tel" />
                     <div className="grid gap-5 sm:grid-cols-2">
                       <CountryField name="nationality" label={t.fields.nationality} value={form.nationality} onChange={(v) => update("nationality", v)} options={countryOptions} placeholder={t.selectPlaceholder} noMatch={t.noCountry} error={err("nationality")} />
                       <CountryField name="residenceCountry" label={t.fields.residenceCountry} hint={t.fields.residenceHint} value={form.residenceCountry} onChange={(v) => update("residenceCountry", v)} options={countryOptions} placeholder={t.selectPlaceholder} noMatch={t.noCountry} error={err("residenceCountry")} autoComplete="country" />
@@ -725,8 +797,45 @@ export default function RegistrationForm({
                           );
                         })}
                         {err("ticket") && <FieldError id="field-ticket-error">{err("ticket")}</FieldError>}
-                        <p className="text-sm text-ink-3">{t.fields.couponHint}</p>
                       </fieldset>
+                      <Field id="field-promoCode" label={t.fields.promoCode} optionalLabel={t.optional} hint={appliedPromo ? undefined : t.fields.promoHint} error={err("promoCode")}>
+                        {appliedPromo ? (
+                          <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-success bg-surface px-4 py-3">
+                            <span className="flex items-center gap-2 text-base font-semibold text-success">
+                              <IconCheck className="h-5 w-5 shrink-0" />
+                              {t.promo.applied(appliedPromo.code, appliedPromo.percentOff)}
+                            </span>
+                            <Button variant="ghost" size="sm" onClick={removePromo}>
+                              {t.promo.remove}
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <input
+                              id="field-promoCode"
+                              className={inputClass(!!err("promoCode"), "font-mono uppercase")}
+                              value={form.promoCode}
+                              onChange={(e) => update("promoCode", e.target.value.toUpperCase())}
+                              onKeyDown={(e) => {
+                                // Enter applies the code rather than submitting the form.
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  applyPromo();
+                                }
+                              }}
+                              autoComplete="off"
+                              autoCapitalize="characters"
+                              spellCheck={false}
+                              maxLength={40}
+                              aria-invalid={!!err("promoCode")}
+                              aria-describedby={describedBy("field-promoCode", { hint: true, error: err("promoCode") })}
+                            />
+                            <Button variant="outline" className="shrink-0" onClick={() => applyPromo()} loading={checkingPromo} disabled={!form.promoCode.trim()}>
+                              {checkingPromo ? t.promo.checking : t.promo.apply}
+                            </Button>
+                          </div>
+                        )}
+                      </Field>
                       <div className="grid gap-5 sm:grid-cols-2">
                         <TextField
                           name="vatNumber"
@@ -743,7 +852,7 @@ export default function RegistrationForm({
 
                     <Section title={t.sections.agreements}>
                       <div id="field-safetyConsent" className="space-y-1.5">
-                        <Checkbox checked={form.safetyConsent} onChange={(v) => update("safetyConsent", v)} invalid={!!err("safetyConsent")} describedBy="field-safetyConsent-error">
+                        <Checkbox required checked={form.safetyConsent} onChange={(v) => update("safetyConsent", v)} invalid={!!err("safetyConsent")} describedBy="field-safetyConsent-error">
                           {consentBefore}
                           <a href={privacyHref} target="_blank" rel="noopener noreferrer" className={linkClass}>
                             {privacyLabel}
@@ -752,6 +861,19 @@ export default function RegistrationForm({
                         </Checkbox>
                         {err("safetyConsent") && <FieldError id="field-safetyConsent-error">{err("safetyConsent")}</FieldError>}
                       </div>
+                      <RadioGroup
+                        name="shareDetails"
+                        label={t.fields.shareDetails}
+                        hint={t.fields.shareDetailsHint}
+                        value={form.shareDetails}
+                        onChange={(v) => update("shareDetails", v)}
+                        options={[
+                          { value: "yes", label: t.shareYes },
+                          { value: "no", label: t.shareNo },
+                        ]}
+                        error={err("shareDetails")}
+                        columns
+                      />
                       <Checkbox checked={form.optInOrganizer} onChange={(v) => update("optInOrganizer", v)}>
                         {t.fields.optInOrganizer}
                       </Checkbox>
@@ -760,7 +882,7 @@ export default function RegistrationForm({
                       </Checkbox>
                     </Section>
 
-                    <Review t={t} lang={lang} form={form} ticket={selectedTicket} onEdit={goToStep} />
+                    <Review t={t} lang={lang} form={form} ticket={selectedTicket} promo={appliedPromo} priceCents={priceCents} onEdit={goToStep} />
                   </>
                 )}
               </div>
@@ -875,15 +997,20 @@ function Review({
   lang,
   form,
   ticket,
+  promo,
+  priceCents,
   onEdit,
 }: {
   t: (typeof COPY)[Language];
   lang: Language;
   form: FormState;
   ticket: TicketOption | undefined;
+  promo: { code: string; percentOff: number } | null;
+  priceCents: number | null;
   onEdit: (step: number) => void;
 }) {
   const rows: { label: string; value: string; step: number }[] = [
+    { label: t.fields.category, value: t.categories[form.category as RegistrationCategory] ?? "", step: 0 },
     { label: t.review.name, value: `${form.firstName} ${form.lastName}`.trim(), step: 0 },
     { label: t.review.email, value: form.email, step: 0 },
     { label: t.review.organization, value: [form.jobTitle, form.organization].filter(Boolean).join(" · "), step: 1 },
@@ -913,8 +1040,18 @@ function Review({
         <div>
           <div className="text-xs font-semibold uppercase tracking-wider text-white/65">{t.review.total}</div>
           <div className="text-sm text-white/80">{ticket ? ticket.name[lang] : t.review.noTicket}</div>
+          {ticket && promo && (
+            <div className="text-sm text-gold">
+              {t.review.discount} {promo.code} (−{promo.percentOff}%)
+            </div>
+          )}
         </div>
-        {ticket && <div className="font-display text-2xl font-bold">{formatPrice(ticket.amountCents, ticket.currency, lang)}</div>}
+        {ticket && priceCents !== null && (
+          <div className="text-right">
+            {promo && <div className="text-sm text-white/65 line-through">{formatPrice(ticket.amountCents, ticket.currency, lang)}</div>}
+            <div className="font-display text-2xl font-bold">{priceCents === 0 ? t.promo.free : formatPrice(priceCents, ticket.currency, lang)}</div>
+          </div>
+        )}
       </div>
     </Card>
   );
@@ -1024,6 +1161,7 @@ function RadioGroup({
   onChange,
   options,
   error,
+  hint,
   inline,
   columns,
 }: {
@@ -1033,17 +1171,23 @@ function RadioGroup({
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
   error?: string;
+  hint?: string;
   inline?: boolean;
   columns?: boolean;
 }) {
   return (
-    <fieldset id={`field-${name}`} className="space-y-2" aria-describedby={error ? `field-${name}-error` : undefined}>
+    <fieldset id={`field-${name}`} className="space-y-2" aria-describedby={describedBy(`field-${name}`, { hint, error })}>
       <legend className="mb-1.5 text-sm font-semibold text-ink">
         {label}
         <span className="ml-0.5 text-gold-ink" aria-hidden="true">
           *
         </span>
       </legend>
+      {hint && (
+        <p id={`field-${name}-hint`} className="-mt-1 text-sm text-ink-3">
+          {hint}
+        </p>
+      )}
       <div className={inline ? "flex flex-wrap gap-2" : columns ? "grid gap-2 sm:grid-cols-2" : "grid gap-2"}>
         {options.map((o) => {
           const checked = value === o.value;
@@ -1080,12 +1224,15 @@ function Checkbox({
   children,
   invalid,
   describedBy,
+  required,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   children: ReactNode;
   invalid?: boolean;
   describedBy?: string;
+  /** Shows the gold * like other required fields. */
+  required?: boolean;
 }) {
   return (
     <label className="flex cursor-pointer items-start gap-3 py-1 text-base leading-snug text-ink-2">
@@ -1096,8 +1243,16 @@ function Checkbox({
         className={cx("mt-0.5 h-5 w-5 shrink-0", invalid && "outline-2 outline-offset-1 outline-danger")}
         aria-invalid={invalid || undefined}
         aria-describedby={invalid ? describedBy : undefined}
+        aria-required={required || undefined}
       />
-      <span>{children}</span>
+      <span>
+        {children}
+        {required && (
+          <span className="ml-0.5 text-gold-ink" aria-hidden="true">
+            *
+          </span>
+        )}
+      </span>
     </label>
   );
 }

@@ -5,7 +5,7 @@ import type {
   HTMLAttributes,
   ReactNode,
 } from "react";
-import { roleAccent } from "@/lib/role-style";
+import { roleAccent, roleLabel } from "@/lib/role-style";
 import { IconAlert, IconCheck, IconInfo } from "@/components/icons";
 import type { Attendee } from "@/lib/types";
 import { paymentLabel } from "@/lib/admin-format";
@@ -336,7 +336,7 @@ export function Chip({ children, dot, className = "" }: { children: ReactNode; d
 }
 
 export function RolePill({ role }: { role: string }) {
-  return <Chip dot={roleAccent(role)} className="capitalize">{role}</Chip>;
+  return <Chip dot={roleAccent(role)}>{roleLabel(role)}</Chip>;
 }
 
 export function StatusPill({ checkedIn }: { checkedIn: boolean }) {

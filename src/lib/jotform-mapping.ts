@@ -12,7 +12,9 @@ const ROLE_KEYWORDS: Record<string, string[]> = {
   speaker: ["speaker", "panelist", "presenter"],
   host: ["host", "organizer", "organiser", "moderator"],
   staff: ["staff", "volunteer", "crew"],
-  sponsor: ["sponsor", "exhibitor"],
+  exhibitor: ["exhibitor", "sponsor"],
+  media: ["media", "press", "journalist"],
+  vip: ["vip"],
   delegate: ["delegate", "attendee", "participant", "guest"],
 };
 

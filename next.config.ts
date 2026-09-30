@@ -7,6 +7,13 @@ const viaHttp = [{ type: "header" as const, key: "x-forwarded-proto", value: "ht
 const viaHttps = [{ type: "header" as const, key: "x-forwarded-proto", value: "https" }];
 
 const nextConfig: NextConfig = {
+  // Files the server reads from disk (not just serves), so hosting platforms
+  // package them with the functions: brand logos for tickets, emails and
+  // icons, and the partner logos the flyer page lists.
+  outputFileTracingIncludes: {
+    "/*": ["./public/brand/*.png"],
+    "/flyer": ["./public/brand/partners/**/*"],
+  },
   async redirects() {
     return [
       {

@@ -1,5 +1,6 @@
 import { COPY } from "@/lib/registration-copy";
 import type { Attendee } from "@/lib/types";
+import { roleLabel } from "@/lib/role-style";
 
 // Display + CSV helpers for the admin dashboard (browser-safe).
 
@@ -107,7 +108,7 @@ const COLUMNS: [string, (a: Attendee, ticketName: (id: string | null) => string)
   ["Full Name", (a) => a.full_name],
   ["Email", (a) => a.email],
   ["Phone", (a) => (a.phone ? new PhoneValue(a.phone) : "")],
-  ["Role", (a) => a.role],
+  ["Category", (a) => roleLabel(a.role)],
   ["Job Title", (a) => a.job_title],
   ["Organisation", (a) => a.organization],
   ["Organisation Country", (a) => a.organization_country],
@@ -120,6 +121,7 @@ const COLUMNS: [string, (a: Attendee, ticketName: (id: string | null) => string)
   ["Food Allergies", (a) => a.food_allergies],
   ["Ticket", (a, ticketName) => ticketName(a.ticket_type)],
   ["Amount", (a) => (a.amount_cents != null ? (a.amount_cents / 100).toFixed(2) : "")],
+  ["Promo code", (a) => a.promo_code ?? ""],
   ["Currency", (a) => (a.currency ?? "").toUpperCase()],
   ["Payment Status", (a) => paymentLabel(a.payment_status, a.source)],
   ["Paid At", (a) => csvDate(a.paid_at)],
@@ -129,6 +131,7 @@ const COLUMNS: [string, (a: Attendee, ticketName: (id: string | null) => string)
   ["Consent Given At", (a) => csvDate(a.consent_at)],
   ["Opt-in Organiser", (a) => yesNo(a.opt_in_organizer)],
   ["Opt-in Sponsors", (a) => yesNo(a.opt_in_sponsors)],
+  ["Shares details on QR scan", (a) => yesNo(a.share_details)],
   ["Language", (a) => (a.language ?? "").toUpperCase()],
   ["Source", (a) => a.source],
   ["Registered At", (a) => csvDate(a.created_at)],

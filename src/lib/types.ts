@@ -1,14 +1,18 @@
 // Must match the attendees_role_check constraint in the database
-// (supabase/migrations/20260928140000_attendee_roles.sql).
+// (supabase/migrations/20260930120000_categories_and_sharing.sql).
 export const ATTENDEE_ROLES = [
-  "attendee",
   "delegate",
   "speaker",
+  "media",
+  "exhibitor",
+  "vip",
   "host",
   "staff",
-  "sponsor",
-  "press",
 ] as const;
+
+/** The categories a visitor picks on the registration form. */
+export const REGISTRATION_CATEGORIES = ["speaker", "delegate", "media", "exhibitor", "vip"] as const;
+export type RegistrationCategory = (typeof REGISTRATION_CATEGORIES)[number];
 export type AttendeeRole = (typeof ATTENDEE_ROLES)[number];
 
 export function isAttendeeRole(value: string): value is AttendeeRole {
@@ -62,6 +66,10 @@ export interface Attendee {
   qr_email_sent_at: string | null;
   created_at: string;
   updated_at: string;
+  /** "Can your details be shared?" on the form. null = not asked (treated as no). */
+  share_details: boolean | null;
+  /** Promo code used at registration, if any. */
+  promo_code: string | null;
 }
 
 /** Can this attendee enter / receive their QR ticket? */

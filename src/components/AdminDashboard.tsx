@@ -24,6 +24,7 @@ import {
 import { IconDownload, IconRefresh, IconSearch } from "@/components/icons";
 import { buildAttendeeCsv, categoryLabel, money, relativeTime } from "@/lib/admin-format";
 import { EVENT_INFO } from "@/lib/event-info";
+import { roleLabel } from "@/lib/role-style";
 import { ATTENDEE_ROLES, type Attendee } from "@/lib/types";
 import type { Ticket } from "@/lib/tickets";
 
@@ -52,7 +53,7 @@ interface RegisterForm {
   phone: string;
 }
 
-const EMPTY_FORM: RegisterForm = { fullName: "", email: "", role: "attendee", organization: "", phone: "" };
+const EMPTY_FORM: RegisterForm = { fullName: "", email: "", role: "delegate", organization: "", phone: "" };
 
 export default function AdminDashboard() {
   const { apiCall, requestedAttendee, setRequestedAttendee } = useAdmin();
@@ -366,9 +367,9 @@ export default function AdminDashboard() {
               <input id="walkin-email" type="email" inputMode="email" className={inputClass(!!formErrors.email)} value={form.email} onChange={(e) => updateForm("email", e.target.value)} aria-invalid={!!formErrors.email} aria-describedby={describedBy("walkin-email", { error: formErrors.email })} autoComplete="off" />
             </Field>
             <Field id="walkin-role" label="Role">
-              <select id="walkin-role" className={inputClass(false, "capitalize")} value={form.role} onChange={(e) => updateForm("role", e.target.value)}>
+              <select id="walkin-role" className={inputClass()} value={form.role} onChange={(e) => updateForm("role", e.target.value)}>
                 {ATTENDEE_ROLES.map((role) => (
-                  <option key={role} value={role}>{role}</option>
+                  <option key={role} value={role}>{roleLabel(role)}</option>
                 ))}
               </select>
             </Field>
@@ -444,7 +445,7 @@ export default function AdminDashboard() {
               <div className="flex flex-wrap items-center gap-2">
                 <FilterSelect label="Payment" value={filters.payment} onChange={(v) => setFilter("payment", v as Filters["payment"])} options={[["all", "All payments"], ["paid", `Paid (${stats.paid})`], ["walk_in", `Walk-in (${stats.walkIns})`], ["pending", `Awaiting payment (${stats.pending})`]]} />
                 <FilterSelect label="Ticket" value={filters.ticket} onChange={(v) => setFilter("ticket", v)} options={[["all", "All tickets"], ...ticketIds.map((id) => [id, `${ticketName(id)} (${stats.perTicket[id] ?? 0})`] as [string, string])]} />
-                <FilterSelect label="Role" value={filters.role} onChange={(v) => setFilter("role", v)} options={[["all", "All roles"], ...roles.map((r) => [r, r[0].toUpperCase() + r.slice(1)] as [string, string])]} />
+                <FilterSelect label="Role" value={filters.role} onChange={(v) => setFilter("role", v)} options={[["all", "All roles"], ...roles.map((r) => [r, roleLabel(r)] as [string, string])]} />
                 <FilterSelect label="Check-in" value={filters.checkin} onChange={(v) => setFilter("checkin", v as Filters["checkin"])} options={[["all", "Any check-in"], ["in", "Checked in"], ["out", "Not checked in"]]} />
                 <button
                   type="button"

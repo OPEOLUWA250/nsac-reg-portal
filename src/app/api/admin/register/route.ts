@@ -17,8 +17,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const fullName = typeof body.fullName === "string" ? body.fullName.trim() : "";
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-  const role =
-    typeof body.role === "string" && body.role.trim() ? body.role.trim().toLowerCase() : "attendee";
+  const requested = typeof body.role === "string" ? body.role.trim().toLowerCase() : "";
+  const role = isAttendeeRole(requested) ? requested : "delegate";
   const organization =
     typeof body.organization === "string" && body.organization.trim()
       ? body.organization.trim()

@@ -132,3 +132,9 @@ export const IconChevronDown = ({ className = "h-4 w-4" }: P) => (
     <path d="M6 9l6 6 6-6" />
   </Svg>
 );
+export const IconTag = ({ className = "h-[18px] w-[18px]" }: P) => (
+  <Svg className={className}>
+    <path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9-9-9z" />
+    <circle cx="8" cy="8" r="1.5" />
+  </Svg>
+);
