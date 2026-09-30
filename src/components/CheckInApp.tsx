@@ -8,6 +8,7 @@ import StationGate, { useStationName } from "@/components/StationGate";
 import { Alert, Button, Card, Eyebrow, RolePill, Spinner } from "@/components/ui";
 import { IconAlert, IconPin } from "@/components/icons";
 import type { Attendee } from "@/lib/types";
+import { roleLabel } from "@/lib/role-style";
 
 type Status = "scanning" | "loading" | "found" | "error";
 
@@ -180,6 +181,27 @@ export default function CheckInApp() {
               {attendee.organization && <p className="text-ink-2">{attendee.organization}</p>}
             </div>
 
+            <dl className="divide-y divide-line border-y border-line text-sm">
+              {[
+                ["Name", attendee.full_name],
+                ["Country of residence", attendee.residence_country],
+                ["Category", roleLabel(attendee.role)],
+                ["Nationality", attendee.nationality],
+                ["Email", attendee.email],
+                ["Phone number", attendee.phone],
+                ["Company / organisation", attendee.organization],
+                ["Job title", attendee.job_title],
+              ].map(([label, value]) => (
+                <div key={label} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-3 py-3">
+                  <dt className="text-ink-3">{label}</dt>
+                  <dd className="font-medium text-ink [overflow-wrap:anywhere]">{value || "Not provided"}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="text-xs text-ink-3">
+              {attendee.share_details === true ? "This attendee allows their contact details to be shared through their QR code." : "This attendee chose not to share their details publicly. These details are visible only to signed-in admins for check-in."}
+            </p>
+
             {attendee.payment_status === "pending" && (
               <Alert tone="error" title="Payment not completed">
                 Send them to the help desk before printing a badge.
@@ -202,11 +224,11 @@ export default function CheckInApp() {
 
             <div className="flex flex-col gap-2.5">
               {!alreadyCheckedIn && !done ? (
-                <Button variant="primary" size="lg" onClick={handleConfirmAndPrint} loading={checkingIn}>
+                <Button variant="primary" size="lg" onClick={handleConfirmAndPrint} loading={checkingIn} disabled={attendee.payment_status === "pending"}>
                   {checkingIn ? "Checking in" : "Confirm check-in and print badge"}
                 </Button>
               ) : (
-                <Button variant="primary" size="lg" onClick={handlePrintBadge}>
+                <Button variant="primary" size="lg" onClick={handlePrintBadge} disabled={attendee.payment_status === "pending"}>
                   Print badge
                 </Button>
               )}

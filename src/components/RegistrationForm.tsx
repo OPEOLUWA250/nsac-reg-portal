@@ -33,7 +33,7 @@ import {
   type ValidationErrors,
 } from "@/lib/registration-fields";
 import { COUNTRY_CODES, EUROPEAN_VAT_COUNTRIES } from "@/lib/countries";
-import { discountedCents, formatPrice } from "@/lib/tickets";
+import { discountedCents, formatPrice, requiresVipPayment } from "@/lib/tickets";
 import { REGISTRATION_CATEGORIES, type RegistrationCategory } from "@/lib/types";
 import { EVENT_INFO } from "@/lib/event-info";
 
@@ -502,6 +502,11 @@ export default function RegistrationForm({
       return;
     }
 
+    if (priceCents !== null && requiresVipPayment(form.category, priceCents)) {
+      showErrors({ [appliedPromo ? "promoCode" : "ticket"]: "vip_payment_required" });
+      return;
+    }
+
     setPhase({ kind: "submitting" });
     let res: Response;
     let json: Record<string, unknown>;
@@ -631,7 +636,7 @@ export default function RegistrationForm({
         ? t.uploading(phase.pct)
         : phase.kind === "redirecting"
           ? t.redirecting
-          : selectedTicket && priceCents === 0
+          : selectedTicket && priceCents === 0 && form.category !== "vip"
             ? t.submitFree
             : t.submit(selectedTicket && priceCents !== null ? formatPrice(priceCents, selectedTicket.currency, lang) : "").replace(/ · $/, "");
 
