@@ -89,7 +89,7 @@ interface Layout {
 // With partner logos: the info panel gets shorter (smaller date and QR) to
 // make room for a white row of logos above the bottom strip.
 const WITH_PARTNERS: Partial<Layout> = { panelTop: 1030, panelH: 172, dateSize: 40, qrSize: 124 };
-const PARTNER_ROW_H = 78;
+const PARTNER_ROW_H = 94;
 
 const LAYOUTS: Record<FlyerFormat, Layout> = {
   portrait: {
@@ -540,9 +540,9 @@ export function drawFlyer(
     ctx.fillRect(L.pad, sTop, W - L.pad * 2, 2);
     // Same height for every logo (wide ones capped), centred as a row, and
     // scaled down together if they don't fit the width.
-    const gapX = 56;
-    let h = 46;
-    const widths = partners.map((img) => Math.min(240, (img.naturalWidth / img.naturalHeight) * h));
+    const gapX = 64;
+    let h = 62;
+    const widths = partners.map((img) => Math.min(300, (img.naturalWidth / img.naturalHeight) * h));
     let total = widths.reduce((sum, w) => sum + w, 0) + gapX * (partners.length - 1);
     const scale = Math.min(1, (W - L.pad * 2) / total);
     h *= scale;

@@ -2,7 +2,7 @@
 -- Run this in the Supabase dashboard (SQL Editor) BEFORE deploying the
 -- version of the app that uses it. Safe to run more than once.
 
--- 1. Registration categories chosen on the form: speaker, delegate, media,
+-- 1. Registration categories chosen on the form: delegate, speaker, media,
 --    exhibitor and vip, stored in attendees.role (it drives the badge
 --    colour); host and staff are for walk-ins added in the admin.
 --    'press' becomes 'media'; 'attendee' and 'sponsor' become 'delegate'.

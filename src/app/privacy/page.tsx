@@ -54,7 +54,7 @@ function PrivacyEn() {
     >
       <LegalSection title="What we collect">
         <ul>
-          <li>Your registration category (speaker, delegate, media, exhibitor or VIP), name, email address, phone number and job title.</li>
+          <li>Your registration category (delegate, speaker, media, exhibitor or VIP), name, email address, phone number and job title.</li>
           <li>Your nationality, country of residence, organisation, its country, your professional category and job function.</li>
           <li>Whether you need an invitation letter and, if you upload it, a copy of your passport.</li>
           <li>Food allergies, so the catering can plan for them.</li>
@@ -133,7 +133,7 @@ function PrivacyFr() {
     >
       <LegalSection title="Ce que nous recueillons">
         <ul>
-          <li>Votre catégorie d&apos;inscription (intervenant, délégué, médias, exposant ou VIP), vos nom et prénom, votre adresse e-mail, votre numéro de téléphone et l&apos;intitulé de votre poste.</li>
+          <li>Votre catégorie d&apos;inscription (délégué, intervenant, médias, exposant ou VIP), vos nom et prénom, votre adresse e-mail, votre numéro de téléphone et l&apos;intitulé de votre poste.</li>
           <li>Votre nationalité, votre pays de résidence, votre organisation et son pays, votre catégorie professionnelle et le domaine d&apos;activité de votre poste.</li>
           <li>Si vous avez besoin d&apos;une lettre d&apos;invitation et, si vous la joignez, une copie de votre passeport.</li>
           <li>Vos allergies alimentaires, pour que le traiteur puisse en tenir compte.</li>

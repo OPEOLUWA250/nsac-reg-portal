@@ -11,7 +11,7 @@ export const ATTENDEE_ROLES = [
 ] as const;
 
 /** The categories a visitor picks on the registration form. */
-export const REGISTRATION_CATEGORIES = ["speaker", "delegate", "media", "exhibitor", "vip"] as const;
+export const REGISTRATION_CATEGORIES = ["delegate", "speaker", "media", "exhibitor", "vip"] as const;
 export type RegistrationCategory = (typeof REGISTRATION_CATEGORIES)[number];
 export type AttendeeRole = (typeof ATTENDEE_ROLES)[number];
 
