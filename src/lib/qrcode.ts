@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import QRCode from "qrcode";
-import { publicBaseUrl } from "@/lib/public-url";
+import { publicBaseUrl, toHttps } from "@/lib/public-url";
 
 // Opaque, unguessable value embedded in the attendee's QR code and stored
 // as `unique_code`. Decoupled from the DB primary key so it can be rotated
@@ -13,11 +13,12 @@ export function generateUniqueCode(): string {
  * What an attendee's QR code holds: a link to their contact page
  * (/p/<code>), so a phone camera opens it (details shown only if they agreed
  * to share). The check-in scanner reads the code back out of the link. Without
- * PUBLIC_BASE_URL it falls back to the bare code.
+ * PUBLIC_BASE_URL it uses the Vercel production domain when available.
  */
 export function ticketQrContent(uniqueCode: string): string {
-  const base = publicBaseUrl();
-  return base ? `${base}/p/${uniqueCode}` : uniqueCode;
+  const base = publicBaseUrl() || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? toHttps(process.env.VERCEL_PROJECT_PRODUCTION_URL) : null);
+  if (!base) throw new Error("Set PUBLIC_BASE_URL before generating attendee QR codes.");
+  return `${base}/p/${uniqueCode}`;
 }
 
 /** The attendee code from a scanned QR: a /p/<code> link or the bare code. */

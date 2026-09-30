@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { proxy } from "./proxy";
+import { proxy, config } from "./proxy";
 
 const mocks = vi.hoisted(() => ({ create: vi.fn(), getUser: vi.fn(), role: vi.fn(), config: vi.fn() }));
 vi.mock("@supabase/ssr", () => ({ createServerClient: mocks.create }));
@@ -36,7 +36,7 @@ it.each(["missing", "invalid", "offline"])("treats %s auth configuration as sign
 it("allows temporary-password admins only onto the reset page", async () => {
   mocks.role.mockResolvedValue("admin");
   mocks.getUser.mockResolvedValue({ data: { user: { app_metadata: { must_change_password: true } } } });
-  for (const path of ["/admin", "/admin/login", "/admin/admins"]) {
+  for (const path of ["/admin", "/admin/login", "/admin/admins", "/checkin"]) {
     expect((await proxy(new NextRequest(`https://example.com${path}`))).headers.get("location")).toBe("https://example.com/admin/reset-password");
   }
   expect((await proxy(new NextRequest("https://example.com/admin/reset-password"))).status).toBe(200);
@@ -46,4 +46,18 @@ it("sends signed-in admins away from login", async () => {
   mocks.role.mockResolvedValue("admin");
   mocks.getUser.mockResolvedValue({ data: { user: { app_metadata: {} } } });
   expect((await proxy(new NextRequest("https://example.com/admin/login"))).headers.get("location")).toBe("https://example.com/admin");
+});
+
+it("protects the scanner and preserves its destination for login", async () => {
+  expect(config.matcher).toContain("/checkin/:path*");
+  const response = await proxy(new NextRequest("https://example.com/checkin"));
+  const destination = new URL(response.headers.get("location")!);
+  expect(destination.pathname).toBe("/admin/login");
+  expect(destination.searchParams.get("next")).toBe("/checkin");
+});
+
+it.each(["admin", "super_admin"])("lets signed-in %s accounts use the scanner", async (role) => {
+  mocks.role.mockResolvedValue(role);
+  mocks.getUser.mockResolvedValue({ data: { user: { app_metadata: {} } } });
+  expect((await proxy(new NextRequest("https://example.com/checkin"))).status).toBe(200);
 });

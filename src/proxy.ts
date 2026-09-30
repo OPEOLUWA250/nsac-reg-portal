@@ -3,7 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import type { User } from "@supabase/supabase-js";
 import { resolveAdminRole, supabaseAuthConfig } from "@/lib/server/admin-roles";
 
-// Protects the admin PAGES (/admin/*). API routes check sign-in themselves
+// Protects admin and scanner pages. API routes check sign-in themselves
 // (adminRoute in src/lib/server/admin-auth.ts).
 //   - not an admin           -> /admin/login?next=<where they were going>
 //   - temporary password     -> /admin/reset-password
@@ -30,7 +30,7 @@ export async function proxy(request: NextRequest) {
           },
         },
       });
-        user = (await supabase.auth.getUser()).data.user;
+      user = (await supabase.auth.getUser()).data.user;
     } catch {
       user = null; // auth unreachable: treat as signed out
     }
@@ -56,5 +56,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/checkin/:path*"],
 };

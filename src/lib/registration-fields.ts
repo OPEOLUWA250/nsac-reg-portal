@@ -75,6 +75,8 @@ export type FieldName =
   | "passport"
   | "foodAllergies"
   | "safetyConsent"
+  | "optInOrganizer"
+  | "optInSponsors"
   | "shareDetails"
   | "promoCode"
   | "ticket"
@@ -102,6 +104,20 @@ export type FieldError =
   | "promo_unavailable";
 
 export type ValidationErrors = Partial<Record<FieldName, FieldError>>;
+
+/** All agreement boxes and an explicit sharing choice are required for checkout. */
+export function registrationAgreementErrors(raw: Record<string, unknown>): ValidationErrors {
+  const errors: ValidationErrors = {};
+  for (const field of ["safetyConsent", "optInOrganizer", "optInSponsors"] as const) {
+    if (raw[field] !== true) errors[field] = "consent_required";
+  }
+  if (raw.shareDetails === undefined || raw.shareDetails === null || raw.shareDetails === "") {
+    errors.shareDetails = "required";
+  } else if (raw.shareDetails !== "yes" && raw.shareDetails !== "no") {
+    errors.shareDetails = "invalid_choice";
+  }
+  return errors;
+}
 
 export interface CleanRegistration {
   id: string;
@@ -236,10 +252,7 @@ export function validateRegistration(
 
   requireText(errors, "foodAllergies", foodAllergies, LIMITS.foodAllergies);
 
-  if (raw.safetyConsent !== true) errors.safetyConsent = "consent_required";
-
-  if (!shareDetails) errors.shareDetails = "required";
-  else if (shareDetails !== "yes" && shareDetails !== "no") errors.shareDetails = "invalid_choice";
+  Object.assign(errors, registrationAgreementErrors(raw));
 
   if (promoCode && !PROMO_CODE_RE.test(promoCode)) errors.promoCode = "promo_invalid";
 

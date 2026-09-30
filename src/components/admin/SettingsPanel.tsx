@@ -16,7 +16,7 @@ interface SettingsResponse {
   status: {
     payments: { configured: boolean; mode: "live" | "test" | null; webhook: boolean };
     email: { provider: string | null; sender: string | null; testSender: boolean };
-    security: { adminSignIn: boolean; owners: number; staffCode: boolean; spamProtection: boolean };
+    security: { adminSignIn: boolean; owners: number; scannerAdminOnly: boolean; spamProtection: boolean };
     keepAlive: boolean;
     publicUrl: string | null;
   };
@@ -206,7 +206,7 @@ export default function SettingsPanel() {
                     : "Admin sign-in: no owner set (ADMIN_EMAILS)"
               }
             />
-            <Check ok={data.status.security.staffCode} label="Staff code for the check-in scanner" />
+            <Check ok={data.status.security.scannerAdminOnly} label="Check-in scanner restricted to signed-in admins" />
             <Check ok={data.status.security.spamProtection} warn={!data.status.security.spamProtection} label="Spam protection (Turnstile)" />
           </StatusGroup>
           <StatusGroup title="Database">

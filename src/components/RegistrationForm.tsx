@@ -26,6 +26,7 @@ import {
   PASSPORT_MIME_TYPES,
   PROFESSIONAL_CATEGORIES,
   validateRegistration,
+  registrationAgreementErrors,
   type FieldError as FieldErrorCode,
   type FieldName,
   type Language,
@@ -118,7 +119,7 @@ type Phase =
 const STEP_FIELDS: FieldName[][] = [
   ["category", "firstName", "lastName", "email", "jobTitle", "phone", "nationality", "residenceCountry"],
   ["organization", "organizationCountry", "professionalCategory", "jobFunction", "invitationLetter", "passport", "foodAllergies"],
-  ["ticket", "promoCode", "vatNumber", "invoiceId", "safetyConsent", "shareDetails"],
+  ["ticket", "promoCode", "vatNumber", "invoiceId", "safetyConsent", "shareDetails", "optInOrganizer", "optInSponsors"],
 ];
 const LAST_STEP = STEP_FIELDS.length - 1;
 
@@ -596,6 +597,8 @@ export default function RegistrationForm({
   };
 
   const privacyToken = "{privacy}";
+  const missingAgreement = Object.keys(registrationAgreementErrors({ ...form }))[0];
+  const agreementsComplete = !missingAgreement;
   const [consentBefore, consentAfter] = t.fields.safetyConsent(privacyToken).split(privacyToken);
   const privacyLabel = lang === "fr" ? "politique de confidentialité" : "privacy policy";
   // Our own /privacy page opens in the form's language.
@@ -914,12 +917,18 @@ export default function RegistrationForm({
                         error={err("shareDetails")}
                         columns
                       />
-                      <Checkbox checked={form.optInOrganizer} onChange={(v) => update("optInOrganizer", v)}>
-                        {t.fields.optInOrganizer}
-                      </Checkbox>
-                      <Checkbox checked={form.optInSponsors} onChange={(v) => update("optInSponsors", v)}>
-                        {t.fields.optInSponsors}
-                      </Checkbox>
+                      <div id="field-optInOrganizer" className="space-y-1.5">
+                        <Checkbox required checked={form.optInOrganizer} onChange={(v) => update("optInOrganizer", v)} invalid={!!err("optInOrganizer")} describedBy="field-optInOrganizer-error">
+                          {t.fields.optInOrganizer}
+                        </Checkbox>
+                        {err("optInOrganizer") && <FieldError id="field-optInOrganizer-error">{err("optInOrganizer")}</FieldError>}
+                      </div>
+                      <div id="field-optInSponsors" className="space-y-1.5">
+                        <Checkbox required checked={form.optInSponsors} onChange={(v) => update("optInSponsors", v)} invalid={!!err("optInSponsors")} describedBy="field-optInSponsors-error">
+                          {t.fields.optInSponsors}
+                        </Checkbox>
+                        {err("optInSponsors") && <FieldError id="field-optInSponsors-error">{err("optInSponsors")}</FieldError>}
+                      </div>
                     </Section>
 
                     <Review t={t} lang={lang} form={form} ticket={selectedTicket} promo={appliedPromo} priceCents={priceCents} onEdit={goToStep} />
@@ -950,9 +959,8 @@ export default function RegistrationForm({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {/* Payment only opens once the agreement box is ticked (the
-                      server checks it too). The note says why it's locked. */}
-                  {!form.safetyConsent && (
+                  {/* Checkout and the API enforce the same agreement requirements. */}
+                  {!agreementsComplete && (
                     <p id="agree-first" className="flex items-start justify-center gap-1.5 text-center text-sm font-medium text-ink-2">
                       <IconAlert className="mt-0.5 h-4 w-4 shrink-0 text-gold-ink" />
                       <span>
@@ -961,7 +969,7 @@ export default function RegistrationForm({
                           type="button"
                           className={linkClass}
                           onClick={() => {
-                            const box = document.querySelector<HTMLInputElement>("#field-safetyConsent input");
+                            const box = document.querySelector<HTMLInputElement>(`#field-${missingAgreement} input`);
                             box?.scrollIntoView({ behavior: "smooth", block: "center" });
                             box?.focus({ preventScroll: true });
                           }}
@@ -977,8 +985,8 @@ export default function RegistrationForm({
                     size="lg"
                     className="w-full"
                     loading={busy}
-                    disabled={!form.safetyConsent}
-                    aria-describedby={form.safetyConsent ? undefined : "agree-first"}
+                    disabled={!agreementsComplete}
+                    aria-describedby={agreementsComplete ? undefined : "agree-first"}
                   >
                     {submitLabel}
                   </Button>
@@ -1271,6 +1279,7 @@ function RadioGroup({
             >
               <input
                 type="radio"
+                required
                 name={name}
                 value={o.value}
                 checked={checked}
@@ -1307,6 +1316,7 @@ function Checkbox({
     <label className="flex cursor-pointer items-start gap-3 py-1 text-base leading-snug text-ink-2">
       <input
         type="checkbox"
+        required={required}
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
         className={cx("mt-0.5 h-5 w-5 shrink-0", invalid && "outline-2 outline-offset-1 outline-danger")}

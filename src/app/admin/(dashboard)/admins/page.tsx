@@ -3,7 +3,7 @@ import AdminsPanel from "@/components/admin/AdminsPanel";
 
 export const metadata: Metadata = {
   title: "Admins",
-  description: "Who can sign in to the admin, and the check-in scanner's staff code.",
+  description: "Manage admin accounts and access to the check-in scanner.",
   robots: { index: false },
 };
 
