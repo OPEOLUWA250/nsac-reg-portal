@@ -36,6 +36,12 @@ export async function generateQrPngDataUrl(token: string): Promise<string> {
   });
 }
 
+/** Vector QR for the printed badge, so it stays sharp at any printer resolution. */
+export async function generateQrSvgDataUrl(token: string): Promise<string> {
+  const svg = await QRCode.toString(token, { type: "svg", errorCorrectionLevel: "M", margin: 1 });
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+}
+
 export async function generateQrPngBuffer(token: string): Promise<Buffer> {
   return QRCode.toBuffer(token, {
     errorCorrectionLevel: "M",

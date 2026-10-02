@@ -35,6 +35,7 @@ export default function CheckInApp() {
   const { stationName, setStationName, clearStationName } = useStationName();
   const [status, setStatus] = useState<Status>("scanning");
   const [attendee, setAttendee] = useState<ScannerAttendee | null>(null);
+  const [badgeQr, setBadgeQr] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [alreadyCheckedIn, setAlreadyCheckedIn] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
@@ -67,8 +68,9 @@ export default function CheckInApp() {
     if (status === "loading" || status === "found") return;
     setStatus("loading");
     try {
-      const { attendee } = await apiCall("/api/checkin/lookup", { token });
+      const { attendee, badgeQr } = await apiCall("/api/checkin/lookup", { token });
       setAttendee(attendee);
+      setBadgeQr(badgeQr ?? null);
       setAlreadyCheckedIn(attendee.checked_in);
       setDone(false);
       setErrorMsg("");
@@ -81,6 +83,7 @@ export default function CheckInApp() {
 
   function reset() {
     setAttendee(null);
+    setBadgeQr(null);
     setAlreadyCheckedIn(false);
     setErrorMsg("");
     setDone(false);
@@ -241,7 +244,7 @@ export default function CheckInApp() {
         )}
       </div>
 
-      {attendee && <Badge attendee={attendee} />}
+      {attendee && <Badge attendee={attendee} qr={badgeQr} />}
     </main>
   );
 }

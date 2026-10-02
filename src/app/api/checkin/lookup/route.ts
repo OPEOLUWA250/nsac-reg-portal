@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { codeFromQr } from "@/lib/qrcode";
+import { codeFromQr, generateQrSvgDataUrl, ticketQrContent } from "@/lib/qrcode";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { adminRoute } from "@/lib/server/admin-auth";
 import { scannerAttendee } from "@/lib/scanner-attendee";
@@ -32,5 +32,14 @@ export const POST = adminRoute(async (req: NextRequest) => {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ attendee: scannerAttendee(attendee) }, { headers: { "Cache-Control": "private, no-store" } });
+  // The printed badge carries the same /p/<code> QR as the ticket, so other
+  // delegates can scan it. A missing base URL must not block check-in.
+  let badgeQr: string | null = null;
+  try {
+    badgeQr = await generateQrSvgDataUrl(ticketQrContent(attendee.unique_code));
+  } catch (err) {
+    console.error("Badge QR generation error", err);
+  }
+
+  return NextResponse.json({ attendee: scannerAttendee(attendee), badgeQr }, { headers: { "Cache-Control": "private, no-store" } });
 });

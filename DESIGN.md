@@ -194,3 +194,18 @@ post on social media) keeps its own deep-space look: starfield, planet
 horizon with glow, shadows and the gold card edge. It is a poster, not the
 interface, and was kept by choice. It still uses the site fonts (Raleway and
 DM Sans), passed in from the flyer maker page.
+
+## Printed conference badge
+
+The 3.5 × 5.5 inch badge uses a blue header with the full-resolution logo,
+gold rule, orbital line artwork, and shared event dates and location. The
+white identity panel uses dark text, 34px Raleway names (28px or 23px for
+longer names), 13px titles and 15px organisations. A 16px category strip
+uses the existing role accent; withheld categories read Attendee. Physical
+artwork uses fixed dimensions and 24px gutters independently of UI sizing.
+The header artwork is inline SVG so it prints even with background graphics
+disabled. The same artwork appears in the scanner preview and a body-level
+print portal; only the portal occupies print layout. The footer carries the
+attendee's 1-inch vector QR (the same /p/<code> link as their ticket) with a
+"Scan to connect" label, so delegates can scan each other's badges; the
+contact page respects the attendee's sharing choice.
