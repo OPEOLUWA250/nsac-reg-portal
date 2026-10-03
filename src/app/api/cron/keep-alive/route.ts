@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { pruneRateLimits } from "@/lib/server/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -23,6 +24,8 @@ export async function GET(req: NextRequest) {
   try {
     const { error } = await supabaseAdmin().from("attendees").select("id", { count: "exact", head: true });
     if (error) throw new Error(error.message);
+    // Housekeeping: drop sign-in/promo counters older than a day.
+    await pruneRateLimits();
     return NextResponse.json({ ok: true, at: new Date().toISOString() }, { headers });
   } catch (err) {
     // A failed run shows as an error in Vercel's Cron Jobs logs.

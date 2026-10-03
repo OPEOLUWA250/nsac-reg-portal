@@ -42,7 +42,7 @@ export default function Badge({ attendee, qr }: { attendee: Pick<Attendee, "full
           <span>Official conference badge</span>
           <strong>{EVENT_INFO.website}</strong>
         </div>
-        {/* Same /p/<code> link as the ticket: shows contact details only if the attendee agreed to share. */}
+        {/* Public contact code (not the entry code): opens their contact page, refused by the check-in scanner. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {qr && <img className="badge-qr" src={qr} width="96" height="96" alt="Attendee QR code" />}
       </footer>

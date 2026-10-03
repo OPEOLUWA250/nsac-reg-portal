@@ -43,6 +43,12 @@ it("does not share an unpaid registration even with consent", async () => {
   expect((await GET(request, context)).status).toBe(404);
 });
 
+it("opens from the badge's contact code when no ticket code matches", async () => {
+  mock.single.mockResolvedValueOnce({ data: null, error: null }).mockResolvedValueOnce({ data: row, error: null });
+  expect((await getPublicContact("abcdef12345678")).status).toBe("shared");
+  expect(mock.single).toHaveBeenCalledTimes(2);
+});
+
 it("rejects invalid codes without querying attendee data", async () => {
   expect(await getPublicContact("../private")).toEqual({ status: "invalid" });
   expect(mock.single).not.toHaveBeenCalled();

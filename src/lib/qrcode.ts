@@ -16,9 +16,23 @@ export function generateUniqueCode(): string {
  * PUBLIC_BASE_URL it uses the Vercel production domain when available.
  */
 export function ticketQrContent(uniqueCode: string): string {
+  return contactPageUrl(uniqueCode);
+}
+
+/**
+ * What the QR printed on a badge holds: the same kind of contact-page link,
+ * but with the attendee's public contact_code. Badges are worn in the open,
+ * so this code opens the contact page and nothing else: the check-in scanner
+ * refuses it.
+ */
+export function badgeQrContent(contactCode: string): string {
+  return contactPageUrl(contactCode);
+}
+
+function contactPageUrl(code: string): string {
   const base = publicBaseUrl() || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? toHttps(process.env.VERCEL_PROJECT_PRODUCTION_URL) : null);
   if (!base) throw new Error("Set PUBLIC_BASE_URL before generating attendee QR codes.");
-  return `${base}/p/${uniqueCode}`;
+  return `${base}/p/${code}`;
 }
 
 /** The attendee code from a scanned QR: a /p/<code> link or the bare code. */

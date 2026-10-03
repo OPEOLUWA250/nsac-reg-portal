@@ -4,7 +4,7 @@ import { proxy, config } from "./proxy";
 
 const mocks = vi.hoisted(() => ({ create: vi.fn(), getUser: vi.fn(), role: vi.fn(), config: vi.fn() }));
 vi.mock("@supabase/ssr", () => ({ createServerClient: mocks.create }));
-vi.mock("@/lib/server/admin-roles", () => ({ resolveAdminRole: mocks.role, supabaseAuthConfig: mocks.config }));
+vi.mock("@/lib/server/admin-roles", () => ({ resolveAdminRole: mocks.role, supabaseAuthConfig: mocks.config, ADMIN_COOKIE_OPTIONS: { httpOnly: true, path: "/" } }));
 
 beforeEach(() => {
   mocks.config.mockReturnValue({ url: "https://example.supabase.co", anonKey: "public-key" });
@@ -23,6 +23,11 @@ it("redirects signed-out requests, preserving destination and refreshed cookies"
   expect(destination.pathname).toBe("/admin/login");
   expect(destination.searchParams.get("next")).toBe("/admin/tickets?filter=active");
   expect(response.cookies.get("session")?.value).toBe("refreshed");
+});
+
+it("keeps session cookies away from page scripts", async () => {
+  await proxy(new NextRequest("https://example.com/admin"));
+  expect(mocks.create.mock.calls[0][2].cookieOptions).toMatchObject({ httpOnly: true });
 });
 
 it.each(["missing", "invalid", "offline"])("treats %s auth configuration as signed out", async (mode) => {

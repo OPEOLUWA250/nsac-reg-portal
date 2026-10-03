@@ -102,7 +102,8 @@ export type FieldError =
   | "promo_expired"
   | "promo_used_up"
   | "promo_not_for_ticket"
-  | "promo_unavailable";
+  | "promo_unavailable"
+  | "promo_rate_limited";
 
 export type ValidationErrors = Partial<Record<FieldName, FieldError>>;
 

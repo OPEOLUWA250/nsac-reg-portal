@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import type { User } from "@supabase/supabase-js";
-import { resolveAdminRole, supabaseAuthConfig, type AdminRole } from "@/lib/server/admin-roles";
+import { ADMIN_COOKIE_OPTIONS, resolveAdminRole, supabaseAuthConfig, type AdminRole } from "@/lib/server/admin-roles";
 
 // Admin sign-in for server code (route handlers, server components). The
 // session lives in cookies, managed by @supabase/ssr. Pages are protected by
@@ -23,6 +23,7 @@ export async function adminAuthClient() {
   if (!config) return null;
   const store = await cookies();
   return createServerClient(config.url, config.anonKey, {
+    cookieOptions: ADMIN_COOKIE_OPTIONS,
     cookies: {
       getAll: () => store.getAll(),
       setAll(list) {

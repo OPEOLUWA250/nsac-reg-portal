@@ -3,6 +3,7 @@ import { adminAuthClient } from "@/lib/server/admin-auth";
 import { isAllowedAdminEmail } from "@/lib/server/admin-emails";
 import { resolveAdminRole } from "@/lib/server/admin-roles";
 import { ADMIN_PASSWORD_MAX } from "@/lib/admin-password";
+import { clientIp, withinLimit } from "@/lib/server/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -10,6 +11,7 @@ export const runtime = "nodejs";
 // Every refusal gets the same answer, so the form can't reveal who the
 // admins are. The real reason goes to the server log.
 const REFUSED = { error: "Incorrect email or password." };
+const TOO_MANY = { error: "Too many sign-in attempts. Wait 15 minutes and try again." };
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,6 +20,18 @@ export async function POST(req: NextRequest) {
     const password = typeof body.password === "string" ? body.password : "";
     if (!email || email.length > 254 || !password || password.length > ADMIN_PASSWORD_MAX) {
       return NextResponse.json(REFUSED, { status: 401 });
+    }
+
+    // Stops password guessing: per visitor, and per email so spreading the
+    // attempts over many machines doesn't help. Checked before anything else
+    // about the email, and the same for every email, so it reveals nothing.
+    const [ipOk, emailOk] = await Promise.all([
+      withinLimit("login-ip", clientIp(req), 10, 15 * 60),
+      withinLimit("login-email", email, 10, 15 * 60),
+    ]);
+    if (!ipOk || !emailOk) {
+      console.warn(`Admin sign-in rate limited for ${email}`);
+      return NextResponse.json(TOO_MANY, { status: 429 });
     }
 
     if (!(await isAllowedAdminEmail(email))) {

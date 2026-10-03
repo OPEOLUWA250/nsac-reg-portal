@@ -44,6 +44,12 @@ interface CheckoutArgs {
   promo?: PromoCode | null;
   language: "en" | "fr";
   baseUrl: string;
+  /**
+   * Someone who may not be the registrant (they only typed the same email):
+   * leave the registrant's open payment page alone and don't touch the
+   * record. If both pages get paid, the second payment is refunded.
+   */
+  keepPrevious?: boolean;
 }
 
 export async function createCheckoutSession({
@@ -52,6 +58,7 @@ export async function createCheckoutSession({
   promo,
   language,
   baseUrl,
+  keepPrevious = false,
 }: CheckoutArgs): Promise<string> {
   // Up to 4 custom fields appear on the Stripe invoice (40-char names).
   const customFields: { name: string; value: string }[] = [];
@@ -62,7 +69,7 @@ export async function createCheckoutSession({
   // Someone starting again (another tab, or back after closing the payment
   // page) gets a new payment page: close the old one, so the same
   // registration can never be paid twice.
-  if (attendee.stripe_session_id) {
+  if (attendee.stripe_session_id && !keepPrevious) {
     try {
       const previous = await stripe().checkout.sessions.retrieve(attendee.stripe_session_id);
       if (previous.status === "open") await stripe().checkout.sessions.expire(previous.id);
@@ -106,10 +113,12 @@ export async function createCheckoutSession({
 
   if (!session.url) throw new Error("Stripe did not return a Checkout URL");
 
-  await supabaseAdmin()
-    .from("attendees")
-    .update({ stripe_session_id: session.id })
-    .eq("id", attendee.id);
+  if (!keepPrevious) {
+    await supabaseAdmin()
+      .from("attendees")
+      .update({ stripe_session_id: session.id })
+      .eq("id", attendee.id);
+  }
 
   return session.url;
 }
@@ -139,6 +148,8 @@ export async function fulfillCheckoutSession(
   }
 
   // Conditional update: only one caller wins the pending → paid transition.
+  // The ticket and code come from the session that was paid, so the record
+  // always matches the payment (see keepPrevious in createCheckoutSession).
   const { data: updated, error } = await supabase
     .from("attendees")
     .update({
@@ -147,6 +158,7 @@ export async function fulfillCheckoutSession(
       stripe_session_id: session.id,
       amount_cents: session.amount_total,
       currency: session.currency,
+      ...(session.metadata?.ticket_type ? { ticket_type: session.metadata.ticket_type, promo_code: session.metadata.promo_code || null } : {}),
     })
     .eq("id", attendeeId)
     .eq("payment_status", "pending")
@@ -169,6 +181,9 @@ export async function fulfillCheckoutSession(
   // together don't both send it.
   const { data: existing } = await supabase.from("attendees").select("*").eq("id", attendeeId).maybeSingle();
   const attendee = (existing as Attendee | null) ?? null;
+  if (attendee?.stripe_session_id && attendee.stripe_session_id !== session.id) {
+    await refundDuplicatePayment(session, attendeeId);
+  }
   if (
     attendee &&
     !attendee.qr_email_sent_at &&
@@ -182,6 +197,26 @@ export async function fulfillCheckoutSession(
     }
   }
   return attendee;
+}
+
+/**
+ * A second payment page for a registration that was already paid through
+ * another one (e.g. the registrant on two devices) was paid too: give the
+ * money back. Same refund key every time, so webhook retries and success
+ * page reloads refund once.
+ */
+async function refundDuplicatePayment(session: Stripe.Checkout.Session, attendeeId: string): Promise<void> {
+  const paymentIntent = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
+  if (session.payment_status !== "paid" || !session.amount_total || !paymentIntent) return;
+  try {
+    await stripe().refunds.create(
+      { payment_intent: paymentIntent, reason: "duplicate", metadata: { attendee_id: attendeeId, checkout_session: session.id } },
+      { idempotencyKey: `duplicate-registration-${session.id}` }
+    );
+    console.warn(`Refunded duplicate payment ${session.id} for attendee ${attendeeId}`);
+  } catch (err) {
+    console.error(`Couldn't refund duplicate payment ${session.id} for attendee ${attendeeId}: refund it in Stripe`, err);
+  }
 }
 
 const EMAIL_RETRY_AFTER_MS = 60_000;

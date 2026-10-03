@@ -2,8 +2,9 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { POST } from "./route";
 
-const mocks = vi.hoisted(() => ({ client: vi.fn(), allowed: vi.fn(), role: vi.fn(), signIn: vi.fn(), signOut: vi.fn() }));
+const mocks = vi.hoisted(() => ({ client: vi.fn(), allowed: vi.fn(), role: vi.fn(), signIn: vi.fn(), signOut: vi.fn(), limit: vi.fn() }));
 vi.mock("@/lib/server/admin-auth", () => ({ adminAuthClient: mocks.client }));
+vi.mock("@/lib/server/rate-limit", () => ({ clientIp: () => "203.0.113.1", withinLimit: mocks.limit }));
 vi.mock("@/lib/server/admin-emails", () => ({ isAllowedAdminEmail: mocks.allowed }));
 vi.mock("@/lib/server/admin-roles", () => ({ resolveAdminRole: mocks.role }));
 
@@ -13,6 +14,7 @@ beforeEach(() => {
   mocks.role.mockResolvedValue("admin");
   mocks.signIn.mockResolvedValue({ data: { user: { app_metadata: { must_change_password: true } } }, error: null });
   mocks.signOut.mockResolvedValue({ error: null });
+  mocks.limit.mockResolvedValue(true);
   vi.spyOn(console, "warn").mockImplementation(() => undefined);
 });
 afterEach(() => vi.restoreAllMocks());
@@ -38,6 +40,13 @@ it.each(["not allowed", "missing config", "offline", "wrong password", "not admi
   expect(response.status).toBe(401);
   expect(await response.json()).toEqual({ error: "Incorrect email or password." });
   if (reason === "not admin") expect(mocks.signOut).toHaveBeenCalledOnce();
+});
+
+it("stops password guessing before trying the password", async () => {
+  mocks.limit.mockImplementation(async (scope: string) => scope !== "login-email");
+  const response = await POST(request({ email: "admin@example.com", password: "guess number 11" }));
+  expect(response.status).toBe(429);
+  expect(mocks.signIn).not.toHaveBeenCalled();
 });
 
 it("returns the temporary password requirement after successful sign-in", async () => {

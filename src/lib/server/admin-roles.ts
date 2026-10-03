@@ -42,6 +42,18 @@ export async function resolveAdminRole(user: RoleUser | null | undefined, lookup
   }
 }
 
+/**
+ * Admin session cookies. Sign-in only ever happens on the server (no browser
+ * Supabase client), so page scripts never need them: HttpOnly keeps a stolen
+ * script from reading the session, Secure keeps it off plain http.
+ */
+export const ADMIN_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
+};
+
 /** Supabase settings for signing admins in. Null when not configured (= everyone signed out). */
 export function supabaseAuthConfig(): { url: string; anonKey: string } | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;

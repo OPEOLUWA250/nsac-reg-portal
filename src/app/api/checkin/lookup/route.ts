@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { codeFromQr, generateQrSvgDataUrl, ticketQrContent } from "@/lib/qrcode";
+import { badgeQrContent, codeFromQr, generateQrSvgDataUrl } from "@/lib/qrcode";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { adminRoute } from "@/lib/server/admin-auth";
 import { scannerAttendee } from "@/lib/scanner-attendee";
@@ -16,11 +16,12 @@ export const POST = adminRoute(async (req: NextRequest) => {
     return NextResponse.json({ error: "missing token" }, { status: 400 });
   }
 
+  const code = codeFromQr(token);
   const supabase = supabaseAdmin();
   const { data: attendee, error } = await supabase
     .from("attendees")
     .select("*")
-    .eq("unique_code", codeFromQr(token))
+    .eq("unique_code", code)
     .maybeSingle();
 
   if (error) {
@@ -29,16 +30,25 @@ export const POST = adminRoute(async (req: NextRequest) => {
   }
 
   if (!attendee) {
-    return NextResponse.json({ error: "not found" }, { status: 404 });
+    // A badge's contact QR is not a ticket: say so, so staff ask for the
+    // QR from the confirmation email instead. (Errors here: column not added
+    // yet; treat as an unknown code.)
+    const { data: badge } = await supabase.from("attendees").select("id").eq("contact_code", code).maybeSingle();
+    return NextResponse.json({ error: badge ? "badge_qr" : "not found" }, { status: 404 });
   }
 
-  // The printed badge carries the same /p/<code> QR as the ticket, so other
-  // delegates can scan it. A missing base URL must not block check-in.
+  // The printed badge carries the public contact code, never the entry code,
+  // so a photo of a badge can't be used at check-in. No contact code yet
+  // (migration not run) or no base URL: the badge prints without a QR.
   let badgeQr: string | null = null;
-  try {
-    badgeQr = await generateQrSvgDataUrl(ticketQrContent(attendee.unique_code));
-  } catch (err) {
-    console.error("Badge QR generation error", err);
+  if (attendee.contact_code) {
+    try {
+      badgeQr = await generateQrSvgDataUrl(badgeQrContent(attendee.contact_code));
+    } catch (err) {
+      console.error("Badge QR generation error", err);
+    }
+  } else {
+    console.warn("Badge printed without a QR: run supabase/migrations/20261003100000_badge_contact_code.sql");
   }
 
   return NextResponse.json({ attendee: scannerAttendee(attendee), badgeQr }, { headers: { "Cache-Control": "private, no-store" } });

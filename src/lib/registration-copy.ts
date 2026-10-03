@@ -235,6 +235,7 @@ export const COPY: Record<Language, Copy> = {
       promo_used_up: "This code has already been used the maximum number of times.",
       promo_not_for_ticket: "This code can't be used with the ticket you chose.",
       promo_unavailable: "We couldn't check the code just now. Try again in a moment.",
+      promo_rate_limited: "Too many codes tried. Wait 10 minutes and try again.",
       summary: "Please check the highlighted fields.",
       network:
         "We couldn't reach the server. Check your connection and try again. Your answers are still here.",
@@ -411,6 +412,7 @@ export const COPY: Record<Language, Copy> = {
       promo_used_up: "Ce code a déjà été utilisé le nombre maximum de fois.",
       promo_not_for_ticket: "Ce code ne s'applique pas au billet choisi.",
       promo_unavailable: "Impossible de vérifier le code pour le moment. Réessayez dans un instant.",
+      promo_rate_limited: "Trop de codes essayés. Patientez 10 minutes puis réessayez.",
       summary: "Veuillez vérifier les champs signalés.",
       network:
         "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez. Vos réponses sont conservées.",

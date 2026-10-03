@@ -156,6 +156,7 @@ export async function POST(req: NextRequest) {
   // Only the browser that created this record (it knows the random id) may
   // upload a passport for it — never someone who merely typed the same email.
   let mayUploadPassport = outcome.status !== "duplicate_email";
+  let keepPreviousCheckout = false;
 
   if (outcome.status === "duplicate_email") {
     if (attendee.payment_status !== "pending") {
@@ -165,18 +166,12 @@ export async function POST(req: NextRequest) {
       if (canResendQr(attendee)) await sendAttendeeQr(attendee);
       return NextResponse.json({ error: "validation", fields: { email: "email_taken" } }, { status: 400 });
     }
-    // Registered before but never paid (e.g. closed the payment page):
-    // let them pay now, for the ticket and code they just picked. Only the
-    // purchase changes: whoever typed this email may not be the person on
-    // file, so their answers (category, consent to share…) stay as they were.
-    const { data } = await supabase
-      .from("attendees")
-      .update({ ticket_type: ticket.id, amount_cents: amountCents, currency: ticket.currency, promo_code: promo?.code ?? null })
-      .eq("id", attendee.id)
-      .eq("payment_status", "pending")
-      .select()
-      .maybeSingle();
-    if (data) attendee = data as Attendee;
+    // Registered before but never paid (e.g. closed the payment page, or on
+    // another device): let them pay now, for the ticket and code they just
+    // picked. Whoever typed this email may not be the person on file, so
+    // nothing on the record changes and their open payment page stays open;
+    // the ticket and code are recorded only when this payment completes.
+    keepPreviousCheckout = true;
     mayUploadPassport = false;
   } else if (attendee.payment_status !== "pending") {
     // A retry of a submission that has since been paid.
@@ -225,6 +220,7 @@ export async function POST(req: NextRequest) {
       promo,
       language: input.language,
       baseUrl: baseUrl(req),
+      keepPrevious: keepPreviousCheckout,
     });
   } catch (err) {
     console.error("Stripe Checkout Session failed", err);

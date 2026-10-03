@@ -17,7 +17,9 @@ type Status = "scanning" | "loading" | "found" | "error";
 async function apiError(res: Response): Promise<Error & { status: number }> {
   const json = await res.json().catch(() => ({}));
   const message =
-    res.status === 404
+    res.status === 404 && json.error === "badge_qr"
+      ? "This is the contact QR from a printed badge, not a ticket. Scan the QR in their confirmation email, or send them to the help desk."
+      : res.status === 404
       ? "This QR code doesn't match any registration. Check it's a NewSpace Africa 2027 ticket, or send them to the help desk."
       : res.status === 401
         ? "Your sign-in has ended. Sign in again to use the scanner."

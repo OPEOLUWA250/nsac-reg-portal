@@ -57,7 +57,10 @@ export interface Attendee {
   payment_status: PaymentStatus;
   stripe_session_id: string | null;
   paid_at: string | null;
+  /** Entry credential: the QR in the confirmation email, accepted by the check-in scanner. Keep private. */
   unique_code: string;
+  /** Public code for the QR printed on the badge: opens the contact page, refused at check-in. Null until the migration runs. */
+  contact_code?: string | null;
   checked_in: boolean;
   checked_in_at: string | null;
   checked_in_station: string | null;

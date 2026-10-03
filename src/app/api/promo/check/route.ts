@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkPromoCode } from "@/lib/promo-codes";
 import { PROMO_CODE_RE } from "@/lib/registration-fields";
 import { describeError } from "@/lib/describe-error";
+import { clientIp, withinLimit } from "@/lib/server/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -10,7 +11,12 @@ export const runtime = "nodejs";
 // The registration endpoint checks the code again, so this is only a preview.
 //   200 { ok: true, code, percentOff }
 //   200 { ok: false, error: "promo_unknown" | "promo_expired" | "promo_used_up" | "promo_not_for_ticket" | "promo_invalid" }
+//   429 { ok: false, error: "promo_rate_limited" }   (stops codes being guessed)
 export async function POST(req: NextRequest) {
+  if (!(await withinLimit("promo", clientIp(req), 20, 10 * 60))) {
+    return NextResponse.json({ ok: false, error: "promo_rate_limited" }, { status: 429 });
+  }
+
   let body: { code?: unknown; ticket?: unknown };
   try {
     body = await req.json();

@@ -206,6 +206,7 @@ artwork uses fixed dimensions and 24px gutters independently of UI sizing.
 The header artwork is inline SVG so it prints even with background graphics
 disabled. The same artwork appears in the scanner preview and a body-level
 print portal; only the portal occupies print layout. The footer carries the
-attendee's 1-inch vector QR (the same /p/<code> link as their ticket) with a
-"Scan to connect" label, so delegates can scan each other's badges; the
-contact page respects the attendee's sharing choice.
+attendee's 1-inch vector QR with a "Scan to connect" label, so delegates can
+scan each other's badges. It holds the public contact code, not the entry
+code in the ticket email: it opens the contact page (which respects the
+attendee's sharing choice) and the check-in scanner refuses it.

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuthClient } from "@/lib/server/admin-auth";
 import { isAllowedAdminEmail } from "@/lib/server/admin-emails";
+import { clientIp, withinLimit } from "@/lib/server/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -12,7 +13,14 @@ export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) ?? {};
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   try {
-    if (email && email.length <= 254 && (await isAllowedAdminEmail(email))) {
+    // Past the limit nothing is sent (the answer stays the same), so nobody
+    // can flood an admin's inbox with reset emails.
+    const allowed =
+      email &&
+      email.length <= 254 &&
+      (await withinLimit("reset-ip", clientIp(req), 5, 60 * 60)) &&
+      (await withinLimit("reset-email", email, 3, 60 * 60));
+    if (allowed && (await isAllowedAdminEmail(email))) {
       const client = await adminAuthClient();
       if (!client) throw new Error("sign-in not configured");
       const origin = new URL(req.url).origin;

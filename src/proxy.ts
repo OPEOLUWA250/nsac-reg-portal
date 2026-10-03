@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import type { User } from "@supabase/supabase-js";
-import { resolveAdminRole, supabaseAuthConfig } from "@/lib/server/admin-roles";
+import { ADMIN_COOKIE_OPTIONS, resolveAdminRole, supabaseAuthConfig } from "@/lib/server/admin-roles";
 
 // Protects admin and scanner pages. API routes check sign-in themselves
 // (adminRoute in src/lib/server/admin-auth.ts).
@@ -21,6 +21,7 @@ export async function proxy(request: NextRequest) {
   if (config) {
     try {
       const supabase = createServerClient(config.url, config.anonKey, {
+        cookieOptions: ADMIN_COOKIE_OPTIONS,
         cookies: {
           getAll: () => request.cookies.getAll(),
           setAll(list) {
