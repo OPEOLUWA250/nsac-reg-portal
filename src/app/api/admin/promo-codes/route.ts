@@ -4,6 +4,7 @@ import { createPromoCode, listPromoCodes, setPromoCodeActive } from "@/lib/promo
 import { PROMO_CODE_RE } from "@/lib/registration-fields";
 import { describeError } from "@/lib/describe-error";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { listTickets } from "@/lib/ticket-store";
 
 export const runtime = "nodejs";
 
@@ -30,7 +31,16 @@ export const POST = adminRoute(async (req: NextRequest) => {
   const percentOff = Number(body.percentOff);
   const maxUses = body.maxUses === null || body.maxUses === "" || body.maxUses === undefined ? null : Number(body.maxUses);
   const expiresAt = typeof body.expiresAt === "string" && body.expiresAt ? body.expiresAt : null;
-  const ticketIds = Array.isArray(body.ticketIds) && body.ticketIds.length ? body.ticketIds.map(String) : null;
+  // Every new code names the tickets it works with (the form starts on
+  // Standard), so a free pass can't silently apply to every ticket.
+  const ticketIds: string[] = Array.isArray(body.ticketIds) ? [...new Set<string>(body.ticketIds.map(String))] : [];
+  let knownTickets: string[];
+  try {
+    knownTickets = (await listTickets()).map((t) => t.id);
+  } catch (err) {
+    console.error(`Load tickets for promo code failed: ${describeError(err)}`);
+    return NextResponse.json({ error: "Couldn't load the tickets. Try again." }, { status: 500 });
+  }
 
   if (code && !PROMO_CODE_RE.test(code)) fields.code = "3 to 40 letters, numbers, dashes or underscores. Leave empty to generate one.";
   if (!label) fields.label = "Say who it's for, e.g. \"AfSA sponsor passes\".";
@@ -39,6 +49,8 @@ export const POST = adminRoute(async (req: NextRequest) => {
   if (maxUses === null) fields.maxUses = "Say how many people can use this code, e.g. 10.";
   else if (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 100_000) fields.maxUses = "A whole number, at least 1.";
   if (expiresAt && !(new Date(expiresAt).getTime() > Date.now())) fields.expiresAt = "Pick a date in the future, or leave empty.";
+  if (!ticketIds.length) fields.ticketIds = "Tick at least one ticket.";
+  else if (ticketIds.some((id) => !knownTickets.includes(id))) fields.ticketIds = "Tick tickets from the list.";
   if (Object.keys(fields).length) return NextResponse.json({ error: "Check the highlighted fields.", fields }, { status: 400 });
 
   try {

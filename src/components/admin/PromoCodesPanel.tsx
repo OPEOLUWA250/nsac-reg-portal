@@ -47,12 +47,15 @@ interface Draft {
   percentOff: string;
   maxUses: string;
   expiresAt: string;
-  ticketIds: string[]; // empty = all tickets
+  ticketIds: string[];
 }
 
 const POLL_MS = 10_000;
 
-const EMPTY: Draft = { label: "", code: "", percentOff: "100", maxUses: "", expiresAt: "", ticketIds: [] };
+// New codes work with the Standard ticket unless the admin ticks others.
+const DEFAULT_TICKET = "standard";
+
+const EMPTY: Draft = { label: "", code: "", percentOff: "100", maxUses: "", expiresAt: "", ticketIds: [DEFAULT_TICKET] };
 
 function status(p: PromoCode): { label: string; dot: string } {
   if (!p.active) return { label: "Switched off", dot: "var(--color-line-strong)" };
@@ -144,7 +147,8 @@ export default function PromoCodesPanel() {
           percentOff: Number(draft.percentOff),
           maxUses: draft.maxUses ? Number(draft.maxUses) : null,
           expiresAt: draft.expiresAt ? new Date(draft.expiresAt).toISOString() : null,
-          ticketIds: draft.ticketIds,
+          // Drops the Standard default if that ticket doesn't exist.
+          ticketIds: draft.ticketIds.filter((id) => tickets.some((t) => t.id === id)),
         }),
       });
       const promo = json.code as PromoCode;
@@ -267,8 +271,8 @@ export default function PromoCodesPanel() {
             <Field id="promo-expires" label="Valid until" optionalLabel="optional" error={err("expiresAt")} hint={`Leave it empty if the code should never expire. The time is in your time zone (${timeZone}).`}>
               <input id="promo-expires" type="datetime-local" className={inputClass(!!err("expiresAt"))} value={draft.expiresAt} onChange={(e) => set("expiresAt", e.target.value)} {...aria("promo-expires", err("expiresAt"), true)} />
             </Field>
-            <Field id="promo-tickets" as="div" label="Works with" hint="Leave all unticked to allow every ticket.">
-              <div className="space-y-1">
+            <Field id="promo-tickets" as="div" label="Works with" required error={err("ticketIds")} hint="Standard by default. Tick other tickets to allow them too.">
+              <div role="group" className="space-y-1" aria-describedby={describedBy("promo-tickets", { hint: true, error: err("ticketIds") })}>
                 {tickets.length === 0 && <p className="text-sm text-ink-3">Loading tickets…</p>}
                 {tickets.map((t) => (
                   <label key={t.id} className="flex min-h-11 items-center gap-3 text-base text-ink">

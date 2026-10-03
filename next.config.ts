@@ -39,6 +39,24 @@ const nextConfig: NextConfig = {
           { key: "Content-Security-Policy", value: "upgrade-insecure-requests" },
         ],
       },
+      {
+        source: "/:path*",
+        headers: [
+          // Browsers trust the declared file type (no guessing an upload is a script).
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          // Full URLs (e.g. ?session_id= on the success page) never go to other sites.
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        ],
+      },
+      // Staff pages can't be shown inside another site's frame (clickjacking).
+      // Public pages stay embeddable, e.g. in the conference website.
+      ...["/admin/:path*", "/checkin/:path*"].map((source) => ({
+        source,
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'; upgrade-insecure-requests" },
+        ],
+      })),
     ];
   },
 };

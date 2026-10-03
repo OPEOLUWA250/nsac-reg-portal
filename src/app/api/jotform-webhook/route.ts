@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { mapJotformSubmission } from "@/lib/jotform-mapping";
 import { createAttendee, sendAttendeeQr, canResendQr } from "@/lib/attendee-service";
@@ -10,13 +11,24 @@ export const runtime = "nodejs";
 //
 // Jotform posts submissions as multipart/form-data. Configure this URL as
 // the webhook target in Jotform: Settings -> Integrations -> Webhooks.
+//
+// Fails closed: rows created here count as valid, paid tickets and get a QR
+// email, so without JOTFORM_WEBHOOK_SECRET the route accepts nothing.
+function secretMatches(provided: string | null, secret: string): boolean {
+  if (!provided) return false;
+  const a = crypto.createHash("sha256").update(provided).digest();
+  const b = crypto.createHash("sha256").update(secret).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
 export async function POST(req: NextRequest) {
   const secret = process.env.JOTFORM_WEBHOOK_SECRET;
-  if (secret) {
-    const provided = req.nextUrl.searchParams.get("secret");
-    if (provided !== secret) {
-      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    }
+  if (!secret) {
+    console.warn("Jotform webhook refused: JOTFORM_WEBHOOK_SECRET is not set");
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
+  if (!secretMatches(req.nextUrl.searchParams.get("secret"), secret)) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
   const form = await req.formData();
