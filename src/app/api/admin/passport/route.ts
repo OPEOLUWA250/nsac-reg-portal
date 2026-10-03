@@ -5,7 +5,8 @@ import { adminRoute } from "@/lib/server/admin-auth";
 export const runtime = "nodejs";
 
 // Returns a link to an attendee's passport scan that expires after 5
-// minutes, for preparing invitation letters. Passports are never public.
+// minutes, for preparing invitation letters. Passports are never public,
+// and only super admins can open them.
 export const POST = adminRoute(async (req: NextRequest) => {
   const { id } = await req.json();
   if (!id || typeof id !== "string") {
@@ -32,4 +33,4 @@ export const POST = adminRoute(async (req: NextRequest) => {
   }
 
   return NextResponse.json({ url: data.signedUrl });
-});
+}, { superAdmin: true });

@@ -9,8 +9,9 @@ import { listTickets } from "@/lib/ticket-store";
 export const runtime = "nodejs";
 
 // /admin/promo-codes: list (GET), create (POST), switch on/off (PATCH).
+// Super admins only: seeing a free-pass code is as good as having one.
 
-export const GET = adminRoute(async (req: NextRequest) => {
+export const GET = adminRoute(async () => {
   try {
     const [codes, counts] = await Promise.all([listPromoCodes(), registrationsPerCode()]);
     return NextResponse.json({
@@ -21,7 +22,7 @@ export const GET = adminRoute(async (req: NextRequest) => {
     console.error(`List promo codes failed: ${describeError(err)}`);
     return NextResponse.json({ error: "Couldn't reach Stripe. Check STRIPE_SECRET_KEY and try again." }, { status: 502 });
   }
-});
+}, { superAdmin: true });
 
 export const POST = adminRoute(async (req: NextRequest) => {
   const body = await req.json().catch(() => ({}));
@@ -64,7 +65,7 @@ export const POST = adminRoute(async (req: NextRequest) => {
     }
     return NextResponse.json({ error: "Couldn't create the code in Stripe. Try again." }, { status: 502 });
   }
-});
+}, { superAdmin: true });
 
 export const PATCH = adminRoute(async (req: NextRequest) => {
   const body = await req.json().catch(() => ({}));
@@ -78,7 +79,7 @@ export const PATCH = adminRoute(async (req: NextRequest) => {
     console.error(`Update promo code failed: ${describeError(err)}`);
     return NextResponse.json({ error: "Couldn't update the code in Stripe. Try again." }, { status: 502 });
   }
-});
+}, { superAdmin: true });
 
 // Our own view of each code's use: completed registrations (paid, including
 // free passes) and ones started but not paid yet. Stripe's own count only

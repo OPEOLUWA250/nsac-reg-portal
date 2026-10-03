@@ -117,7 +117,9 @@ function statusOf(t: Ticket): { label: string; tone: "on" | "off" } {
 }
 
 export default function TicketManager() {
-  const { apiCall } = useAdmin();
+  const { apiCall, me } = useAdmin();
+  // Prices are for super admins to change; other admins see them read-only.
+  const canEdit = me?.role === "super_admin";
   const [tickets, setTickets] = useState<Ticket[] | null>(null);
   const [counts, setCounts] = useState<Record<string, TicketCounts>>({});
   const [loadError, setLoadError] = useState("");
@@ -271,11 +273,17 @@ export default function TicketManager() {
       <PageHeader
         eyebrow="Registration form"
         title="Tickets & prices"
-        description="What you save here is what the registration form shows and what Stripe charges, from the next page load. People who already registered keep the price they paid. Discount codes are managed in Stripe."
+        description={
+          canEdit
+            ? "What you save here is what the registration form shows and what Stripe charges, from the next page load. People who already registered keep the price they paid. Discount codes are managed in Stripe."
+            : "What the registration form shows and what Stripe charges. Only super admins can change tickets and prices."
+        }
         actions={
-          <Button variant="primary" onClick={startNew} disabled={saving || editingKey === NEW_KEY || tickets === null}>
-            Add ticket
-          </Button>
+          canEdit && (
+            <Button variant="primary" onClick={startNew} disabled={saving || editingKey === NEW_KEY || tickets === null}>
+              Add ticket
+            </Button>
+          )
         }
       />
 
@@ -345,7 +353,7 @@ export default function TicketManager() {
             <EmptyState
               title="No tickets yet"
               body="The registration form stays closed until at least one ticket is on sale."
-              action={<Button variant="outline" onClick={startNew}>Add the first ticket</Button>}
+              action={canEdit && <Button variant="outline" onClick={startNew}>Add the first ticket</Button>}
             />
           </Card>
         )
@@ -378,7 +386,7 @@ export default function TicketManager() {
                       </p>
                     </div>
                     <p className="font-display text-2xl font-bold text-blue">{formatPrice(t.amountCents, t.currency)}</p>
-                    <div className="flex w-full flex-wrap gap-2 lg:w-auto lg:justify-end">
+                    {canEdit && <div className="flex w-full flex-wrap gap-2 lg:w-auto lg:justify-end">
                       <Button variant="outline" size="sm" disabled={saving && !editing} onClick={() => (editing ? cancelEdit() : startEdit(t))} aria-expanded={editing}>
                         {editing ? "Close" : "Edit"}
                       </Button>
@@ -395,7 +403,7 @@ export default function TicketManager() {
                           Delete
                         </Button>
                       )}
-                    </div>
+                    </div>}
                   </div>
                   {editing && draft && (
                     <div className="rounded-lg border border-line bg-canvas p-4 transition-opacity duration-200 starting:opacity-0">

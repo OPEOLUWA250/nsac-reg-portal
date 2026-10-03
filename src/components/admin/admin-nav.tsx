@@ -1,14 +1,14 @@
 import type { ReactNode } from "react";
 import { IconCog, IconGrid, IconTag, IconTicket, IconUser } from "@/components/icons";
 
-type NavItem = { href: string; label: string; icon: ReactNode; superAdminOnly?: boolean };
+export type NavItem ={ href: string; label: string; icon: ReactNode; superAdminOnly?: boolean };
 
 // Pages of the staff admin. The main ones sit at the top of the sidebar,
 // Admins and Settings at the bottom.
 export const ADMIN_NAV: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: <IconGrid /> },
   { href: "/admin/tickets", label: "Tickets & prices", icon: <IconTicket /> },
-  { href: "/admin/promo-codes", label: "Promo codes", icon: <IconTag /> },
+  { href: "/admin/promo-codes", label: "Promo codes", icon: <IconTag />, superAdminOnly: true },
 ];
 
 export const ADMIN_NAV_BOTTOM: NavItem[] = [

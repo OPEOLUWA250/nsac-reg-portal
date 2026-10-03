@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 
 // Tickets & prices, edited from /admin. Changes show on /register straight
 // away. Registrations already made keep the price they were charged.
+// Every admin can see them; only super admins can change them.
 export const GET = adminRoute(async (req: NextRequest) => {
   try {
     const [tickets, counts] = await Promise.all([listTickets(), ticketRegistrationCounts()]);
@@ -57,7 +58,7 @@ export const POST = adminRoute(async (req: NextRequest) => {
     console.error("Save ticket error", err);
     return NextResponse.json({ error: "database error" }, { status: 500 });
   }
-});
+}, { superAdmin: true });
 
 // DELETE /api/admin/tickets?id=standard — only for tickets nobody has
 // registered with (otherwise hide it: past registrations keep their ticket).
@@ -80,4 +81,4 @@ export const DELETE = adminRoute(async (req: NextRequest) => {
     console.error("Delete ticket error", err);
     return NextResponse.json({ error: "database error" }, { status: 500 });
   }
-});
+}, { superAdmin: true });

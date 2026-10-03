@@ -57,7 +57,9 @@ interface RegisterForm {
 const EMPTY_FORM: RegisterForm = { fullName: "", email: "", role: "delegate", organization: "", phone: "" };
 
 export default function AdminDashboard() {
-  const { apiCall, requestedAttendee, setRequestedAttendee } = useAdmin();
+  const { apiCall, requestedAttendee, setRequestedAttendee, me } = useAdmin();
+  // Passports and deleting registrations are for super admins only.
+  const isSuper = me?.role === "super_admin";
   const [attendees, setAttendees] = useState<Attendee[] | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loadError, setLoadError] = useState("");
@@ -613,8 +615,8 @@ export default function AdminDashboard() {
           onClose={() => setSelectedId(null)}
           onResend={() => handleResend(selected.id)}
           onToggleCheckIn={() => handleToggleCheckIn(selected.id, !selected.checked_in)}
-          onPassport={() => handleViewPassport(selected.id)}
-          onDelete={() => setDeleteTarget(selected)}
+          onPassport={isSuper ? () => handleViewPassport(selected.id) : undefined}
+          onDelete={isSuper ? () => setDeleteTarget(selected) : undefined}
         />
       )}
       {deleteTarget && (

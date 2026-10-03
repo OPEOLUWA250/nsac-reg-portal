@@ -36,9 +36,10 @@ export default function AttendeeDrawer({
   onClose: () => void;
   onResend: () => void;
   onToggleCheckIn: () => void;
-  onPassport: () => void;
-  /** Deletes this registration (asks for confirmation first). */
-  onDelete: () => void;
+  /** Omitted for admins who may not open passports (super admins only). */
+  onPassport?: () => void;
+  /** Deletes this registration (asks for confirmation first). Super admins only. */
+  onDelete?: () => void;
 }) {
   const [closing, setClosing] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -144,7 +145,7 @@ export default function AttendeeDrawer({
             <Button variant="on-dark" size="sm" onClick={onResend} disabled={busy}>
               Resend QR email
             </Button>
-            {a.passport_path && (
+            {a.passport_path && onPassport && (
               <Button variant="on-dark" size="sm" onClick={onPassport} disabled={busy}>
                 View passport
               </Button>
@@ -233,16 +234,18 @@ export default function AttendeeDrawer({
             <Row label="Jotform submission" value={a.jotform_submission_id} />
           </Section>
 
-          <section className="space-y-3 rounded-lg border border-danger bg-surface p-5">
-            <h3 className="font-semibold text-danger">Delete this registration</h3>
-            <p className="text-sm text-ink-2">
-              Removes {a.full_name} and their passport file for good. Their ticket and QR code stop working. A payment
-              isn&apos;t refunded: do that in Stripe.
-            </p>
-            <Button variant="danger" size="sm" onClick={onDelete} disabled={busy}>
-              Delete registration
-            </Button>
-          </section>
+          {onDelete && (
+            <section className="space-y-3 rounded-lg border border-danger bg-surface p-5">
+              <h3 className="font-semibold text-danger">Delete this registration</h3>
+              <p className="text-sm text-ink-2">
+                Removes {a.full_name} and their passport file for good. Their ticket and QR code stop working. A payment
+                isn&apos;t refunded: do that in Stripe.
+              </p>
+              <Button variant="danger" size="sm" onClick={onDelete} disabled={busy}>
+                Delete registration
+              </Button>
+            </section>
+          )}
         </div>
       </aside>
     </div>

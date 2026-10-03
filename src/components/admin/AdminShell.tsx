@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { AdminProvider, useAdmin } from "@/components/admin/AdminContext";
-import { ADMIN_NAV, ADMIN_NAV_BOTTOM, isAdminPathActive } from "@/components/admin/admin-nav";
+import { ADMIN_NAV, ADMIN_NAV_BOTTOM, isAdminPathActive, type NavItem } from "@/components/admin/admin-nav";
 import { usePopover } from "@/components/usePopover";
 import { IconBell, IconChevronDown, IconClose, IconCog, IconKey, IconLogout, IconMenu, IconScan, IconUser } from "@/components/icons";
 import { Button, cx, Skeleton, Spinner } from "@/components/ui";
@@ -78,7 +78,9 @@ function Frame({ children }: { children: ReactNode }) {
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { me } = useAdmin();
-  const bottom = ADMIN_NAV_BOTTOM.filter((item) => !item.superAdminOnly || me?.role === "super_admin");
+  const allowed = (item: NavItem) => !item.superAdminOnly || me?.role === "super_admin";
+  const top = ADMIN_NAV.filter(allowed);
+  const bottom = ADMIN_NAV_BOTTOM.filter(allowed);
   return (
     <div className="on-dark flex h-full flex-col bg-blue text-white">
       <div className="flex h-16 shrink-0 items-center px-6">
@@ -88,7 +90,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </div>
       <nav aria-label="Admin" className="flex flex-1 flex-col px-3 pt-4">
         <div className="space-y-1">
-          {ADMIN_NAV.map((item) => (
+          {top.map((item) => (
             <SidebarLink key={item.href} item={item} active={isAdminPathActive(pathname, item.href)} onNavigate={onNavigate} />
           ))}
         </div>

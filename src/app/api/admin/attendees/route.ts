@@ -22,14 +22,11 @@ export const GET = adminRoute(async (req: NextRequest) => {
 
 // DELETE /api/admin/attendees?id=<uuid>          one registration
 // DELETE /api/admin/attendees?all=1&confirm=DELETE every registration
-// Also deletes their passport files. Stripe payments are not refunded (do
-// that in the Stripe dashboard). This can't be undone.
-export const DELETE = adminRoute(async (req: NextRequest, _context: unknown, session) => {
+// Super admins only. Also deletes their passport files. Stripe payments are
+// not refunded (do that in the Stripe dashboard). This can't be undone.
+export const DELETE = adminRoute(async (req: NextRequest) => {
   const id = req.nextUrl.searchParams.get("id");
   const all = req.nextUrl.searchParams.get("all") === "1";
-  if (all && session.role !== "super_admin") {
-    return NextResponse.json({ error: "Only super admins can delete every registration." }, { status: 403 });
-  }
   if (all && req.nextUrl.searchParams.get("confirm") !== "DELETE") {
     return NextResponse.json({ error: "Type DELETE to confirm deleting every registration." }, { status: 400 });
   }
@@ -60,4 +57,4 @@ export const DELETE = adminRoute(async (req: NextRequest, _context: unknown, ses
     console.error(`Delete registrations failed: ${describeError(err)}`);
     return NextResponse.json({ error: "Couldn't delete. Try again." }, { status: 500 });
   }
-});
+}, { superAdmin: true });
