@@ -74,6 +74,7 @@ export const PATCH = adminRoute(async (req: NextRequest) => {
   }
   try {
     const promo = await setPromoCodeActive(body.id, body.active);
+    if (!promo) return NextResponse.json({ error: "No such promo code." }, { status: 404 });
     return NextResponse.json({ code: promo });
   } catch (err) {
     console.error(`Update promo code failed: ${describeError(err)}`);

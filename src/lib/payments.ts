@@ -35,6 +35,43 @@ function localApiOverride(): ConstructorParameters<typeof Stripe>[1] {
 
 export const EVENT_TITLE = "NewSpace Africa Conference 2027";
 
+// Every ticket is sold as this one Stripe product. The Stripe account also
+// sells for the Space in Africa website, and promo codes are limited to this
+// product (promo-codes.ts), so a conference code can't discount anything
+// sold there. Created on first use; the ticket's own name goes on the
+// payment page and invoice instead.
+export const TICKET_PRODUCT_ID = "nsac_reg_portal_ticket";
+let ticketProductReady: Promise<string> | null = null;
+
+export function ticketProduct(): Promise<string> {
+  ticketProductReady ??= ensureTicketProduct().catch((err) => {
+    ticketProductReady = null; // try again next time
+    throw err;
+  });
+  return ticketProductReady;
+}
+
+async function ensureTicketProduct(): Promise<string> {
+  try {
+    const product = await stripe().products.retrieve(TICKET_PRODUCT_ID);
+    // Archived in the Stripe dashboard: checkouts would fail.
+    if (!product.active) await stripe().products.update(TICKET_PRODUCT_ID, { active: true });
+  } catch (err) {
+    if ((err as { code?: string }).code !== "resource_missing") throw err;
+    try {
+      await stripe().products.create({
+        id: TICKET_PRODUCT_ID,
+        name: `${EVENT_TITLE} ticket`,
+        metadata: { app: "nsac-reg-portal" },
+      });
+    } catch (createErr) {
+      // Another request created it at the same moment.
+      if ((createErr as { code?: string }).code !== "resource_already_exists") throw createErr;
+    }
+  }
+  return TICKET_PRODUCT_ID;
+}
+
 interface CheckoutArgs {
   attendee: Pick<Attendee, "id" | "email" | "vat_number" | "invoice_reference" | "organization"> & {
     stripe_session_id?: string | null;
@@ -61,7 +98,7 @@ export async function createCheckoutSession({
   keepPrevious = false,
 }: CheckoutArgs): Promise<string> {
   // Up to 4 custom fields appear on the Stripe invoice (40-char names).
-  const customFields: { name: string; value: string }[] = [];
+  const customFields: { name: string; value: string }[] = [{ name: "Ticket", value: ticket.name.en.slice(0, 140) }];
   if (attendee.organization) customFields.push({ name: "Organisation", value: attendee.organization.slice(0, 140) });
   if (attendee.vat_number) customFields.push({ name: "Company VAT number", value: attendee.vat_number });
   if (attendee.invoice_reference) customFields.push({ name: "Reference", value: attendee.invoice_reference });
@@ -86,10 +123,12 @@ export async function createCheckoutSession({
         price_data: {
           currency: ticket.currency,
           unit_amount: ticket.amountCents,
-          product_data: { name: `${EVENT_TITLE} · ${ticket.name.en}` },
+          product: await ticketProduct(),
         },
       },
     ],
+    // The product is the same for every ticket: say which one this is.
+    custom_text: { submit: { message: `${ticket.name[language] || ticket.name.en}` } },
     customer_email: attendee.email,
     client_reference_id: attendee.id,
     metadata: { attendee_id: attendee.id, ticket_type: ticket.id, promo_code: promo?.code ?? "" },
@@ -102,7 +141,7 @@ export async function createCheckoutSession({
     invoice_creation: {
       enabled: true,
       invoice_data: {
-        description: `${EVENT_TITLE} registration`,
+        description: `${EVENT_TITLE} registration · ${ticket.name.en}`,
         ...(customFields.length ? { custom_fields: customFields } : {}),
       },
     },

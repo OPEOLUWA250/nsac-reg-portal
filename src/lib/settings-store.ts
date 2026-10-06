@@ -2,7 +2,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { describeError } from "@/lib/describe-error";
 
 // Server-only: settings edited from /admin → Settings, stored in the
-// `settings` table (see supabase/migrations/20260929130000_settings.sql).
+// `settings` table (20260929130000_settings.sql, see the README).
 
 export interface AppSettings {
   /** Public registration form accepting new registrations. */

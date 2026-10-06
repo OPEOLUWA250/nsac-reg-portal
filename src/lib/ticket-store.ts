@@ -46,7 +46,7 @@ export async function listTickets(): Promise<Ticket[]> {
   if (error) {
     if (error.code === "42P01" || error.code === "PGRST205") {
       console.error(
-        "tickets table is missing — run supabase/migrations/20260928130000_tickets.sql",
+        "tickets table is missing — run 20260928130000_tickets.sql (see the README)",
         error
       );
     }

@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import type Stripe from "stripe";
-import { stripe } from "@/lib/payments";
+import { stripe, ticketProduct } from "@/lib/payments";
 
 export { discountedCents } from "@/lib/tickets";
 
@@ -83,6 +83,9 @@ export async function createPromoCode(input: NewPromoCode): Promise<PromoCode> {
   const coupon = await stripe().coupons.create({
     percent_off: input.percentOff,
     duration: "once",
+    // Conference tickets only: the Stripe account also sells for the Space in
+    // Africa website, where this code must not work (payments.ts).
+    applies_to: { products: [await ticketProduct()] },
     // Shown on the Stripe payment page and receipt.
     name: (label ? `${label} (${input.percentOff}% off)` : `${input.percentOff}% off`).slice(0, 40),
     metadata: { app: APP_TAG },
@@ -98,7 +101,10 @@ export async function createPromoCode(input: NewPromoCode): Promise<PromoCode> {
   return toPromoCode(promo)!;
 }
 
+/** Turns one of our codes on or off. Null (and nothing changed) for any other promotion code in the account. */
 export async function setPromoCodeActive(id: string, active: boolean): Promise<PromoCode | null> {
+  const current = await stripe().promotionCodes.retrieve(id, { expand: ["promotion.coupon"] });
+  if (!toPromoCode(current)) return null;
   const promo = await stripe().promotionCodes.update(id, { active, expand: ["promotion.coupon"] });
   return toPromoCode(promo);
 }

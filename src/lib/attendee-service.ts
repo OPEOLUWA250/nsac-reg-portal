@@ -138,7 +138,7 @@ export async function createAttendee(input: NewAttendeeInput): Promise<CreateAtt
     }
     if (error.code === "42703") {
       console.error(
-        "attendees table is missing a column — run supabase/migrations/20260928120000_registration_form.sql",
+        "attendees table is missing a column — run 20260928120000_registration_form.sql (see the README)",
         error
       );
     }

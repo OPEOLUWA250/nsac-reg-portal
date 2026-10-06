@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 // Per-visitor limits for the public checks and admin sign-in, counted in
-// Supabase (supabase/migrations/20261003110000_rate_limits.sql) so they hold
+// Supabase (20261003110000_rate_limits.sql, see the README) so they hold
 // across every server instance. Fails open: if the count can't be reached,
 // the request goes through, so registration never stops because of this.
 

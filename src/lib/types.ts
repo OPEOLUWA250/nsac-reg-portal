@@ -1,5 +1,5 @@
 // Must match the attendees_role_check constraint in the database
-// (supabase/migrations/20260930120000_categories_and_sharing.sql).
+// (20260930120000_categories_and_sharing.sql, see the README).
 export const ATTENDEE_ROLES = [
   "delegate",
   "speaker",

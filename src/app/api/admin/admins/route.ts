@@ -27,7 +27,7 @@ function missingTable(error: { code?: string } | null | undefined) {
   return Boolean(error && ["PGRST205", "42P01", "42703"].includes(error.code ?? ""));
 }
 const MISSING_TABLE = {
-  error: "The admins table isn't set up yet. Run supabase/migrations/20261001090000_admin_users.sql in the Supabase SQL Editor.",
+  error: "The admins table isn't set up yet. Run its setup script (20261001090000_admin_users.sql, see the README) in the Supabase SQL Editor.",
   missingTable: true,
 };
 

@@ -135,26 +135,11 @@ Jotform form is closed.
    - `CRON_SECRET` — any long random string; protects the daily
      keep-alive job (see **Keeping the free database awake**).
 
-2. Run these in the Supabase SQL editor, in order, **before deploying**:
-   - `supabase/migrations/20260928120000_registration_form.sql` — the form's
-     columns, payment tracking, the private `passports` bucket and a
-     one-registration-per-email rule (the file explains how to find
-     duplicates first if that last step fails).
-   - `supabase/migrations/20260928130000_tickets.sql` — the `tickets` table
-     behind **Tickets & prices**, pre-filled with Early Bird and Virtual.
-   - `supabase/migrations/20260928140000_attendee_roles.sql` — replaces the
-     table's original role check (which rejected `delegate`, so every form
-     submission failed) with the roles the app uses.
-   - `supabase/migrations/20260929120000_more_tickets.sql` — Standard and
-     Late tickets, hidden, placeholder prices.
-   - `supabase/migrations/20260929130000_settings.sql` — the `settings`
-     table behind the open/close registration switch.
-   - `supabase/migrations/20260930120000_categories_and_sharing.sql`:
-     registration categories (delegate, speaker, media, exhibitor, VIP),
-     the "Can your details be shared?" answer, and the promo code used.
-   - `supabase/migrations/20261001090000_admin_users.sql` — the
-     `admin_users` table behind **Admins** (owners in `ADMIN_EMAILS` can
-     sign in without it).
+2. The database is already set up in Supabase. Its setup scripts (the
+   `supabase/migrations/*.sql` files) were removed from the code once they
+   had been run. To set up a new Supabase project, get them back from git
+   history and run them in the SQL editor, oldest first:
+   `git checkout 5cd3e45 -- supabase/migrations`
 
 3. In Stripe → Developers → Webhooks, add
    `https://your-domain.com/api/stripe-webhook` with the events
@@ -174,7 +159,7 @@ Jotform form is closed.
 ## Attendee schema
 
 The `attendees` table in Supabase. The original columns were created in the
-dashboard; later changes are in `supabase/migrations/`. Original columns:
+dashboard; later changes came from the setup scripts (see step 2 above). Original columns:
 
 | Column | Type | Notes |
 | --- | --- | --- |

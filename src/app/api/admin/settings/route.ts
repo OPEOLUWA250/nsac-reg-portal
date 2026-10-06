@@ -69,7 +69,7 @@ export const POST = adminRoute(async (req: NextRequest) => {
   } catch (err) {
     console.error(`Could not save settings: ${describeError(err)}`);
     return NextResponse.json(
-      { error: "Could not save. Has the settings migration (20260929130000_settings.sql) been run?" },
+      { error: "Could not save. Has the settings table been set up (20260929130000_settings.sql, see the README)?" },
       { status: 500 }
     );
   }

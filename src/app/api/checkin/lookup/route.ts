@@ -48,7 +48,7 @@ export const POST = adminRoute(async (req: NextRequest) => {
       console.error("Badge QR generation error", err);
     }
   } else {
-    console.warn("Badge printed without a QR: run supabase/migrations/20261003100000_badge_contact_code.sql");
+    console.warn("Badge printed without a QR: run 20261003100000_badge_contact_code.sql (see the README)");
   }
 
   return NextResponse.json({ attendee: scannerAttendee(attendee), badgeQr }, { headers: { "Cache-Control": "private, no-store" } });
