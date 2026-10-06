@@ -18,7 +18,8 @@ function systemStatus() {
   return {
     payments: {
       configured: Boolean(stripeKey),
-      mode: stripeKey.startsWith("sk_live_") ? "live" : stripeKey ? "test" : null,
+      // sk_ = full secret key, rk_ = restricted key.
+      mode: /^(sk|rk)_live_/.test(stripeKey) ? "live" : stripeKey ? "test" : null,
       webhook: Boolean(process.env.STRIPE_WEBHOOK_SECRET),
     },
     email: {

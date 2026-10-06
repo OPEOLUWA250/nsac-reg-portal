@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { retrieveCheckoutSession } from "@/lib/payments";
+import { checkoutAttendeeId, retrieveCheckoutSession } from "@/lib/payments";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { renderTicket, ticketFilename } from "@/lib/ticket-image";
 import { hasValidTicket, type Attendee } from "@/lib/types";
@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 export async function GET(req: NextRequest) {
   const sessionId = req.nextUrl.searchParams.get("session_id") ?? "";
   const session = await retrieveCheckoutSession(sessionId);
-  const attendeeId = session?.client_reference_id ?? session?.metadata?.attendee_id;
+  const attendeeId = checkoutAttendeeId(session);
   if (!attendeeId) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }

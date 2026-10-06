@@ -18,7 +18,7 @@ async function post(path: string, body: unknown): Promise<{ ok: boolean; json: R
   return { ok: res.ok, json: await res.json().catch(() => ({})) };
 }
 
-export default function LoginForm({ next, linkFailed }: { next: string; linkFailed: boolean }) {
+export default function LoginForm({ next, linkFailed, timedOut }: { next: string; linkFailed: boolean; timedOut: boolean }) {
   const [mode, setMode] = useState<Mode>("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -105,6 +105,12 @@ export default function LoginForm({ next, linkFailed }: { next: string; linkFail
         <Alert tone="error" title="That link didn't work">
           Reset links expire after an hour and work only once, in the browser where you asked for them. Ask for a new
           one below.
+        </Alert>
+      )}
+      {timedOut && !linkFailed && mode === "sign-in" && !error && (
+        <Alert tone="info" title="You were signed out">
+          For security, the admin signs you out after 12 hours without activity, and once a week in any case. Sign in
+          again to continue.
         </Alert>
       )}
       {error && <Alert tone="error">{error}</Alert>}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminAuthClient } from "@/lib/server/admin-auth";
+import { ADMIN_ACTIVITY_COOKIE } from "@/lib/server/admin-idle";
 
 export const runtime = "nodejs";
 
@@ -11,5 +12,7 @@ export async function POST() {
   } catch (err) {
     console.warn(`Sign-out failed: ${err instanceof Error ? err.message : String(err)}`);
   }
-  return NextResponse.json({ ok: true });
+  const response = NextResponse.json({ ok: true });
+  response.cookies.delete(ADMIN_ACTIVITY_COOKIE);
+  return response;
 }

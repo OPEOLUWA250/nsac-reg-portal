@@ -25,6 +25,9 @@ interface AdminContextValue {
 
 const AdminContext = createContext<AdminContextValue | null>(null);
 
+const ACTIVITY_PING_MS = 5 * 60_000;
+const ACTIVITY_EVENTS = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
+
 // The session ended (expired, signed out in another tab, access removed):
 // back to the sign-in page, returning here afterwards.
 function toLogin() {
@@ -61,6 +64,22 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     }
     return json;
   }, []);
+
+  // Clicking, typing or scrolling keeps the sign-in alive; the dashboard's
+  // background refreshes don't (src/lib/server/admin-idle.ts). Tell the
+  // server at most every few minutes. The page load itself already counted.
+  useEffect(() => {
+    let reported = Date.now();
+    const onActivity = () => {
+      if (Date.now() - reported < ACTIVITY_PING_MS) return;
+      reported = Date.now();
+      apiCall("/api/auth/activity", { method: "POST" }).catch(() => undefined);
+    };
+    for (const type of ACTIVITY_EVENTS) window.addEventListener(type, onActivity, { passive: true });
+    return () => {
+      for (const type of ACTIVITY_EVENTS) window.removeEventListener(type, onActivity);
+    };
+  }, [apiCall]);
 
   useEffect(() => {
     apiCall("/api/auth/session").then(

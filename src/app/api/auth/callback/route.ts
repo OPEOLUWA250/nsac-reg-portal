@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuthClient } from "@/lib/server/admin-auth";
 import { safeAdminNext } from "@/lib/safe-next";
+import { adminActivityCookie } from "@/lib/server/admin-idle";
 
 export const runtime = "nodejs";
 
@@ -21,7 +22,10 @@ export async function GET(req: NextRequest) {
       console.warn(`Auth link failed: ${error.message}`);
       return failed;
     }
-    return NextResponse.redirect(new URL(next, url.origin));
+    // A fresh sign-in: start the inactivity clock (src/lib/server/admin-idle.ts).
+    const response = NextResponse.redirect(new URL(next, url.origin));
+    response.cookies.set(adminActivityCookie(Date.now()));
+    return response;
   } catch (err) {
     console.warn(`Auth link failed: ${err instanceof Error ? err.message : String(err)}`);
     return failed;

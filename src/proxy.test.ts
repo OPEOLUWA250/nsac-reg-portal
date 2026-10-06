@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { proxy, config } from "./proxy";
+import { ADMIN_ACTIVITY_COOKIE, ADMIN_IDLE_LIMIT_MS } from "@/lib/server/admin-idle";
 
-const mocks = vi.hoisted(() => ({ create: vi.fn(), getUser: vi.fn(), role: vi.fn(), config: vi.fn() }));
+const mocks = vi.hoisted(() => ({ create: vi.fn(), getUser: vi.fn(), signOut: vi.fn(), role: vi.fn(), config: vi.fn() }));
 vi.mock("@supabase/ssr", () => ({ createServerClient: mocks.create }));
 vi.mock("@/lib/server/admin-roles", () => ({ resolveAdminRole: mocks.role, supabaseAuthConfig: mocks.config, ADMIN_COOKIE_OPTIONS: { httpOnly: true, path: "/" } }));
 
@@ -10,12 +11,23 @@ beforeEach(() => {
   mocks.config.mockReturnValue({ url: "https://example.supabase.co", anonKey: "public-key" });
   mocks.create.mockImplementation((_url, _key, options) => {
     options.cookies.setAll([{ name: "session", value: "refreshed", options: { httpOnly: true, path: "/" } }]);
-    return { auth: { getUser: mocks.getUser } };
+    return { auth: { getUser: mocks.getUser, signOut: mocks.signOut } };
   });
   mocks.getUser.mockResolvedValue({ data: { user: null } });
+  mocks.signOut.mockResolvedValue({ error: null });
   mocks.role.mockResolvedValue(null);
 });
 afterEach(() => vi.restoreAllMocks());
+
+const HOUR = 60 * 60 * 1000;
+
+// A request from a browser last active `idleFor` ago.
+function signedIn(path: string, idleFor = 0, headers: Record<string, string> = {}) {
+  const now = Date.now();
+  return new NextRequest(`https://example.com${path}`, {
+    headers: { cookie: `${ADMIN_ACTIVITY_COOKIE}=${now - HOUR - idleFor}.${now - idleFor}`, ...headers },
+  });
+}
 
 it("redirects signed-out requests, preserving destination and refreshed cookies", async () => {
   const response = await proxy(new NextRequest("https://example.com/admin/tickets?filter=active"));
@@ -42,15 +54,15 @@ it("allows temporary-password admins only onto the reset page", async () => {
   mocks.role.mockResolvedValue("admin");
   mocks.getUser.mockResolvedValue({ data: { user: { app_metadata: { must_change_password: true } } } });
   for (const path of ["/admin", "/admin/login", "/admin/admins", "/checkin"]) {
-    expect((await proxy(new NextRequest(`https://example.com${path}`))).headers.get("location")).toBe("https://example.com/admin/reset-password");
+    expect((await proxy(signedIn(path))).headers.get("location")).toBe("https://example.com/admin/reset-password");
   }
-  expect((await proxy(new NextRequest("https://example.com/admin/reset-password"))).status).toBe(200);
+  expect((await proxy(signedIn("/admin/reset-password"))).status).toBe(200);
 });
 
 it("sends signed-in admins away from login", async () => {
   mocks.role.mockResolvedValue("admin");
   mocks.getUser.mockResolvedValue({ data: { user: { app_metadata: {} } } });
-  expect((await proxy(new NextRequest("https://example.com/admin/login"))).headers.get("location")).toBe("https://example.com/admin");
+  expect((await proxy(signedIn("/admin/login"))).headers.get("location")).toBe("https://example.com/admin");
 });
 
 it("protects the scanner and preserves its destination for login", async () => {
@@ -64,5 +76,50 @@ it("protects the scanner and preserves its destination for login", async () => {
 it.each(["admin", "super_admin"])("lets signed-in %s accounts use the scanner", async (role) => {
   mocks.role.mockResolvedValue(role);
   mocks.getUser.mockResolvedValue({ data: { user: { app_metadata: {} } } });
-  expect((await proxy(new NextRequest("https://example.com/checkin"))).status).toBe(200);
+  expect((await proxy(signedIn("/checkin"))).status).toBe(200);
+});
+
+it("counts page loads as activity, but not prefetches", async () => {
+  mocks.role.mockResolvedValue("admin");
+  mocks.getUser.mockResolvedValue({ data: { user: { app_metadata: {} } } });
+  const before = Date.now();
+  const response = await proxy(signedIn("/admin", HOUR));
+  const [signedInAt, lastActiveAt] = response.cookies.get(ADMIN_ACTIVITY_COOKIE)!.value.split(".").map(Number);
+  expect(lastActiveAt).toBeGreaterThanOrEqual(before);
+  expect(before - signedInAt).toBeGreaterThanOrEqual(2 * HOUR); // the sign-in time is kept
+  const prefetch = await proxy(signedIn("/admin", HOUR, { "next-router-prefetch": "1" }));
+  expect(prefetch.status).toBe(200);
+  expect(prefetch.cookies.get(ADMIN_ACTIVITY_COOKIE)).toBeUndefined();
+});
+
+it.each([
+  ["inactive too long", ADMIN_IDLE_LIMIT_MS + 1000],
+  ["without an activity record", null],
+] as const)("signs out admins %s, saying why", async (_case, idleFor) => {
+  mocks.role.mockResolvedValue("admin");
+  mocks.getUser.mockResolvedValue({ data: { user: { app_metadata: {} } } });
+  for (const [path, next] of [["/admin/tickets", "/admin/tickets"], ["/checkin", "/checkin"], ["/admin/login?next=%2Fadmin%2Fadmins", "/admin/admins"]]) {
+    mocks.signOut.mockClear();
+    const request = idleFor === null ? new NextRequest(`https://example.com${path}`) : signedIn(path, idleFor);
+    const response = await proxy(request);
+    const destination = new URL(response.headers.get("location")!);
+    expect(destination.pathname).toBe("/admin/login");
+    expect(destination.searchParams.get("next")).toBe(next);
+    expect(destination.searchParams.get("signedOut")).toBe("idle");
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(response.cookies.get(ADMIN_ACTIVITY_COOKIE)?.value).toBe("");
+  }
+});
+
+it("clears the session itself when Supabase can't sign out, without looping", async () => {
+  mocks.role.mockResolvedValue("admin");
+  mocks.getUser.mockResolvedValue({ data: { user: { app_metadata: {} } } });
+  mocks.signOut.mockRejectedValue(new Error("offline"));
+  const cookie = "sb-ref-auth-token.0=chunk; sb-ref-auth-token.1=chunk";
+  const response = await proxy(new NextRequest("https://example.com/admin", { headers: { cookie } }));
+  expect(response.cookies.get("sb-ref-auth-token.0")?.value).toBe("");
+  expect(response.cookies.get("sb-ref-auth-token.1")?.value).toBe("");
+  // Already showing the notice: render the sign-in page instead of redirecting again.
+  const login = await proxy(new NextRequest("https://example.com/admin/login?next=%2Fadmin&signedOut=idle", { headers: { cookie } }));
+  expect(login.status).toBe(200);
 });

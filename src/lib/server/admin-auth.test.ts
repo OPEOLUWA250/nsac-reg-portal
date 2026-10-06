@@ -6,6 +6,14 @@ vi.mock("server-only", () => ({}));
 import { createAdminRoute, type AdminSession } from "./admin-auth";
 import { resolveAdminRole } from "./admin-roles";
 import { isAllowedAdminEmail, parseAdminEmails } from "./admin-emails";
+import {
+  ADMIN_ACTIVITY_COOKIE,
+  ADMIN_IDLE_LIMIT_MS,
+  ADMIN_SESSION_MAX_MS,
+  adminActivityCookie,
+  adminActivityExpired,
+  parseAdminActivity,
+} from "./admin-idle";
 
 const user = { id: "user-1", email: "Admin@Example.com", email_confirmed_at: "2026-09-30" };
 
@@ -59,7 +67,7 @@ describe("admin roles", () => {
 
 describe("adminRoute", () => {
   const request = new NextRequest("https://example.com/api/admin/admins");
-  const session: AdminSession = { user: user as User, email: "admin@example.com", role: "admin", mustChangePassword: false };
+  const session: AdminSession = { user: user as User, email: "admin@example.com", role: "admin", mustChangePassword: false, signedInAt: 1_000 };
 
   it.each([
     [null, false, 401],
@@ -80,5 +88,38 @@ describe("adminRoute", () => {
     const context = { params: Promise.resolve({}) };
     expect((await createAdminRoute(async () => value)(handler, { superAdmin })(request, context)).status).toBe(200);
     expect(handler).toHaveBeenCalledWith(request, context, value);
+  });
+
+  it("counts actions as activity but not reads", async () => {
+    const route = createAdminRoute(async () => session)(async () => new Response("ok", { status: 201 }));
+    const read = await route(request, {});
+    expect(read.headers.get("set-cookie")).toBeNull();
+    const action = await route(new NextRequest(request.url, { method: "POST" }), {});
+    expect(action.status).toBe(201);
+    expect(await action.text()).toBe("ok");
+    expect(action.headers.get("set-cookie")).toMatch(new RegExp(`^${ADMIN_ACTIVITY_COOKIE}=1000\\.\\d+;`));
+  });
+});
+
+describe("inactivity sign-out", () => {
+  const hour = 60 * 60 * 1000;
+  const now = 30 * 24 * hour;
+
+  it("reads only well-formed activity cookies", () => {
+    expect(parseAdminActivity("100.200")).toEqual({ signedInAt: 100, lastActiveAt: 200 });
+    for (const bad of [undefined, "", "100", "a.b", "100.200.300", "-1.2"]) expect(parseAdminActivity(bad)).toBeNull();
+  });
+
+  it("expires after the idle limit, after the maximum session, or with no record", () => {
+    const fresh = { signedInAt: now - hour, lastActiveAt: now - hour };
+    expect(adminActivityExpired(fresh, now)).toBe(false);
+    expect(adminActivityExpired({ ...fresh, lastActiveAt: now - ADMIN_IDLE_LIMIT_MS + 1 }, now)).toBe(false);
+    expect(adminActivityExpired({ ...fresh, lastActiveAt: now - ADMIN_IDLE_LIMIT_MS - 1 }, now)).toBe(true);
+    expect(adminActivityExpired({ signedInAt: now - ADMIN_SESSION_MAX_MS - 1, lastActiveAt: now }, now)).toBe(true);
+    expect(adminActivityExpired(null, now)).toBe(true);
+  });
+
+  it("writes an HttpOnly cookie that keeps the sign-in time", () => {
+    expect(adminActivityCookie(100, 200)).toMatchObject({ name: ADMIN_ACTIVITY_COOKIE, value: "100.200", httpOnly: true, path: "/" });
   });
 });

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import FlyerMaker, { type FlyerPrefill } from "@/components/FlyerMaker";
-import { retrieveCheckoutSession } from "@/lib/payments";
+import { checkoutAttendeeId, retrieveCheckoutSession } from "@/lib/payments";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { hasValidTicket, type Attendee } from "@/lib/types";
 import { EVENT_INFO } from "@/lib/event-info";
@@ -25,7 +25,7 @@ export default async function FlyerPage(props: PageProps<"/flyer">) {
 
   if (sessionId) {
     const session = await retrieveCheckoutSession(sessionId);
-    const attendeeId = session?.client_reference_id ?? session?.metadata?.attendee_id;
+    const attendeeId = checkoutAttendeeId(session);
     if (attendeeId) {
       const { data } = await supabaseAdmin().from("attendees").select("*").eq("id", attendeeId).maybeSingle();
       const attendee = data as Attendee | null;

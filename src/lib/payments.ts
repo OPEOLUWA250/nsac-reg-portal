@@ -123,6 +123,17 @@ export async function createCheckoutSession({
   return session.url;
 }
 
+/**
+ * The attendee a Checkout Session paid for, or null when it isn't one of
+ * ours. The Stripe account also takes payments for the Space in Africa
+ * website, whose sessions reach our webhook too: only sessions this portal
+ * created carry the attendee in both places (createCheckoutSession).
+ */
+export function checkoutAttendeeId(session: Stripe.Checkout.Session | null | undefined): string | null {
+  const id = session?.metadata?.attendee_id;
+  return id && session.client_reference_id === id ? id : null;
+}
+
 function isSettled(session: Stripe.Checkout.Session): boolean {
   // "no_payment_required" = a 100% discount code was used.
   return session.payment_status === "paid" || session.payment_status === "no_payment_required";
@@ -137,7 +148,7 @@ function isSettled(session: Stripe.Checkout.Session): boolean {
 export async function fulfillCheckoutSession(
   session: Stripe.Checkout.Session
 ): Promise<Attendee | null> {
-  const attendeeId = session.client_reference_id ?? session.metadata?.attendee_id;
+  const attendeeId = checkoutAttendeeId(session);
   if (!attendeeId) return null;
 
   const supabase = supabaseAdmin();

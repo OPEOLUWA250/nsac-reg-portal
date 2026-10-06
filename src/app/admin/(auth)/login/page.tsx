@@ -10,5 +10,7 @@ export const metadata: Metadata = {
 export default async function AdminLoginPage({ searchParams }: PageProps<"/admin/login">) {
   const params = await searchParams;
   const next = typeof params.next === "string" ? params.next : null;
-  return <LoginForm next={safeAdminNext(next)} linkFailed={params.error === "link"} />;
+  return (
+    <LoginForm next={safeAdminNext(next)} linkFailed={params.error === "link"} timedOut={params.signedOut === "idle"} />
+  );
 }

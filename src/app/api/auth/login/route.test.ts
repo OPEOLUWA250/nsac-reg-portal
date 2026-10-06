@@ -53,4 +53,6 @@ it("returns the temporary password requirement after successful sign-in", async 
   const response = await POST(request({ email: " ADMIN@example.com ", password: "temporary password" }));
   expect(await response.json()).toEqual({ ok: true, mustChangePassword: true });
   expect(mocks.signIn).toHaveBeenCalledWith({ email: "admin@example.com", password: "temporary password" });
+  // Starts the inactivity clock.
+  expect(response.headers.get("set-cookie")).toMatch(/^nsac_admin_activity=\d+\.\d+;.*HttpOnly/i);
 });

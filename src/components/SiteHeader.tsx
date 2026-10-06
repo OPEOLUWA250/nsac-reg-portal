@@ -8,6 +8,7 @@ import { IconClose, IconMenu } from "@/components/icons";
 import BrandLogo from "@/components/BrandLogo";
 import { useSiteLanguage } from "@/lib/site-language";
 import { SITE_COPY } from "@/lib/site-copy";
+import { EVENT_INFO } from "@/lib/event-info";
 
 // Public header. Staff pages (/admin, /checkin) aren't linked from here:
 // staff know their addresses, and visitors don't need to see them. The text
@@ -68,9 +69,10 @@ export default function SiteHeader() {
     {skipLink}
     <header className="on-dark sticky top-0 z-30 bg-blue">
       <div className={cx("mx-auto flex h-16 items-center justify-between gap-4 px-4 sm:px-6", !staffPage && "max-w-6xl")}>
-        <Link href="/" className="shrink-0 rounded-sm" aria-label={t.home}>
+        {/* The logo leads to the conference website, like its own header logo. */}
+        <a href={`${EVENT_INFO.websiteUrl}/`} className="shrink-0 rounded-sm" aria-label={t.home}>
           <BrandLogo />
-        </Link>
+        </a>
 
         {showCta && (
           <ButtonLink href={`/?lang=${lang}`} variant="primary" size="sm" className="max-sm:hidden">

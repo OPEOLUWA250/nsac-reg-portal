@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuthClient } from "@/lib/server/admin-auth";
 import { isAllowedAdminEmail } from "@/lib/server/admin-emails";
 import { resolveAdminRole } from "@/lib/server/admin-roles";
+import { adminActivityCookie } from "@/lib/server/admin-idle";
 import { ADMIN_PASSWORD_MAX } from "@/lib/admin-password";
 import { clientIp, withinLimit } from "@/lib/server/rate-limit";
 
@@ -58,7 +59,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(REFUSED, { status: 401 });
     }
 
-    return NextResponse.json({ ok: true, mustChangePassword: data.user.app_metadata?.must_change_password === true });
+    const response = NextResponse.json({ ok: true, mustChangePassword: data.user.app_metadata?.must_change_password === true });
+    response.cookies.set(adminActivityCookie(Date.now()));
+    return response;
   } catch (err) {
     console.warn(`Admin sign-in failed: ${err instanceof Error ? err.message : String(err)}`);
     return NextResponse.json(REFUSED, { status: 401 });

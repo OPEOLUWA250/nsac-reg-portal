@@ -23,7 +23,7 @@ export const SITE_COPY: Record<
 > = {
   en: {
     skip: "Skip to content",
-    home: "NewSpace Africa Conference 2027, registration form",
+    home: "NewSpace Africa Conference 2027 website",
     openMenu: "Open menu",
     closeMenu: "Close menu",
     register: "Register",
@@ -38,7 +38,7 @@ export const SITE_COPY: Record<
   },
   fr: {
     skip: "Aller au contenu",
-    home: "Conférence NewSpace Africa 2027, formulaire d'inscription",
+    home: "Site de la Conférence NewSpace Africa 2027",
     openMenu: "Ouvrir le menu",
     closeMenu: "Fermer le menu",
     register: "S'inscrire",
