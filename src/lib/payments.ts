@@ -4,6 +4,7 @@ import { sendAttendeeQr } from "@/lib/attendee-service";
 import type { Attendee } from "@/lib/types";
 import type { Ticket } from "@/lib/tickets";
 import type { PromoCode } from "@/lib/promo-codes";
+import { markStudentCodeUsed } from "@/lib/student-codes";
 
 // Stripe Checkout: we create a Checkout Session and send the registrant to
 // Stripe's hosted payment page. Card details never touch our server. When
@@ -79,6 +80,8 @@ interface CheckoutArgs {
   ticket: Ticket;
   /** Promo code entered on the form, already checked. */
   promo?: PromoCode | null;
+  /** Student code entered on the form, already checked; used up when the payment succeeds. */
+  studentCode?: string | null;
   language: "en" | "fr";
   baseUrl: string;
   /**
@@ -93,6 +96,7 @@ export async function createCheckoutSession({
   attendee,
   ticket,
   promo,
+  studentCode = null,
   language,
   baseUrl,
   keepPrevious = false,
@@ -131,7 +135,12 @@ export async function createCheckoutSession({
     custom_text: { submit: { message: `${ticket.name[language] || ticket.name.en}` } },
     customer_email: attendee.email,
     client_reference_id: attendee.id,
-    metadata: { attendee_id: attendee.id, ticket_type: ticket.id, promo_code: promo?.code ?? "" },
+    metadata: {
+      attendee_id: attendee.id,
+      ticket_type: ticket.id,
+      promo_code: promo?.code ?? studentCode ?? "",
+      ...(studentCode ? { student_code: studentCode } : {}),
+    },
     payment_intent_data: { metadata: { attendee_id: attendee.id, ticket_type: ticket.id } },
     // Promo codes are entered on our form (so the price shown there is the
     // price charged) and applied here. With a 100% code Stripe asks for no
@@ -221,6 +230,7 @@ export async function fulfillCheckoutSession(
   }
 
   if (updated) {
+    if (session.metadata?.student_code) await markStudentCodeUsed(session.metadata.student_code, attendeeId);
     await sendAttendeeQr(updated as Attendee);
     return updated as Attendee;
   }

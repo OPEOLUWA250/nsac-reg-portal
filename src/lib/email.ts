@@ -215,6 +215,99 @@ export async function sendQrEmail({
   await deliver(message);
 }
 
+const STUDENT_COPY = {
+  en: {
+    subject: (event: string) => `Your student code for the ${event}`,
+    heading: "Your student code",
+    greeting: (first: string) => (first ? `Hi ${first},` : "Hello,"),
+    intro: "Thank you for sending your student ID. Here is your personal code for the Student ticket:",
+    how: "On the registration form, choose the <strong>Student</strong> ticket on the last step and enter this code.",
+    only: (email: string, until: string) =>
+      `It only works with this email address (${email}) and can be used once, until ${until}.`,
+    cta: "Register now",
+    footer: "Questions? Just reply to this email.",
+  },
+  fr: {
+    subject: (event: string) => `Votre code étudiant pour la ${event}`,
+    heading: "Votre code étudiant",
+    greeting: (first: string) => (first ? `Bonjour ${first},` : "Bonjour,"),
+    intro: "Merci de nous avoir envoyé votre carte d'étudiant. Voici votre code personnel pour le billet Étudiant :",
+    how: "Sur le formulaire d'inscription, choisissez le billet <strong>Étudiant</strong> à la dernière étape et saisissez ce code.",
+    only: (email: string, until: string) =>
+      `Il ne fonctionne qu'avec cette adresse e-mail (${email}) et ne peut être utilisé qu'une fois, jusqu'au ${until}.`,
+    cta: "S'inscrire",
+    footer: "Des questions ? Répondez simplement à cet e-mail.",
+  },
+} as const;
+
+/** Emails a student their personal code (sent from /admin/student-codes). */
+export async function sendStudentCodeEmail({
+  toEmail,
+  name,
+  code,
+  expiresAt,
+  registerUrl,
+  logoPngBuffer,
+  language = "en",
+}: {
+  toEmail: string;
+  name: string;
+  code: string;
+  expiresAt: string;
+  registerUrl: string;
+  logoPngBuffer?: Buffer | null;
+  language?: EmailLanguage;
+}) {
+  const fromAddress = process.env.EMAIL_FROM;
+  if (!fromAddress) throw new Error("Missing EMAIL_FROM environment variable");
+  const t = STUDENT_COPY[language] ?? STUDENT_COPY.en;
+  const event = EVENT_INFO.name[language === "fr" ? "fr" : "en"];
+  const until = new Date(expiresAt).toLocaleDateString(language === "fr" ? "fr-FR" : "en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Africa/Lagos",
+  });
+  const firstName = escapeHtml(name.trim().split(/\s+/)[0] ?? "");
+  const font = "'DM Sans', Helvetica, Arial, 'Segoe UI', sans-serif";
+
+  await deliver({
+    from: fromAddress,
+    to: toEmail,
+    subject: t.subject(event),
+    attachments: logoPngBuffer
+      ? [{ filename: "newspace-africa-logo.png", content: logoPngBuffer, contentType: "image/png", contentId: "brand-logo.png" }]
+      : [],
+    html: `
+<body style="margin:0; padding:32px 16px; background:${CANVAS}; font-family:${font}; color:${INK};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px; margin:0 auto; background:#ffffff; border:1px solid ${LINE}; border-radius:8px; overflow:hidden;">
+    <tr>
+      <td style="background:${BLUE}; padding:24px 32px; text-align:center;">
+        ${
+          logoPngBuffer
+            ? `<img src="cid:brand-logo.png" alt="NewSpace Africa Conference" width="170" height="63" style="display:block; margin:0 auto; width:170px; height:63px;" />`
+            : `<div style="color:#ffffff; font-size:20px; font-weight:700;">NewSpace Africa Conference</div>`
+        }
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:32px; text-align:center;">
+        <h1 style="margin:0 0 16px; color:${BLUE}; font-size:24px; font-weight:800;">${t.heading}</h1>
+        <p style="margin:0 0 4px; color:${INK}; font-size:16px; line-height:1.6;">${t.greeting(firstName)}</p>
+        <p style="margin:0 0 20px; color:${INK_2}; font-size:16px; line-height:1.6;">${t.intro}</p>
+        <p style="margin:0 auto 20px; display:inline-block; padding:14px 22px; border:2px dashed ${GOLD}; border-radius:8px; color:${BLUE}; font-family:'Courier New', monospace; font-size:28px; font-weight:800; letter-spacing:3px;">${escapeHtml(code)}</p>
+        <p style="margin:0 0 8px; color:${INK_2}; font-size:15px; line-height:1.6;">${t.how}</p>
+        <p style="margin:0 0 24px; color:${INK_3}; font-size:14px; line-height:1.6;">${t.only(escapeHtml(toEmail), until)}</p>
+        <a href="${escapeHtml(registerUrl)}" style="display:inline-block; background:${GOLD}; color:#000000; font-size:15px; font-weight:700; text-decoration:none; padding:13px 22px; border-radius:6px;">${t.cta}</a>
+        <p style="margin:28px 0 0; padding-top:20px; border-top:1px solid ${LINE}; color:${INK_3}; font-size:13px;">${t.footer}</p>
+      </td>
+    </tr>
+  </table>
+</body>
+    `,
+  });
+}
+
 interface OutgoingEmail {
   from: string;
   to: string;

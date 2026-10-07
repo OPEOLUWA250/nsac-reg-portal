@@ -33,7 +33,7 @@ import {
   type ValidationErrors,
 } from "@/lib/registration-fields";
 import { COUNTRY_CODES, EUROPEAN_VAT_COUNTRIES } from "@/lib/countries";
-import { discountedCents, formatPrice, requiresVipPayment } from "@/lib/tickets";
+import { discountedCents, formatPrice, requiresVipPayment, STUDENT_TICKET_ID } from "@/lib/tickets";
 import { REGISTRATION_CATEGORIES, type RegistrationCategory } from "@/lib/types";
 import { EVENT_INFO } from "@/lib/event-info";
 
@@ -76,6 +76,7 @@ interface FormState {
   safetyConsent: boolean;
   shareDetails: string;
   promoCode: string;
+  studentCode: string;
   optInOrganizer: boolean;
   optInSponsors: boolean;
   website: string; // honeypot — must stay empty
@@ -102,6 +103,7 @@ const EMPTY: FormState = {
   safetyConsent: false,
   shareDetails: "",
   promoCode: "",
+  studentCode: "",
   optInOrganizer: false,
   optInSponsors: false,
   website: "",
@@ -119,7 +121,7 @@ type Phase =
 const STEP_FIELDS: FieldName[][] = [
   ["category", "firstName", "lastName", "email", "jobTitle", "phone", "nationality", "residenceCountry"],
   ["organization", "organizationCountry", "professionalCategory", "jobFunction", "invitationLetter", "passport", "foodAllergies"],
-  ["ticket", "promoCode", "vatNumber", "invoiceId", "safetyConsent", "shareDetails", "optInOrganizer", "optInSponsors"],
+  ["ticket", "promoCode", "studentCode", "vatNumber", "invoiceId", "safetyConsent", "shareDetails", "optInOrganizer", "optInSponsors"],
 ];
 const LAST_STEP = STEP_FIELDS.length - 1;
 
@@ -350,6 +352,13 @@ export default function RegistrationForm({
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     dirty.current = true;
     if (key === "promoCode") setAppliedPromo(null);
+    if (key === "ticket" && value === STUDENT_TICKET_ID) {
+      // Students register as Delegates, and promo codes don't apply.
+      setAppliedPromo(null);
+      setForm((f) => ({ ...f, ticket: value as string, category: "delegate", promoCode: "" }));
+      setErrors((e) => ({ ...e, ticket: undefined, category: undefined, promoCode: undefined }));
+      return;
+    }
     // Some codes only work with certain tickets: check again for the new one.
     if (key === "ticket" && appliedPromo && value !== form.ticket) applyPromo(appliedPromo.code, value as string);
     setForm((f) => ({ ...f, [key]: value }));
@@ -846,6 +855,24 @@ export default function RegistrationForm({
                         })}
                         {err("ticket") && <FieldError id="field-ticket-error">{err("ticket")}</FieldError>}
                       </fieldset>
+                      {form.ticket === STUDENT_TICKET_ID ? (
+                        <Field id="field-studentCode" label={t.fields.studentCode} required hint={t.fields.studentCodeHint} error={err("studentCode")}>
+                          <input
+                            id="field-studentCode"
+                            className={inputClass(!!err("studentCode"), "font-mono uppercase")}
+                            value={form.studentCode}
+                            onChange={(e) => update("studentCode", e.target.value.toUpperCase())}
+                            autoComplete="off"
+                            autoCapitalize="characters"
+                            spellCheck={false}
+                            maxLength={20}
+                            required
+                            aria-invalid={!!err("studentCode")}
+                            aria-describedby={describedBy("field-studentCode", { hint: true, error: err("studentCode") })}
+                          />
+                          <p className="mt-2 text-sm text-ink-3">{t.fields.studentDelegate}</p>
+                        </Field>
+                      ) : (
                       <Field id="field-promoCode" label={t.fields.promoCode} optionalLabel={t.optional} hint={appliedPromo ? undefined : t.fields.promoHint} error={err("promoCode")}>
                         {appliedPromo ? (
                           <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-success bg-surface px-4 py-3">
@@ -884,6 +911,7 @@ export default function RegistrationForm({
                           </div>
                         )}
                       </Field>
+                      )}
                       <div className="grid gap-5 sm:grid-cols-2">
                         <TextField
                           name="vatNumber"
@@ -1092,7 +1120,12 @@ function Review({
   onEdit: (step: number) => void;
 }) {
   const rows: { label: string; value: string; step: number }[] = [
-    { label: t.fields.category, value: t.categories[form.category as RegistrationCategory] ?? "", step: 0 },
+    {
+      label: t.fields.category,
+      // Students are registered as Delegates (the server does the same).
+      value: t.categories[(ticket?.id === STUDENT_TICKET_ID ? "delegate" : form.category) as RegistrationCategory] ?? "",
+      step: 0,
+    },
     { label: t.review.name, value: `${form.firstName} ${form.lastName}`.trim(), step: 0 },
     { label: t.review.email, value: form.email, step: 0 },
     { label: t.review.organization, value: [form.jobTitle, form.organization].filter(Boolean).join(" · "), step: 1 },

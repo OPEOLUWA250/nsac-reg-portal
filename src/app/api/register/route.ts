@@ -11,6 +11,8 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import type { Attendee } from "@/lib/types";
 import { describeError } from "@/lib/describe-error";
 import { checkPromoCode, discountedCents, type PromoCode } from "@/lib/promo-codes";
+import { checkStudentCode } from "@/lib/student-codes";
+import { clientIp, withinLimit } from "@/lib/server/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -102,6 +104,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "validation", fields: { promoCode: "promo_unavailable" } }, { status: 400 });
     }
   }
+  // Student ticket: the personal code must belong to this email
+  // (validateRegistration already requires one with that ticket).
+  if (input.studentCode) {
+    // Limits guessing; a real student needs a try or two at most.
+    if (!(await withinLimit("student-code", clientIp(req), 20, 10 * 60))) {
+      return NextResponse.json({ error: "validation", fields: { studentCode: "promo_rate_limited" } }, { status: 400 });
+    }
+    try {
+      const check = await checkStudentCode(input.studentCode, input.email);
+      if (!check.ok) {
+        return NextResponse.json({ error: "validation", fields: { studentCode: `student_code_${check.problem}` } }, { status: 400 });
+      }
+    } catch (err) {
+      console.error(`Student code check failed: ${describeError(err)}`);
+      return NextResponse.json({ error: "validation", fields: { studentCode: "student_code_unavailable" } }, { status: 400 });
+    }
+  }
   const amountCents = promo ? discountedCents(ticket.amountCents, promo.percentOff) : ticket.amountCents;
   if (requiresVipPayment(input.role, amountCents)) {
     return NextResponse.json({ error: "validation", fields: { [promo ? "promoCode" : "ticket"]: "vip_payment_required" } }, { status: 400 });
@@ -126,7 +145,8 @@ export async function POST(req: NextRequest) {
     invoice_reference: input.invoiceId,
     consent_at: new Date().toISOString(),
     share_details: input.shareDetails,
-    promo_code: promo?.code ?? null,
+    // The student code is recorded here too, so admins can see which one was used.
+    promo_code: promo?.code ?? input.studentCode ?? null,
     ticket_type: ticket.id,
     amount_cents: amountCents,
     currency: ticket.currency,
@@ -218,6 +238,7 @@ export async function POST(req: NextRequest) {
       attendee,
       ticket,
       promo,
+      studentCode: input.studentCode,
       language: input.language,
       baseUrl: baseUrl(req),
       keepPrevious: keepPreviousCheckout,

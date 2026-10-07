@@ -18,7 +18,7 @@ import {
   Skeleton,
 } from "@/components/ui";
 import { useAdmin } from "@/components/admin/AdminContext";
-import type { Ticket } from "@/lib/tickets";
+import { STUDENT_TICKET_ID, type Ticket } from "@/lib/tickets";
 import { relativeTime } from "@/lib/admin-format";
 import { IconRefresh } from "@/components/icons";
 
@@ -274,7 +274,7 @@ export default function PromoCodesPanel() {
             <Field id="promo-tickets" as="div" label="Works with" required error={err("ticketIds")} hint="Standard by default. Tick other tickets to allow them too.">
               <div role="group" className="space-y-1" aria-describedby={describedBy("promo-tickets", { hint: true, error: err("ticketIds") })}>
                 {tickets.length === 0 && <p className="text-sm text-ink-3">Loading tickets…</p>}
-                {tickets.map((t) => (
+                {tickets.filter((t) => t.id !== STUDENT_TICKET_ID).map((t) => (
                   <label key={t.id} className="flex min-h-11 items-center gap-3 text-base text-ink">
                     <input
                       type="checkbox"

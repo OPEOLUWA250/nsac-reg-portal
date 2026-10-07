@@ -41,6 +41,9 @@ type Copy = {
     ticket: string;
     promoCode: string;
     promoHint: string;
+    studentCode: string;
+    studentCodeHint: string;
+    studentDelegate: string;
     shareDetails: string;
     shareDetailsHint: string;
     vatNumber: string;
@@ -173,6 +176,10 @@ export const COPY: Record<Language, Copy> = {
       ticket: "Choose your ticket",
       promoCode: "Promo code",
       promoHint: "Got a code from a sponsor or partner? Enter it here.",
+      studentCode: "Student code",
+      studentCodeHint:
+        "To redeem the discount, kindly email info@spaceinafrica.com with a copy of your valid student ID card. We'll reply with your personal code. It only works with the email address you sent it from.",
+      studentDelegate: "Student tickets are registered in the Delegate category.",
       shareDetails: "Can your details be shared?",
       shareDetailsHint:
         "If yes, people who scan your QR code at the event see your name, registration category, country of residence, nationality, job title, organisation, email and phone number. If no, they only see that you chose not to share.",
@@ -236,6 +243,11 @@ export const COPY: Record<Language, Copy> = {
       promo_not_for_ticket: "This code can't be used with the ticket you chose.",
       promo_unavailable: "We couldn't check the code just now. Try again in a moment.",
       promo_rate_limited: "Too many codes tried. Wait 10 minutes and try again.",
+      student_code_required: "Enter the student code we emailed you.",
+      student_code_unknown: "This code doesn't match. Check it, and use the same email address you sent your student ID from.",
+      student_code_expired: "This code has expired. Email info@spaceinafrica.com for a new one.",
+      student_code_used: "This code has already been used.",
+      student_code_unavailable: "We couldn't check the code just now. Try again in a moment.",
       summary: "Please check the highlighted fields.",
       network:
         "We couldn't reach the server. Check your connection and try again. Your answers are still here.",
@@ -349,6 +361,10 @@ export const COPY: Record<Language, Copy> = {
       foodAllergiesHint: "Écrivez «\u00a0Aucune\u00a0» si vous n'en avez pas.",
       ticket: "Choisissez votre billet",
       promoCode: "Code promo",
+      studentCode: "Code étudiant",
+      studentCodeHint:
+        "Pour bénéficier de la réduction, veuillez envoyer une copie de votre carte d'étudiant valide à info@spaceinafrica.com. Nous vous répondrons avec votre code personnel. Il ne fonctionne qu'avec l'adresse e-mail depuis laquelle vous nous avez écrit.",
+      studentDelegate: "Les billets étudiants sont enregistrés dans la catégorie Délégué(e).",
       promoHint: "Vous avez un code d'un sponsor ou d'un partenaire\u00a0? Saisissez-le ici.",
       shareDetails: "Vos coordonnées peuvent-elles être partagées\u00a0?",
       shareDetailsHint:
@@ -413,6 +429,11 @@ export const COPY: Record<Language, Copy> = {
       promo_not_for_ticket: "Ce code ne s'applique pas au billet choisi.",
       promo_unavailable: "Impossible de vérifier le code pour le moment. Réessayez dans un instant.",
       promo_rate_limited: "Trop de codes essayés. Patientez 10 minutes puis réessayez.",
+      student_code_required: "Saisissez le code étudiant que nous vous avons envoyé.",
+      student_code_unknown: "Ce code ne correspond pas. Vérifiez-le, et utilisez l'adresse e-mail depuis laquelle vous avez envoyé votre carte d'étudiant.",
+      student_code_expired: "Ce code a expiré. Écrivez à info@spaceinafrica.com pour en recevoir un nouveau.",
+      student_code_used: "Ce code a déjà été utilisé.",
+      student_code_unavailable: "Nous n'avons pas pu vérifier le code. Réessayez dans un instant.",
       summary: "Veuillez vérifier les champs signalés.",
       network:
         "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez. Vos réponses sont conservées.",

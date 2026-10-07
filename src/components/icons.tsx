@@ -138,6 +138,13 @@ export const IconTag = ({ className = "h-[18px] w-[18px]" }: P) => (
     <circle cx="8" cy="8" r="1.5" />
   </Svg>
 );
+export const IconStudent = ({ className = "h-[18px] w-[18px]" }: P) => (
+  <Svg className={className}>
+    <path d="M2 9l10-5 10 5-10 5z" />
+    <path d="M6 11v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5" />
+    <path d="M22 9v6" />
+  </Svg>
+);
 export const IconEye = ({ className = "h-5 w-5" }: P) => (
   <Svg className={className}>
     <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />

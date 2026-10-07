@@ -5,6 +5,7 @@ import { PROMO_CODE_RE } from "@/lib/registration-fields";
 import { describeError } from "@/lib/describe-error";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { listTickets } from "@/lib/ticket-store";
+import { STUDENT_TICKET_ID } from "@/lib/tickets";
 
 export const runtime = "nodejs";
 
@@ -37,7 +38,8 @@ export const POST = adminRoute(async (req: NextRequest) => {
   const ticketIds: string[] = Array.isArray(body.ticketIds) ? [...new Set<string>(body.ticketIds.map(String))] : [];
   let knownTickets: string[];
   try {
-    knownTickets = (await listTickets()).map((t) => t.id);
+    // Not the Student ticket: its price is fixed (student codes unlock it).
+    knownTickets = (await listTickets()).map((t) => t.id).filter((id) => id !== STUDENT_TICKET_ID);
   } catch (err) {
     console.error(`Load tickets for promo code failed: ${describeError(err)}`);
     return NextResponse.json({ error: "Couldn't load the tickets. Try again." }, { status: 500 });

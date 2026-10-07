@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import type Stripe from "stripe";
 import { stripe, ticketProduct } from "@/lib/payments";
+import { STUDENT_TICKET_ID } from "@/lib/tickets";
 
 export { discountedCents } from "@/lib/tickets";
 
@@ -118,6 +119,8 @@ export async function checkPromoCode(
   const all = found.data.map(toPromoCode).filter((p): p is PromoCode => p !== null);
   const promo = all.find((p) => p.active) ?? all[0];
   if (!promo) return { ok: false, problem: "unknown" };
+  // The Student ticket's price is fixed, whatever the code says it works with.
+  if (ticketId === STUDENT_TICKET_ID) return { ok: false, problem: "not_for_ticket" };
   if (promo.expiresAt && new Date(promo.expiresAt).getTime() < Date.now()) return { ok: false, problem: "expired" };
   if (promo.maxUses !== null && promo.used >= promo.maxUses) return { ok: false, problem: "used_up" };
   if (!promo.active) return { ok: false, problem: "expired" };

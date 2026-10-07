@@ -13,6 +13,8 @@ vi.mock("@/lib/supabase-admin", () => ({
   supabaseAdmin: vi.fn(() => ({ from: () => ({ update: () => ({ eq: async () => ({}) }) }) })),
 }));
 vi.mock("@/lib/attendee-service", () => ({ sendAttendeeQr: vi.fn() }));
+const used = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/student-codes", () => ({ markStudentCodeUsed: used }));
 import { checkoutAttendeeId, createCheckoutSession, fulfillCheckoutSession, TICKET_PRODUCT_ID } from "./payments";
 import { createPromoCode, setPromoCodeActive } from "./promo-codes";
 
@@ -74,4 +76,33 @@ it("never switches off another site's promo code", async () => {
   api.promotionCodes.retrieve.mockResolvedValue({ id: "promo_sia", metadata: {}, promotion: { coupon: { percent_off: 20 } } });
   expect(await setPromoCodeActive("promo_sia", false)).toBeNull();
   expect(api.promotionCodes.update).not.toHaveBeenCalled();
+});
+
+it("uses up a student code only once the payment has gone through", async () => {
+  const { supabaseAdmin } = await import("@/lib/supabase-admin");
+  const paidRow = { id: "a1", payment_status: "paid" };
+  vi.mocked(supabaseAdmin).mockReturnValue({
+    from: () => ({
+      update: () => ({ eq: () => ({ eq: () => ({ select: () => ({ maybeSingle: async () => ({ data: paidRow, error: null }) }) }) }) }),
+      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: "a1", payment_status: "pending" }, error: null }) }) }),
+    }),
+  } as never);
+  const meta = { attendee_id: "a1", ticket_type: "student", promo_code: "STU-7K3QXP", student_code: "STU-7K3QXP" };
+  await fulfillCheckoutSession(session({ client_reference_id: "a1", metadata: meta, payment_status: "unpaid" }));
+  expect(used).not.toHaveBeenCalled();
+  await fulfillCheckoutSession(session({ client_reference_id: "a1", metadata: meta, payment_status: "paid", amount_total: 20000, currency: "eur" }));
+  expect(used).toHaveBeenCalledWith("STU-7K3QXP", "a1");
+});
+
+it("puts the student code on the payment, as the code used", async () => {
+  await createCheckoutSession({
+    attendee: { id: "a1", email: "a@example.com", vat_number: null, invoice_reference: null, organization: null },
+    ticket: { ...ticket, id: "student" },
+    studentCode: "STU-7K3QXP",
+    language: "en",
+    baseUrl: "https://example.com",
+  });
+  const params = api.checkout.sessions.create.mock.calls[0][0];
+  expect(params.metadata).toMatchObject({ ticket_type: "student", promo_code: "STU-7K3QXP", student_code: "STU-7K3QXP" });
+  expect(params.discounts).toBeUndefined();
 });

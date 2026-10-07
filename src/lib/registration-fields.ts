@@ -4,6 +4,7 @@
 
 import { isCountryCode, countryNameEn, EUROPEAN_VAT_COUNTRIES } from "@/lib/countries";
 import { REGISTRATION_CATEGORIES, type RegistrationCategory } from "@/lib/types";
+import { STUDENT_TICKET_ID } from "@/lib/tickets";
 
 export const LANGUAGES = ["en", "fr"] as const;
 
@@ -53,6 +54,9 @@ export const LIMITS = {
 /** Promo codes: letters, digits, dashes and underscores (Stripe's rules). */
 export const PROMO_CODE_RE = /^[A-Za-z0-9_-]{3,40}$/;
 
+/** Personal student codes, e.g. STU-7K3QXP (src/lib/student-codes.ts). */
+export const STUDENT_CODE_RE = /^STU-[A-Z0-9]{6}$/;
+
 // Deliberately simple: something@something.tld, no spaces.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE_RE = /^\+?[\d\s().-]{6,}$/;
@@ -79,6 +83,7 @@ export type FieldName =
   | "optInSponsors"
   | "shareDetails"
   | "promoCode"
+  | "studentCode"
   | "ticket"
   | "vatNumber"
   | "invoiceId";
@@ -103,7 +108,12 @@ export type FieldError =
   | "promo_used_up"
   | "promo_not_for_ticket"
   | "promo_unavailable"
-  | "promo_rate_limited";
+  | "promo_rate_limited"
+  | "student_code_required"
+  | "student_code_unknown"
+  | "student_code_expired"
+  | "student_code_used"
+  | "student_code_unavailable";
 
 export type ValidationErrors = Partial<Record<FieldName, FieldError>>;
 
@@ -151,6 +161,8 @@ export interface CleanRegistration {
   shareDetails: boolean;
   /** Promo code typed on the form (checked against Stripe by the server). */
   promoCode: string | null;
+  /** Personal student code; required with the Student ticket (checked by the server). */
+  studentCode: string | null;
 }
 
 // Collapses runs of whitespace so "  Ama   Owusu " is stored as "Ama Owusu".
@@ -208,6 +220,7 @@ export function validateRegistration(
   const category = clean(raw.category);
   const shareDetails = clean(raw.shareDetails);
   const promoCode = clean(raw.promoCode).toUpperCase();
+  const studentCode = clean(raw.studentCode).toUpperCase();
 
   if (!category) errors.category = "required";
   else if (!(REGISTRATION_CATEGORIES as readonly string[]).includes(category)) errors.category = "invalid_choice";
@@ -261,6 +274,14 @@ export function validateRegistration(
   if (!ticketId) errors.ticket = "required";
   else if (!availableTicketIds.includes(ticketId)) errors.ticket = "ticket_unavailable";
 
+  const student = ticketId === STUDENT_TICKET_ID;
+  if (student) {
+    if (!studentCode) errors.studentCode = "student_code_required";
+    else if (!STUDENT_CODE_RE.test(studentCode)) errors.studentCode = "student_code_unknown";
+    // Promo codes don't apply to the Student ticket.
+    if (promoCode) errors.promoCode = "promo_not_for_ticket";
+  }
+
   if (vatNumber.length > LIMITS.vatNumber) errors.vatNumber = "too_long";
   else if (!vatNumber && EUROPEAN_VAT_COUNTRIES.has(organizationCountry))
     errors.vatNumber = "vat_required";
@@ -297,9 +318,11 @@ export function validateRegistration(
       vatNumber: vatNumber || null,
       invoiceId: invoiceId || null,
       language,
-      role: category as RegistrationCategory,
+      // Students register as Delegates, whatever was picked on step 1.
+      role: student ? "delegate" : (category as RegistrationCategory),
       shareDetails: shareDetails === "yes",
       promoCode: promoCode || null,
+      studentCode: student ? studentCode : null,
     },
   };
 }

@@ -61,6 +61,7 @@ function PrivacyEn() {
           <li>Your ticket, the amount paid, and a VAT number or invoice ID if you give one.</li>
           <li>Your answers to the consent, communication and sharing questions, and the time you gave them.</li>
           <li>A promo code, if you used one.</li>
+          <li>For the Student ticket: the student ID you email to info@spaceinafrica.com, and the personal student code we send you.</li>
           <li>On the day: when and where you checked in, and how many badges were printed for you.</li>
         </ul>
       </LegalSection>
@@ -69,6 +70,7 @@ function PrivacyEn() {
         <ul>
           <li>To register you, take payment, send your ticket and check you in at the event.</li>
           <li>To prepare an invitation letter for your visa, if you asked for one. Your passport is used for nothing else.</li>
+          <li>To confirm you&apos;re a student before giving you a Student ticket code. Your student ID is used for nothing else.</li>
           <li>To plan the event, for example catering and attendance numbers.</li>
           <li>To send you news about the conference, or share your details with sponsors and exhibitors, only if you ticked those boxes.</li>
         </ul>
@@ -140,6 +142,7 @@ function PrivacyFr() {
           <li>Votre billet, le montant payé et, si vous les indiquez, un numéro de TVA ou une référence de facture.</li>
           <li>Vos réponses aux questions de consentement, de communication et de partage, avec leur date.</li>
           <li>Un code promo, si vous en avez utilisé un.</li>
+          <li>Pour le billet Étudiant&nbsp;: la carte d&apos;étudiant que vous envoyez à info@spaceinafrica.com, et le code étudiant personnel que nous vous envoyons.</li>
           <li>Le jour de l&apos;événement&nbsp;: l&apos;heure et le lieu de votre enregistrement, et le nombre de badges imprimés à votre nom.</li>
         </ul>
       </LegalSection>
@@ -148,6 +151,7 @@ function PrivacyFr() {
         <ul>
           <li>Pour vous inscrire, encaisser votre paiement, vous envoyer votre billet et enregistrer votre arrivée à l&apos;événement.</li>
           <li>Pour établir une lettre d&apos;invitation pour votre visa, si vous en avez demandé une. Votre passeport ne sert à rien d&apos;autre.</li>
+          <li>Pour vérifier que vous êtes étudiant(e) avant de vous envoyer un code pour le billet Étudiant. Votre carte d&apos;étudiant ne sert à rien d&apos;autre.</li>
           <li>Pour organiser l&apos;événement, par exemple la restauration et le nombre de participants.</li>
           <li>Pour vous envoyer des nouvelles de la conférence, ou transmettre vos coordonnées aux sponsors et exposants, uniquement si vous avez coché les cases correspondantes.</li>
         </ul>

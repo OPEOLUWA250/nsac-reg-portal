@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { IconCog, IconGrid, IconTag, IconTicket, IconUser } from "@/components/icons";
+import { IconCog, IconGrid, IconStudent, IconTag, IconTicket, IconUser } from "@/components/icons";
 
 export type NavItem ={ href: string; label: string; icon: ReactNode; superAdminOnly?: boolean };
 
@@ -9,6 +9,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: <IconGrid /> },
   { href: "/admin/tickets", label: "Tickets & prices", icon: <IconTicket /> },
   { href: "/admin/promo-codes", label: "Promo codes", icon: <IconTag />, superAdminOnly: true },
+  { href: "/admin/student-codes", label: "Student codes", icon: <IconStudent /> },
 ];
 
 export const ADMIN_NAV_BOTTOM: NavItem[] = [

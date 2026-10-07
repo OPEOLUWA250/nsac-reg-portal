@@ -21,6 +21,14 @@ export interface Ticket {
   sortOrder: number;
 }
 
+/**
+ * The Student ticket (Tickets & prices, id "student"). Only people with a
+ * personal student code from the organisers can buy it, after emailing
+ * their student ID (src/lib/student-codes.ts). They register as Delegates,
+ * and promo codes don't apply to it.
+ */
+export const STUDENT_TICKET_ID = "student";
+
 /** Stripe won't charge less than €0.50. */
 export const MIN_PRICE_CENTS = 50;
 /** Public VIP registrations always require a charge, including after discounts. */
