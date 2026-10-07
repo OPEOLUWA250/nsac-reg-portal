@@ -95,23 +95,26 @@ it("counts page loads as activity, but not prefetches", async () => {
 it.each([
   ["inactive too long", ADMIN_IDLE_LIMIT_MS + 1000],
   ["without an activity record", null],
-] as const)("signs out admins %s, saying why", async (_case, idleFor) => {
+] as const)("signs out admins %s", async (_case, idleFor) => {
   mocks.role.mockResolvedValue("admin");
   mocks.getUser.mockResolvedValue({ data: { user: { app_metadata: {} } } });
-  for (const [path, next] of [["/admin/tickets", "/admin/tickets"], ["/checkin", "/checkin"], ["/admin/login?next=%2Fadmin%2Fadmins", "/admin/admins"]]) {
+  for (const path of ["/admin/tickets", "/checkin"]) {
     mocks.signOut.mockClear();
     const request = idleFor === null ? new NextRequest(`https://example.com${path}`) : signedIn(path, idleFor);
     const response = await proxy(request);
     const destination = new URL(response.headers.get("location")!);
     expect(destination.pathname).toBe("/admin/login");
-    expect(destination.searchParams.get("next")).toBe(next);
-    expect(destination.searchParams.get("signedOut")).toBe("idle");
+    expect(destination.searchParams.get("next")).toBe(path);
     expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
     expect(response.cookies.get(ADMIN_ACTIVITY_COOKIE)?.value).toBe("");
   }
+  // On the sign-in page itself: signed out, and the page shows.
+  const login = await proxy(idleFor === null ? new NextRequest("https://example.com/admin/login") : signedIn("/admin/login", idleFor));
+  expect(login.status).toBe(200);
+  expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
 });
 
-it("clears the session itself when Supabase can't sign out, without looping", async () => {
+it("clears the session itself when Supabase can't sign out", async () => {
   mocks.role.mockResolvedValue("admin");
   mocks.getUser.mockResolvedValue({ data: { user: { app_metadata: {} } } });
   mocks.signOut.mockRejectedValue(new Error("offline"));
@@ -119,7 +122,6 @@ it("clears the session itself when Supabase can't sign out, without looping", as
   const response = await proxy(new NextRequest("https://example.com/admin", { headers: { cookie } }));
   expect(response.cookies.get("sb-ref-auth-token.0")?.value).toBe("");
   expect(response.cookies.get("sb-ref-auth-token.1")?.value).toBe("");
-  // Already showing the notice: render the sign-in page instead of redirecting again.
-  const login = await proxy(new NextRequest("https://example.com/admin/login?next=%2Fadmin&signedOut=idle", { headers: { cookie } }));
+  const login = await proxy(new NextRequest("https://example.com/admin/login", { headers: { cookie } }));
   expect(login.status).toBe(200);
 });

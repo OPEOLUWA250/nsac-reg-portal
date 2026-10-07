@@ -18,7 +18,7 @@ async function post(path: string, body: unknown): Promise<{ ok: boolean; json: R
   return { ok: res.ok, json: await res.json().catch(() => ({})) };
 }
 
-export default function LoginForm({ next, linkFailed, timedOut }: { next: string; linkFailed: boolean; timedOut: boolean }) {
+export default function LoginForm({ next, linkFailed }: { next: string; linkFailed: boolean }) {
   const [mode, setMode] = useState<Mode>("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -94,23 +94,15 @@ export default function LoginForm({ next, linkFailed, timedOut }: { next: string
     <Card className="space-y-6 p-6 sm:p-8">
       <div className="space-y-2">
         <h1 className="font-display text-2xl font-bold text-blue">{mode === "sign-in" ? "Sign in to the admin" : "Reset your password"}</h1>
-        <p className="text-sm text-ink-2">
-          {mode === "sign-in"
-            ? "NewSpace Africa Conference 2027 registration admin."
-            : "Enter your admin email and we'll send you a link to set a new password."}
-        </p>
+        {mode === "forgot" && (
+          <p className="text-sm text-ink-2">Enter your admin email and we&apos;ll send you a link to set a new password.</p>
+        )}
       </div>
 
       {linkFailed && mode === "sign-in" && !error && (
         <Alert tone="error" title="That link didn't work">
           Reset links expire after an hour and work only once, in the browser where you asked for them. Ask for a new
           one below.
-        </Alert>
-      )}
-      {timedOut && !linkFailed && mode === "sign-in" && !error && (
-        <Alert tone="info" title="You were signed out">
-          For security, the admin signs you out after 12 hours without activity, and once a week in any case. Sign in
-          again to continue.
         </Alert>
       )}
       {error && <Alert tone="error">{error}</Alert>}

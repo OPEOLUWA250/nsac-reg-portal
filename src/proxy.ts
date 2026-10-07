@@ -48,7 +48,6 @@ export async function proxy(request: NextRequest) {
 
   let role = await resolveAdminRole(user);
   const { pathname, search } = request.nextUrl;
-  let timedOut = false;
 
   if (role) {
     const activity = parseAdminActivity(request.cookies.get(ADMIN_ACTIVITY_COOKIE)?.value);
@@ -60,8 +59,7 @@ export async function proxy(request: NextRequest) {
         if (name.startsWith("sb-")) response.cookies.delete(name);
       }
       response.cookies.delete(ADMIN_ACTIVITY_COOKIE);
-      role = null;
-      timedOut = true;
+      role = null; // from here on, the same as signed out
     } else if (activity && !isPrefetch(request)) {
       response.cookies.set(adminActivityCookie(activity.signedInAt));
     }
@@ -74,12 +72,6 @@ export async function proxy(request: NextRequest) {
     return res;
   };
 
-  if (timedOut && !(pathname === LOGIN && request.nextUrl.searchParams.get("signedOut") === "idle")) {
-    // Say why, wherever they were: an open tab whose API call was refused
-    // lands straight on the sign-in page.
-    const next = pathname === LOGIN ? (request.nextUrl.searchParams.get("next") ?? "/admin") : pathname + search;
-    return redirect(`${LOGIN}?next=${encodeURIComponent(next)}&signedOut=idle`);
-  }
   if (!role) {
     if (pathname === LOGIN) return response;
     return redirect(`${LOGIN}?next=${encodeURIComponent(pathname + search)}`);
