@@ -14,15 +14,68 @@ const INK_2 = "#454B52";
 const INK_3 = "#5E6670";
 const LINE = "#D8DCE0";
 const CANVAS = "#F5F5F5";
+// Warm panel, and a dark gold that stays readable (gold text on white is too faint).
+const CREAM = "#FFF8EB";
+const GOLD_DARK = "#8A5300";
 
 export type EmailLanguage = "en" | "fr";
+
+// Category names in the attendee's language (the form only lists some).
+const CATEGORY_NAMES: Record<EmailLanguage, Record<string, string>> = {
+  en: { delegate: "Delegate", speaker: "Speaker", media: "Media", exhibitor: "Exhibitor", vip: "VIP", host: "Host", staff: "Staff" },
+  fr: { delegate: "Délégué(e)", speaker: "Intervenant(e)", media: "Médias", exhibitor: "Exposant(e)", vip: "VIP", host: "Hôte", staff: "Équipe" },
+};
+
+/** "vip" -> "VIP", "delegate" -> "Délégué(e)" in French; unknown ones capitalised. Not escaped. */
+function categoryName(role: string, language: EmailLanguage): string {
+  return CATEGORY_NAMES[language]?.[role.toLowerCase()] ?? role.charAt(0).toUpperCase() + role.slice(1);
+}
+
+const PASS_COPY = {
+  en: { category: "YOUR REGISTRATION CATEGORY", attendee: "ATTENDEE", dates: "DATES" },
+  fr: { category: "VOTRE CATÉGORIE D’INSCRIPTION", attendee: "PARTICIPANT(E)", dates: "DATES" },
+} as const;
+
+/**
+ * The registration category as a small event pass: the category large on a
+ * cream panel with a gold edge, then a dashed tear line with the attendee's
+ * name and the conference dates. Tables and inline styles only, so it holds
+ * up in Gmail, Outlook and phone mail apps. Values must already be escaped.
+ */
+function categoryPass({ category, note, name, language }: { category: string; note: string; name: string; language: EmailLanguage }): string {
+  const t = PASS_COPY[language] ?? PASS_COPY.en;
+  const label = `margin:0; color:${INK_3}; font-size:10px; font-weight:700; letter-spacing:1.5px;`;
+  const value = `margin:4px 0 0; color:${INK}; font-size:14px; font-weight:700; line-height:1.4;`;
+  const cell = `padding:14px 20px 18px; border-top:1px dashed ${GOLD}; vertical-align:top;`;
+  // Long names ("Intervenant(e)") get smaller, so they fit on a phone.
+  const size = category.length > 10 ? 21 : category.length > 7 ? 28 : 34;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 8px; border:1px solid ${GOLD}; border-radius:12px; border-collapse:separate; background:#ffffff;">
+          <tr><td colspan="2" style="height:6px; background:${GOLD}; border-radius:11px 11px 0 0; font-size:1px; line-height:6px;">&nbsp;</td></tr>
+          <tr><td colspan="2" style="padding:24px 20px 22px; background:${CREAM}; text-align:center;">
+            <p style="margin:0; color:${GOLD_DARK}; font-size:11px; font-weight:700; letter-spacing:2.5px;">${t.category}</p>
+            <p style="margin:10px 0 0; color:${BLUE}; font-size:${size}px; line-height:1.15; font-weight:800; letter-spacing:${size > 30 ? 3 : size > 24 ? 2 : 1}px; text-transform:uppercase; word-break:break-word;">${category}</p>
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin:14px auto;"><tr><td style="width:44px; height:3px; background:${GOLD}; font-size:1px; line-height:3px;">&nbsp;</td></tr></table>
+            <p style="margin:0; color:${INK_2}; font-size:13px; line-height:1.5;">${note}</p>
+          </td></tr>
+          <tr>
+            <td width="50%" style="${cell} text-align:left;">
+              <p style="${label}">${t.attendee}</p>
+              <p style="${value}">${name}</p>
+            </td>
+            <td width="50%" style="${cell} text-align:right;">
+              <p style="${label}">${t.dates}</p>
+              <p style="${value}">${EVENT_INFO.date[language]}</p>
+              <p style="margin:2px 0 0; color:${INK_3}; font-size:13px; line-height:1.4;">${EVENT_INFO.place[language]}</p>
+            </td>
+          </tr>
+        </table>`;
+}
 
 const COPY = {
   en: {
     subject: (event: string) => `You're registered for the ${event}: your check-in QR code`,
     heading: "Registration confirmed",
-    category: "YOUR REGISTRATION CATEGORY",
-    categoryNote: "Your place at NewSpace Africa 2027",
+    categoryNote: "Shown on your badge when you check in.",
     greeting: (first: string) => `Hi ${first},`,
     thanks: (event: string) =>
       `Thank you for registering for the <strong style="color:${BLUE};">${event}</strong>. Your place is confirmed.`,
@@ -38,8 +91,7 @@ const COPY = {
   fr: {
     subject: (event: string) => `Votre inscription à la ${event} est confirmée\u00a0: votre QR code d'accès`,
     heading: "Inscription confirmée",
-    category: "VOTRE CATÉGORIE D’INSCRIPTION",
-    categoryNote: "Votre place à NewSpace Africa 2027",
+    categoryNote: "Indiquée sur votre badge lors de votre enregistrement.",
     greeting: (first: string) => `Bonjour ${first},`,
     thanks: (event: string) =>
       `Merci pour votre inscription à la <strong style="color:${BLUE};">${event}</strong>. Votre place est confirmée.`,
@@ -101,7 +153,7 @@ export async function sendQrEmail({
   // Everything that came from a registrant is escaped before it goes into HTML.
   const firstName = escapeHtml(fullName.trim().split(/\s+/)[0] || fullName);
   const safeEvent = escapeHtml(event);
-  const safeRole = role ? escapeHtml(role) : "";
+  const safeRole = role ? escapeHtml(categoryName(role, language)) : "";
   const font = "'DM Sans', Helvetica, Arial, 'Segoe UI', sans-serif";
 
   const message: OutgoingEmail = {
@@ -147,20 +199,11 @@ export async function sendQrEmail({
         <p style="margin:0 0 4px; color:${INK_2}; font-size:16px; line-height:1.6;">
           ${t.thanks(safeEvent)}
         </p>
-        <p style="margin:14px 0 4px; color:${BLUE}; font-size:16px; font-weight:700; line-height:1.6;">
-          ${EVENT_INFO.date[language]} &nbsp;·&nbsp; ${EVENT_INFO.place[language]}
-        </p>
         ${
+          // The pass shows the dates; without a category they get their own line.
           safeRole
-            ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 8px; background:${BLUE}; border-radius:10px; border:1px solid ${BLUE};">
-                <tr><td style="height:5px; background:${GOLD}; border-radius:10px 10px 0 0; font-size:1px; line-height:5px;">&nbsp;</td></tr>
-                <tr><td style="padding:22px 16px; text-align:center;">
-                  <p style="margin:0 0 10px; color:${GOLD}; font-size:11px; font-weight:700; letter-spacing:2px;">${t.category}</p>
-                  <p style="margin:0; color:#ffffff; font-size:28px; line-height:1.3; font-weight:800; letter-spacing:2px; text-transform:uppercase;">${safeRole}</p>
-                  <p style="margin:10px 0 0; color:#ffffff; font-size:13px; line-height:1.5;">${t.categoryNote}</p>
-                </td></tr>
-              </table>`
-            : ""
+            ? categoryPass({ category: safeRole, note: t.categoryNote, name: escapeHtml(fullName.trim()), language })
+            : `<p style="margin:14px 0 4px; color:${BLUE}; font-size:16px; font-weight:700; line-height:1.6;">${EVENT_INFO.date[language]} &nbsp;·&nbsp; ${EVENT_INFO.place[language]}</p>`
         }
       </td>
     </tr>
@@ -308,12 +351,6 @@ export async function sendStudentCodeEmail({
   });
 }
 
-// Category names in the attendee's language (the form only lists some).
-const CATEGORY_NAMES: Record<EmailLanguage, Record<string, string>> = {
-  en: { delegate: "Delegate", speaker: "Speaker", media: "Media", exhibitor: "Exhibitor", vip: "VIP", host: "Host", staff: "Staff" },
-  fr: { delegate: "Délégué(e)", speaker: "Intervenant(e)", media: "Médias", exhibitor: "Exposant(e)", vip: "VIP", host: "Hôte", staff: "Équipe" },
-};
-
 const CATEGORY_COPY = {
   en: {
     subject: (event: string, vip: boolean) =>
@@ -325,7 +362,6 @@ const CATEGORY_COPY = {
         ? `We're delighted to let you know that your registration for the <strong style="color:${BLUE};">${event}</strong> is now <strong>VIP</strong>.`
         : `Your registration category for the <strong style="color:${BLUE};">${event}</strong> is now <strong>${category}</strong>.`,
     badge: "Your badge will show it when you check in at the registration desk.",
-    category: "YOUR REGISTRATION CATEGORY",
     qrIntro: "Your check-in QR code hasn't changed. Here it is again, so you have it to hand:",
     qrAlt: "Your check-in QR code",
     footer: "Questions? Just reply to this email.",
@@ -340,7 +376,6 @@ const CATEGORY_COPY = {
         ? `Nous avons le plaisir de vous informer que votre inscription à la <strong style="color:${BLUE};">${event}</strong> passe en catégorie <strong>VIP</strong>.`
         : `Votre catégorie d'inscription à la <strong style="color:${BLUE};">${event}</strong> est désormais <strong>${category}</strong>.`,
     badge: "Votre badge l'indiquera lors de votre enregistrement à l'accueil.",
-    category: "VOTRE CATÉGORIE D’INSCRIPTION",
     qrIntro: "Votre QR code d'accès ne change pas. Le voici à nouveau, pour l'avoir sous la main :",
     qrAlt: "Votre QR code d'accès",
     footer: "Des questions ? Répondez simplement à cet e-mail.",
@@ -371,7 +406,7 @@ export async function sendCategoryChangeEmail({
   const t = CATEGORY_COPY[language] ?? CATEGORY_COPY.en;
   const vip = role === "vip";
   const event = EVENT_INFO.name[language === "fr" ? "fr" : "en"];
-  const category = escapeHtml(CATEGORY_NAMES[language]?.[role] ?? role.charAt(0).toUpperCase() + role.slice(1));
+  const category = escapeHtml(categoryName(role, language));
   const firstName = escapeHtml(fullName.trim().split(/\s+/)[0] || fullName);
   const font = "'DM Sans', Helvetica, Arial, 'Segoe UI', sans-serif";
 
@@ -402,17 +437,7 @@ export async function sendCategoryChangeEmail({
         <h1 style="margin:0 0 16px; color:${BLUE}; font-size:24px; font-weight:800;">${t.heading(vip)}</h1>
         <p style="margin:0 0 4px; color:${INK}; font-size:16px; line-height:1.6;">${t.greeting(firstName)}</p>
         <p style="margin:0 0 4px; color:${INK_2}; font-size:16px; line-height:1.6;">${t.changed(escapeHtml(event), category, vip)}</p>
-        <p style="margin:14px 0 4px; color:${BLUE}; font-size:16px; font-weight:700; line-height:1.6;">
-          ${EVENT_INFO.date[language]} &nbsp;·&nbsp; ${EVENT_INFO.place[language]}
-        </p>
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 8px; background:${BLUE}; border-radius:10px; border:1px solid ${BLUE};">
-          <tr><td style="height:5px; background:${GOLD}; border-radius:10px 10px 0 0; font-size:1px; line-height:5px;">&nbsp;</td></tr>
-          <tr><td style="padding:22px 16px; text-align:center;">
-            <p style="margin:0 0 10px; color:${GOLD}; font-size:11px; font-weight:700; letter-spacing:2px;">${t.category}</p>
-            <p style="margin:0; color:#ffffff; font-size:28px; line-height:1.3; font-weight:800; letter-spacing:2px; text-transform:uppercase;">${category}</p>
-            <p style="margin:10px 0 0; color:#ffffff; font-size:13px; line-height:1.5;">${t.badge}</p>
-          </td></tr>
-        </table>
+        ${categoryPass({ category, note: t.badge, name: escapeHtml(fullName.trim()), language })}
       </td>
     </tr>
     <tr>

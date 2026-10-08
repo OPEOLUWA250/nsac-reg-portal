@@ -5,6 +5,7 @@ import { createServerClient } from "@supabase/ssr";
 import type { User } from "@supabase/supabase-js";
 import { ADMIN_COOKIE_OPTIONS, resolveAdminRole, supabaseAuthConfig, type AdminRole } from "@/lib/server/admin-roles";
 import { ADMIN_ACTIVITY_COOKIE, adminActivityCookie, adminActivityExpired, parseAdminActivity } from "@/lib/server/admin-idle";
+import { APP_VERSION, APP_VERSION_HEADER } from "@/lib/app-version";
 
 // Admin sign-in for server code (route handlers, server components). The
 // session lives in cookies, managed by @supabase/ssr. Pages are protected by
@@ -81,9 +82,11 @@ export function createAdminRoute(getSession: () => Promise<AdminSession | null>)
         return NextResponse.json({ error: "Only super admins can do this." }, { status: 403 });
       }
       const response = await handler(req, context, session);
-      // Reads include the dashboard's background polling: only actions count as activity.
-      if (req.method === "GET" || req.method === "HEAD") return response;
       const res = response instanceof NextResponse ? response : new NextResponse(response.body, response);
+      // Lets a page left open across a deploy offer a reload (app-version.ts).
+      if (APP_VERSION) res.headers.set(APP_VERSION_HEADER, APP_VERSION);
+      // Reads include the dashboard's background polling: only actions count as activity.
+      if (req.method === "GET" || req.method === "HEAD") return res;
       res.cookies.set(adminActivityCookie(session.signedInAt));
       return res;
     };

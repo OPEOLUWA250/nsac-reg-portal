@@ -11,6 +11,7 @@ import { IconBell, IconChevronDown, IconClose, IconCog, IconKey, IconLogout, Ico
 import { Button, cx, Skeleton, Spinner } from "@/components/ui";
 import { relativeTime } from "@/lib/admin-format";
 import type { ActivityItem } from "@/app/api/admin/activity/route";
+import { APP_UPDATE_EVENT } from "@/lib/app-version";
 
 // Layout for every /admin page: a blue sidebar (logo top left, page links)
 // and a white top bar with notifications and the profile menu. On phones the
@@ -65,10 +66,31 @@ function Frame({ children }: { children: ReactNode }) {
           </div>
         </header>
 
+        <UpdateBar />
         <main id="main" className="flex-1">
           {children}
         </main>
       </div>
+    </div>
+  );
+}
+
+// A new version went live while this page was open: offer a reload, so
+// nobody keeps working with buttons and features from the old one.
+function UpdateBar() {
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  useEffect(() => {
+    const show = () => setUpdateAvailable(true);
+    window.addEventListener(APP_UPDATE_EVENT, show);
+    return () => window.removeEventListener(APP_UPDATE_EVENT, show);
+  }, []);
+  if (!updateAvailable) return null;
+  return (
+    <div role="status" className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-gold bg-gold px-4 py-2.5 text-sm text-black sm:px-6 lg:px-8">
+      <p className="min-w-0 flex-1 font-semibold">A new version of the admin is available. Reload to get the latest features.</p>
+      <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>
+        Reload now
+      </Button>
     </div>
   );
 }

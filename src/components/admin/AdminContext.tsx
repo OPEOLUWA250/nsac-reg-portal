@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { APP_UPDATE_EVENT, APP_VERSION_HEADER, isNewerDeployment } from "@/lib/app-version";
 
 // Shared by every /admin page: who is signed in, an API helper, and sign-out.
 // The sign-in itself is a cookie session (Supabase Auth), sent with every
@@ -50,6 +51,8 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     } catch {
       throw new Error("Couldn't reach the server. Check your connection and try again.");
     }
+    // A newer version went live: the shell offers a reload (UpdateBar).
+    if (isNewerDeployment(res.headers.get(APP_VERSION_HEADER))) window.dispatchEvent(new Event(APP_UPDATE_EVENT));
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
       if (res.status === 401) {

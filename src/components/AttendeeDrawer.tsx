@@ -337,22 +337,38 @@ function RoleEditor({
             : canEmail && notify ? "Save and email them" : "Save category"}
         </Button>
       </div>
-      {changed &&
-        (canEmail ? (
-          <label className="flex min-h-11 items-center gap-3 text-sm text-ink">
-            <input type="checkbox" className="h-5 w-5" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
-            Email {firstName} their new category, {roleLabel(role)} (with their QR code)
-          </label>
+      {/* Always shown, so it's clear a change can be emailed. */}
+      <div className={cx("rounded-md border p-3", changed && canEmail && notify ? "border-gold bg-canvas" : "border-line")}>
+        {canEmail ? (
+          <>
+            <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-ink">
+              <input type="checkbox" className="h-5 w-5 shrink-0" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
+              Email {firstName} when I change the category
+            </label>
+            <p className="pl-8 text-sm text-ink-3">
+              {changed && notify
+                ? `They'll get "${emailSubject(role, a.language)}" in ${a.language === "fr" ? "French" : "English"}, showing ${roleLabel(role)} and their QR code.`
+                : `They get an email in ${a.language === "fr" ? "French" : "English"} with their new category and their QR code.`}
+            </p>
+          </>
         ) : (
           <p className="text-sm text-ink-3">
-            They haven&apos;t paid yet, so no email now. Their confirmation email will show {roleLabel(role)} once they pay.
+            No email while they haven&apos;t paid. Their confirmation email will show their category once they pay.
           </p>
-        ))}
+        )}
+      </div>
       {changed && a.badge_print_count > 0 && (
         <p className="text-sm text-ink-2">Their badge was already printed as {roleLabel(a.role)}. Reprint it after saving.</p>
       )}
     </section>
   );
+}
+
+// Matches the subject lines in src/lib/email.ts (sendCategoryChangeEmail).
+function emailSubject(role: string, language: string | null): string {
+  const fr = language === "fr";
+  if (role === "vip") return fr ? "Vous êtes invité(e) VIP…" : "You're a VIP guest…";
+  return fr ? "Votre catégorie d'inscription… a changé" : "Your registration category… has changed";
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {

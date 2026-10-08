@@ -7,6 +7,10 @@ const viaHttp = [{ type: "header" as const, key: "x-forwarded-proto", value: "ht
 const viaHttps = [{ type: "header" as const, key: "x-forwarded-proto", value: "https" }];
 
 const nextConfig: NextConfig = {
+  // Which deployment this build is (the commit on Vercel; empty locally).
+  // Admin API responses carry it, so an admin page left open across a
+  // deploy can offer a reload (src/lib/app-version.ts).
+  env: { APP_VERSION: process.env.VERCEL_GIT_COMMIT_SHA ?? "" },
   // Files the server reads from disk (not just serves), so hosting platforms
   // package them with the functions: brand logos for tickets, emails and
   // icons, and the partner logos the flyer page lists.
