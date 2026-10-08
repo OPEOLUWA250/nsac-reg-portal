@@ -127,7 +127,7 @@ function extras({ language, flyerUrl }: { language: EmailLanguage; flyerUrl?: st
         </p>${
           flyerUrl
             ? `
-        <p style="margin:24px 0 0; text-align:center;"><a href="${escapeHtml(flyerUrl)}" style="display:inline-block; border:1px solid ${NAVY}; border-radius:4px; padding:12px 20px; font-family:${FONT}; color:${NAVY}; font-size:14px; font-weight:700; text-decoration:none;">${t.flyerCta}</a></p>`
+        <p style="margin:24px 0 0; text-align:center;"><a href="${escapeHtml(flyerUrl)}" style="display:inline-block; background:${NAVY}; border:1px solid ${NAVY}; border-radius:4px; padding:13px 22px; font-family:${FONT}; color:#ffffff; font-size:14px; font-weight:700; text-decoration:none;">${t.flyerCta}</a></p>`
             : ""
         }`;
 }
