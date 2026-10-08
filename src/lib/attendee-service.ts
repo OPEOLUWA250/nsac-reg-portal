@@ -214,6 +214,7 @@ export async function sendCategoryChangeNotice(attendee: Attendee): Promise<bool
       language: attendee.language === "fr" ? "fr" : "en",
       qrPngBuffer,
       logoPngBuffer,
+      flyerUrl: publicBaseUrl() ? `${publicBaseUrl()}/flyer` : null,
     });
     return true;
   } catch (err) {

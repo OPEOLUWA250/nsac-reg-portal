@@ -119,7 +119,7 @@ export async function createCheckoutSession({
     }
   }
 
-  const session = await stripe().checkout.sessions.create({
+  const params: Stripe.Checkout.SessionCreateParams = {
     mode: "payment",
     line_items: [
       {
@@ -161,7 +161,24 @@ export async function createCheckoutSession({
     adaptive_pricing: { enabled: false },
     success_url: `${baseUrl}/register/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${baseUrl}/?payment=cancelled`,
-  });
+  };
+
+  // A wide Space in Africa logo, so it shows large at the top of the payment
+  // page. Set per payment page rather than in the Stripe dashboard, which the
+  // Space in Africa website shares. Stripe fetches it, so only from a public
+  // https address (not localhost).
+  const branded: Stripe.Checkout.SessionCreateParams = baseUrl.startsWith("https://")
+    ? { ...params, branding_settings: { logo: { type: "url", url: `${baseUrl}/brand/space-in-africa-checkout.png` } } }
+    : params;
+  let session: Stripe.Checkout.Session;
+  try {
+    session = await stripe().checkout.sessions.create(branded);
+  } catch (err) {
+    // A logo problem must never stop a payment: try again without it.
+    if (branded === params || !String((err as { param?: string }).param ?? "").startsWith("branding_settings")) throw err;
+    console.warn(`Checkout logo refused, continuing without it: ${(err as Error).message}`);
+    session = await stripe().checkout.sessions.create(params);
+  }
 
   if (!session.url) throw new Error("Stripe did not return a Checkout URL");
 

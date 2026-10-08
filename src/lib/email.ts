@@ -46,6 +46,9 @@ const LAYOUT_COPY = {
     dates: "DATES",
     venue: "VENUE",
     entryPass: "YOUR ENTRY PASS",
+    calendar: "Add to your calendar",
+    calendarAttached: "An invite is also attached.",
+    flyerCta: "Create your “I’m attending” flyer for LinkedIn",
     regards: "Kind regards,",
     team: "The NewSpace Africa Conference team",
     questions: "Questions? Simply reply to this email.",
@@ -56,6 +59,9 @@ const LAYOUT_COPY = {
     dates: "DATES",
     venue: "LIEU",
     entryPass: "VOTRE ACCÈS",
+    calendar: "Ajouter à votre agenda",
+    calendarAttached: "Une invitation est également jointe.",
+    flyerCta: "Créez votre visuel « J’y serai » pour LinkedIn",
     regards: "Bien cordialement,",
     team: "L’équipe de la Conférence NewSpace Africa",
     questions: "Des questions ? Répondez simplement à cet e-mail.",
@@ -74,13 +80,14 @@ const para = (html: string, style = "") =>
   `<p style="margin:0 0 16px; font-family:${FONT}; color:${INK_2}; font-size:15px; line-height:1.7;${style}">${html}</p>`;
 
 /**
- * The registration at a glance: the category large, then name, dates and
- * venue in ruled rows, on a warm panel with a gold top edge.
+ * The registration at a glance: the category in white on a brand-blue panel
+ * with a gold top edge (as on the badge), then name, dates and venue in
+ * ruled rows on a warm panel.
  */
-function credentialCard({ category, name, language }: { category: string; name: string; language: EmailLanguage }): string {
+function credentialCard({ category, name, note, language }: { category: string; name: string; note: string; language: EmailLanguage }): string {
   const t = LAYOUT_COPY[language];
   // Long names ("Intervenant(e)") get smaller, so they fit on a phone.
-  const size = category.length > 10 ? 22 : category.length > 8 ? 26 : 30;
+  const size = category.length > 10 ? 22 : category.length > 8 ? 26 : 32;
   const label = `font-family:${FONT}; color:${INK_3}; font-size:10px; font-weight:700; letter-spacing:1.5px;`;
   const row = (key: string, value: string) => `
           <tr>
@@ -88,15 +95,49 @@ function credentialCard({ category, name, language }: { category: string; name: 
             <td style="padding:11px 24px 11px 12px; border-top:1px solid ${HAIRLINE}; vertical-align:top; font-family:${FONT}; color:${INK}; font-size:14px; font-weight:600; line-height:1.5;">${value}</td>
           </tr>`;
   return `
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 28px; background:${PANEL}; border:1px solid ${HAIRLINE}; border-top:3px solid ${GOLD}; border-collapse:collapse;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 28px; background:${PANEL}; border:1px solid ${HAIRLINE}; border-collapse:collapse;">
           <tr>
-            <td colspan="2" style="padding:22px 24px 18px;">
-              <p style="margin:0; ${label}">${t.category}</p>
-              <p style="margin:8px 0 0; font-family:${DISPLAY}; color:${NAVY}; font-size:${size}px; line-height:1.2; font-weight:800; letter-spacing:1px; text-transform:uppercase; word-break:break-word;">${category}</p>
+            <td colspan="2" style="padding:28px 24px 26px; background:${NAVY}; border-top:3px solid ${GOLD}; text-align:center;">
+              <p style="margin:0; font-family:${FONT}; color:${GOLD}; font-size:10px; font-weight:700; letter-spacing:2.5px;">${t.category}</p>
+              <p style="margin:12px 0 0; font-family:${DISPLAY}; color:#ffffff; font-size:${size}px; line-height:1.2; font-weight:800; letter-spacing:${size > 26 ? 4 : 2}px; text-transform:uppercase; word-break:break-word;">${category}</p>
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:16px auto 14px;"><tr><td style="width:36px; height:2px; background:${GOLD}; font-size:1px; line-height:2px;">&nbsp;</td></tr></table>
+              <p style="margin:0; font-family:${FONT}; color:#C9D7E2; font-size:12px; line-height:1.6;">${note}</p>
             </td>
           </tr>${row(t.name, name)}${row(t.dates, EVENT_INFO.date[language])}${row(t.venue, EVENT_INFO.place[language])}
         </table>`;
 }
+
+/**
+ * "Add to your calendar" links and the "I'm attending" flyer button, at the
+ * end of every email. Apple Calendar opens the .ics from our site (only when
+ * the public address is configured; the invite is attached too).
+ */
+function extras({ language, flyerUrl }: { language: EmailLanguage; flyerUrl?: string | null }): string {
+  const t = LAYOUT_COPY[language];
+  const base = publicBaseUrl();
+  const links = [
+    { label: "Google", href: googleCalendarUrl(language) },
+    { label: "Outlook", href: outlookCalendarUrl(language) },
+    ...(base ? [{ label: "Apple", href: `${base}/api/calendar?lang=${language}` }] : []),
+  ];
+  const link = `color:${NAVY}; font-weight:700; text-decoration:underline; text-decoration-color:${GOLD};`;
+  return `
+        <p style="margin:24px 0 0; font-family:${FONT}; color:${INK_3}; font-size:13px; line-height:1.7; text-align:center;">
+          ${t.calendar}: ${links.map((l) => `<a href="${escapeHtml(l.href)}" style="${link}">${l.label}</a>`).join(" &nbsp;·&nbsp; ")}<br />${t.calendarAttached}
+        </p>${
+          flyerUrl
+            ? `
+        <p style="margin:24px 0 0; text-align:center;"><a href="${escapeHtml(flyerUrl)}" style="display:inline-block; border:1px solid ${NAVY}; border-radius:4px; padding:12px 20px; font-family:${FONT}; color:${NAVY}; font-size:14px; font-weight:700; text-decoration:none;">${t.flyerCta}</a></p>`
+            : ""
+        }`;
+}
+
+/** The conference days as an .ics invite (goes with the calendar links). */
+const calendarAttachment = (language: EmailLanguage) => ({
+  filename: icsFilename(),
+  content: Buffer.from(buildIcs(language)),
+  contentType: "text/calendar",
+});
 
 /** The entry QR code in a hairline frame, with what to do with it. */
 function entryPass({ text, qrAlt, note, language }: { text: string; qrAlt: string; note?: string; language: EmailLanguage }): string {
@@ -210,9 +251,7 @@ const COPY = {
     instructions: "Present this QR code at the registration desk, on your phone or printed. It checks you in and prints your badge.",
     qrAlt: "Your check-in QR code",
     ticketAttached: "Your ticket is also attached, ready to save or print.",
-    calendar: "Add to your calendar",
-    calendarAttached: "An invite is also attached.",
-    flyerCta: "Create your “I’m attending” flyer for LinkedIn",
+    categoryNote: "Shown on your badge when you check in.",
     footerNote: "You are receiving this email because you registered for the conference.",
   },
   fr: {
@@ -227,9 +266,7 @@ const COPY = {
       "Présentez ce QR code à l'accueil, sur votre téléphone ou imprimé. Il sert à enregistrer votre arrivée et à imprimer votre badge.",
     qrAlt: "Votre QR code d'accès",
     ticketAttached: "Votre billet est également joint, pour l'enregistrer ou l'imprimer.",
-    calendar: "Ajouter à votre agenda",
-    calendarAttached: "Une invitation est également jointe.",
-    flyerCta: "Créez votre visuel « J’y serai » pour LinkedIn",
+    categoryNote: "Indiquée sur votre badge lors de votre enregistrement.",
     footerNote: "Vous recevez cet e-mail suite à votre inscription à la conférence.",
   },
 } as const;
@@ -269,35 +306,18 @@ export async function sendQrEmail({
   // The event's name in the email's language ("Conférence NewSpace Africa 2027").
   const event = eventName ?? EVENT_INFO.name[language === "fr" ? "fr" : "en"];
 
-  // "Add to calendar" links. Apple Calendar opens the .ics from our site
-  // (only when the public address is configured; the invite is attached too).
-  const base = publicBaseUrl();
-  const calendarLinks = [
-    { label: "Google", href: googleCalendarUrl(language) },
-    { label: "Outlook", href: outlookCalendarUrl(language) },
-    ...(base ? [{ label: "Apple", href: `${base}/api/calendar?lang=${language}` }] : []),
-  ];
-
   // Everything that came from a registrant is escaped before it goes into HTML.
   const firstName = escapeHtml(fullName.trim().split(/\s+/)[0] || fullName);
   const safeRole = role ? escapeHtml(categoryName(role, language)) : "";
-  const link = `color:${NAVY}; font-weight:700; text-decoration:underline; text-decoration-color:${GOLD};`;
 
   const content = `
         ${eyebrow(t.eyebrow)}
         ${heading(t.heading)}
         ${para(t.greeting(firstName), ` color:${INK};`)}
         ${para(t.thanks(escapeHtml(event)))}
-        ${safeRole ? credentialCard({ category: safeRole, name: escapeHtml(fullName.trim()), language }) : ""}
+        ${safeRole ? credentialCard({ category: safeRole, name: escapeHtml(fullName.trim()), note: t.categoryNote, language }) : ""}
         ${entryPass({ text: t.instructions, qrAlt: t.qrAlt, note: ticketPngBuffer ? t.ticketAttached : undefined, language })}
-        <p style="margin:24px 0 0; font-family:${FONT}; color:${INK_3}; font-size:13px; line-height:1.7; text-align:center;">
-          ${t.calendar}: ${calendarLinks.map((l) => `<a href="${escapeHtml(l.href)}" style="${link}">${l.label}</a>`).join(" &nbsp;·&nbsp; ")}<br />${t.calendarAttached}
-        </p>
-        ${
-          flyerUrl
-            ? `<p style="margin:24px 0 0; text-align:center;"><a href="${escapeHtml(flyerUrl)}" style="display:inline-block; border:1px solid ${NAVY}; border-radius:4px; padding:12px 20px; font-family:${FONT}; color:${NAVY}; font-size:14px; font-weight:700; text-decoration:none;">${t.flyerCta}</a></p>`
-            : ""
-        }
+        ${extras({ language, flyerUrl })}
         ${signOff(language)}`;
 
   const message: OutgoingEmail = {
@@ -315,8 +335,7 @@ export async function sendQrEmail({
       ...(ticketPngBuffer
         ? [{ filename: "newspace-africa-2027-ticket.png", content: ticketPngBuffer, contentType: "image/png" }]
         : []),
-      // "Add to calendar": the conference days as an .ics invite.
-      { filename: icsFilename(), content: Buffer.from(buildIcs(language)), contentType: "text/calendar" },
+      calendarAttachment(language),
     ],
     html: layout({ language, preheader: t.preheader, hasLogo: Boolean(logoPngBuffer), content, footerNote: t.footerNote }),
   };
@@ -396,13 +415,14 @@ export async function sendStudentCodeEmail({
         ${para(t.how)}
         ${para(t.only(escapeHtml(toEmail), until), ` color:${INK_3}; font-size:14px;`)}
         <p style="margin:8px 0 0;"><a href="${escapeHtml(registerUrl)}" style="display:inline-block; background:${GOLD}; border-radius:4px; padding:13px 24px; font-family:${FONT}; color:#000000; font-size:15px; font-weight:700; text-decoration:none;">${t.cta}</a></p>
+        ${extras({ language })}
         ${signOff(language)}`;
 
   await deliver({
     from: fromAddress,
     to: toEmail,
     subject: t.subject(event),
-    attachments: logoPngBuffer ? [logoAttachment(logoPngBuffer)] : [],
+    attachments: [...(logoPngBuffer ? [logoAttachment(logoPngBuffer)] : []), calendarAttachment(language)],
     html: layout({ language, preheader: t.preheader, hasLogo: Boolean(logoPngBuffer), content, footerNote: t.footerNote }),
   });
 }
@@ -422,7 +442,7 @@ const CATEGORY_COPY = {
       vip
         ? `We are delighted to confirm that your registration for the <strong style="color:${NAVY};">${event}</strong> has been upgraded to <strong>VIP</strong>.`
         : `Your registration category for the <strong style="color:${NAVY};">${event}</strong> has been updated to <strong>${category}</strong>.`,
-    badge: "Your badge will show your category when you check in at the registration desk.",
+    badge: "Shown on your badge when you check in.",
     qrText: "Your QR code has not changed. Present it at the registration desk, on your phone or printed.",
     qrAlt: "Your check-in QR code",
     footerNote: "You are receiving this email because you registered for the conference.",
@@ -439,7 +459,7 @@ const CATEGORY_COPY = {
       vip
         ? `Nous avons le plaisir de vous confirmer que votre inscription à la <strong style="color:${NAVY};">${event}</strong> passe en catégorie <strong>VIP</strong>.`
         : `Votre catégorie d'inscription à la <strong style="color:${NAVY};">${event}</strong> est désormais <strong>${category}</strong>.`,
-    badge: "Votre badge indiquera votre catégorie lors de votre enregistrement à l'accueil.",
+    badge: "Indiquée sur votre badge lors de votre enregistrement.",
     qrText: "Votre QR code ne change pas. Présentez-le à l'accueil, sur votre téléphone ou imprimé.",
     qrAlt: "Votre QR code d'accès",
     footerNote: "Vous recevez cet e-mail suite à votre inscription à la conférence.",
@@ -456,6 +476,7 @@ export async function sendCategoryChangeEmail({
   role,
   qrPngBuffer,
   logoPngBuffer,
+  flyerUrl,
   language = "en",
 }: {
   toEmail: string;
@@ -463,6 +484,8 @@ export async function sendCategoryChangeEmail({
   role: string;
   qrPngBuffer: Buffer;
   logoPngBuffer?: Buffer | null;
+  /** Link to the "I'm attending" flyer maker, shown as a button when set. */
+  flyerUrl?: string | null;
   language?: EmailLanguage;
 }) {
   const fromAddress = process.env.EMAIL_FROM;
@@ -478,9 +501,9 @@ export async function sendCategoryChangeEmail({
         ${heading(t.heading(vip))}
         ${para(t.greeting(firstName), ` color:${INK};`)}
         ${para(t.changed(escapeHtml(event), category, vip))}
-        ${credentialCard({ category, name: escapeHtml(fullName.trim()), language })}
-        ${para(t.badge, " margin-bottom:28px;")}
+        ${credentialCard({ category, name: escapeHtml(fullName.trim()), note: t.badge, language })}
         ${entryPass({ text: t.qrText, qrAlt: t.qrAlt, language })}
+        ${extras({ language, flyerUrl })}
         ${signOff(language)}`;
 
   await deliver({
@@ -490,6 +513,7 @@ export async function sendCategoryChangeEmail({
     attachments: [
       { filename: "checkin-qr.png", content: qrPngBuffer, contentType: "image/png", contentId: "checkin-qr.png" },
       ...(logoPngBuffer ? [logoAttachment(logoPngBuffer)] : []),
+      calendarAttachment(language),
     ],
     html: layout({ language, preheader: t.preheader(category, vip), hasLogo: Boolean(logoPngBuffer), content, footerNote: t.footerNote }),
   });

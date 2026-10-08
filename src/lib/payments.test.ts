@@ -62,6 +62,25 @@ it("sells every ticket as the portal's own product, naming the ticket on the pag
   expect(params.invoice_creation.invoice_data.custom_fields).toEqual([{ name: "Ticket", value: "Standard" }]);
   // Euros only: no converted price on the payment page.
   expect(params.adaptive_pricing).toEqual({ enabled: false });
+  // The wide Space in Africa logo, for this site's payment pages only.
+  expect(params.branding_settings).toEqual({ logo: { type: "url", url: "https://example.com/brand/space-in-africa-checkout.png" } });
+});
+
+it("still opens the payment page if Stripe refuses the logo", async () => {
+  const args = {
+    attendee: { id: "a1", email: "a@example.com", vat_number: null, invoice_reference: null, organization: null },
+    ticket,
+    language: "en" as const,
+  };
+  api.checkout.sessions.create
+    .mockRejectedValueOnce(Object.assign(new Error("Invalid logo"), { param: "branding_settings[logo][url]" }))
+    .mockResolvedValueOnce({ id: "cs_2", url: "https://checkout.stripe.com/y" });
+  expect(await createCheckoutSession({ ...args, baseUrl: "https://example.com" })).toBe("https://checkout.stripe.com/y");
+  expect(api.checkout.sessions.create.mock.calls[1][0].branding_settings).toBeUndefined();
+  // Locally (http://localhost) Stripe couldn't fetch it, so it isn't sent.
+  api.checkout.sessions.create.mockReset().mockResolvedValue({ id: "cs_3", url: "https://checkout.stripe.com/z" });
+  await createCheckoutSession({ ...args, baseUrl: "http://localhost:3000" });
+  expect(api.checkout.sessions.create.mock.calls[0][0].branding_settings).toBeUndefined();
 });
 
 it("limits new promo codes to the portal's product", async () => {

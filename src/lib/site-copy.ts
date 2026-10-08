@@ -15,9 +15,8 @@ export const SITE_COPY: Record<
     flyer: string;
     privacy: string;
     terms: string;
-    contact: string;
-    website: string;
     organisedBy: string;
+    hostedBy: string;
     organiserSite: string;
   }
 > = {
@@ -31,9 +30,8 @@ export const SITE_COPY: Record<
     flyer: "Create your flyer",
     privacy: "Privacy",
     terms: "Terms",
-    contact: "Contact",
-    website: "Conference website",
     organisedBy: "Organised by",
+    hostedBy: "Hosted by",
     organiserSite: "Space in Africa website",
   },
   fr: {
@@ -46,9 +44,8 @@ export const SITE_COPY: Record<
     flyer: "Créer votre visuel",
     privacy: "Confidentialité",
     terms: "Conditions",
-    contact: "Contact",
-    website: "Site de la conférence",
     organisedBy: "Organisé par",
+    hostedBy: "Accueilli par",
     organiserSite: "Site de Space in Africa",
   },
 };
