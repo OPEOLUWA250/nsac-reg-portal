@@ -5,18 +5,26 @@ import { EVENT_INFO } from "@/lib/event-info";
 import { publicBaseUrl } from "@/lib/public-url";
 import { buildIcs, googleCalendarUrl, icsFilename, outlookCalendarUrl } from "@/lib/calendar";
 
-// Brand colours (the conference website's blue and gold), duplicated from
-// globals.css: email HTML can't read CSS custom properties.
-const BLUE = "#03416A";
+// Every email shares one letterhead layout: a navy band with the logo and
+// the dates, a thin gold rule, a white page with a left-aligned letter, a
+// credential card for the registration, the entry QR code and a sign-off.
+// Tables and inline styles only, so it holds up in Gmail, Outlook and phone
+// mail apps. Brand colours and fonts come from DESIGN.md (email HTML can't
+// read the site's CSS); clients that can't load Raleway or DM Sans fall back
+// to Helvetica or Arial.
+
+const NAVY = "#03416A";
 const GOLD = "#F09F07";
+// Gold text on white is too faint: labels use the darker gold.
+const GOLD_INK = "#8A5300";
 const INK = "#232323";
 const INK_2 = "#454B52";
 const INK_3 = "#5E6670";
-const LINE = "#D8DCE0";
-const CANVAS = "#F5F5F5";
-// Warm panel, and a dark gold that stays readable (gold text on white is too faint).
-const CREAM = "#FFF8EB";
-const GOLD_DARK = "#8A5300";
+const IVORY = "#F4F2EE";
+const PANEL = "#FAF8F4";
+const HAIRLINE = "#E6E1D8";
+const FONT = "'DM Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif";
+const DISPLAY = "Raleway, 'Helvetica Neue', Helvetica, Arial, sans-serif";
 
 export type EmailLanguage = "en" | "fr";
 
@@ -31,78 +39,198 @@ function categoryName(role: string, language: EmailLanguage): string {
   return CATEGORY_NAMES[language]?.[role.toLowerCase()] ?? role.charAt(0).toUpperCase() + role.slice(1);
 }
 
-const PASS_COPY = {
-  en: { category: "YOUR REGISTRATION CATEGORY", attendee: "ATTENDEE", dates: "DATES" },
-  fr: { category: "VOTRE CATÉGORIE D’INSCRIPTION", attendee: "PARTICIPANT(E)", dates: "DATES" },
+const LAYOUT_COPY = {
+  en: {
+    category: "REGISTRATION CATEGORY",
+    name: "NAME",
+    dates: "DATES",
+    venue: "VENUE",
+    entryPass: "YOUR ENTRY PASS",
+    regards: "Kind regards,",
+    team: "The NewSpace Africa Conference team",
+    questions: "Questions? Simply reply to this email.",
+  },
+  fr: {
+    category: "CATÉGORIE D’INSCRIPTION",
+    name: "NOM",
+    dates: "DATES",
+    venue: "LIEU",
+    entryPass: "VOTRE ACCÈS",
+    regards: "Bien cordialement,",
+    team: "L’équipe de la Conférence NewSpace Africa",
+    questions: "Des questions ? Répondez simplement à cet e-mail.",
+  },
 } as const;
 
+// ---------- building blocks (all values must already be escaped) ----------
+
+const eyebrow = (text: string, align = "left") =>
+  `<p style="margin:0 0 12px; font-family:${FONT}; color:${GOLD_INK}; font-size:11px; font-weight:700; letter-spacing:2.5px; text-transform:uppercase; text-align:${align};">${text}</p>`;
+
+const heading = (text: string) =>
+  `<h1 style="margin:0 0 24px; font-family:${DISPLAY}; color:${NAVY}; font-size:26px; line-height:1.25; font-weight:800;">${text}</h1>`;
+
+const para = (html: string, style = "") =>
+  `<p style="margin:0 0 16px; font-family:${FONT}; color:${INK_2}; font-size:15px; line-height:1.7;${style}">${html}</p>`;
+
 /**
- * The registration category as a small event pass: the category large on a
- * cream panel with a gold edge, then a dashed tear line with the attendee's
- * name and the conference dates. Tables and inline styles only, so it holds
- * up in Gmail, Outlook and phone mail apps. Values must already be escaped.
+ * The registration at a glance: the category large, then name, dates and
+ * venue in ruled rows, on a warm panel with a gold top edge.
  */
-function categoryPass({ category, note, name, language }: { category: string; note: string; name: string; language: EmailLanguage }): string {
-  const t = PASS_COPY[language] ?? PASS_COPY.en;
-  const label = `margin:0; color:${INK_3}; font-size:10px; font-weight:700; letter-spacing:1.5px;`;
-  const value = `margin:4px 0 0; color:${INK}; font-size:14px; font-weight:700; line-height:1.4;`;
-  const cell = `padding:14px 20px 18px; border-top:1px dashed ${GOLD}; vertical-align:top;`;
+function credentialCard({ category, name, language }: { category: string; name: string; language: EmailLanguage }): string {
+  const t = LAYOUT_COPY[language];
   // Long names ("Intervenant(e)") get smaller, so they fit on a phone.
-  const size = category.length > 10 ? 21 : category.length > 7 ? 28 : 34;
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 8px; border:1px solid ${GOLD}; border-radius:12px; border-collapse:separate; background:#ffffff;">
-          <tr><td colspan="2" style="height:6px; background:${GOLD}; border-radius:11px 11px 0 0; font-size:1px; line-height:6px;">&nbsp;</td></tr>
-          <tr><td colspan="2" style="padding:24px 20px 22px; background:${CREAM}; text-align:center;">
-            <p style="margin:0; color:${GOLD_DARK}; font-size:11px; font-weight:700; letter-spacing:2.5px;">${t.category}</p>
-            <p style="margin:10px 0 0; color:${BLUE}; font-size:${size}px; line-height:1.15; font-weight:800; letter-spacing:${size > 30 ? 3 : size > 24 ? 2 : 1}px; text-transform:uppercase; word-break:break-word;">${category}</p>
-            <table role="presentation" cellpadding="0" cellspacing="0" style="margin:14px auto;"><tr><td style="width:44px; height:3px; background:${GOLD}; font-size:1px; line-height:3px;">&nbsp;</td></tr></table>
-            <p style="margin:0; color:${INK_2}; font-size:13px; line-height:1.5;">${note}</p>
-          </td></tr>
+  const size = category.length > 10 ? 22 : category.length > 8 ? 26 : 30;
+  const label = `font-family:${FONT}; color:${INK_3}; font-size:10px; font-weight:700; letter-spacing:1.5px;`;
+  const row = (key: string, value: string) => `
           <tr>
-            <td width="50%" style="${cell} text-align:left;">
-              <p style="${label}">${t.attendee}</p>
-              <p style="${value}">${name}</p>
+            <td width="32%" style="padding:12px 0 12px 24px; border-top:1px solid ${HAIRLINE}; vertical-align:top; ${label}">${key}</td>
+            <td style="padding:11px 24px 11px 12px; border-top:1px solid ${HAIRLINE}; vertical-align:top; font-family:${FONT}; color:${INK}; font-size:14px; font-weight:600; line-height:1.5;">${value}</td>
+          </tr>`;
+  return `
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 28px; background:${PANEL}; border:1px solid ${HAIRLINE}; border-top:3px solid ${GOLD}; border-collapse:collapse;">
+          <tr>
+            <td colspan="2" style="padding:22px 24px 18px;">
+              <p style="margin:0; ${label}">${t.category}</p>
+              <p style="margin:8px 0 0; font-family:${DISPLAY}; color:${NAVY}; font-size:${size}px; line-height:1.2; font-weight:800; letter-spacing:1px; text-transform:uppercase; word-break:break-word;">${category}</p>
             </td>
-            <td width="50%" style="${cell} text-align:right;">
-              <p style="${label}">${t.dates}</p>
-              <p style="${value}">${EVENT_INFO.date[language]}</p>
-              <p style="margin:2px 0 0; color:${INK_3}; font-size:13px; line-height:1.4;">${EVENT_INFO.place[language]}</p>
+          </tr>${row(t.name, name)}${row(t.dates, EVENT_INFO.date[language])}${row(t.venue, EVENT_INFO.place[language])}
+        </table>`;
+}
+
+/** The entry QR code in a hairline frame, with what to do with it. */
+function entryPass({ text, qrAlt, note, language }: { text: string; qrAlt: string; note?: string; language: EmailLanguage }): string {
+  return `
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${HAIRLINE};">
+          <tr>
+            <td style="padding:30px 0 4px; text-align:center;">
+              ${eyebrow(LAYOUT_COPY[language].entryPass, "center")}
+              ${para(text, " text-align:center;")}
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px auto 0; border:1px solid ${HAIRLINE}; background:#ffffff;">
+                <tr><td style="padding:14px;"><img src="cid:checkin-qr.png" alt="${qrAlt}" width="180" height="180" style="display:block; width:180px; height:180px;" /></td></tr>
+              </table>
+              ${note ? `<p style="margin:14px 0 0; font-family:${FONT}; color:${INK_3}; font-size:13px; line-height:1.6;">${note}</p>` : ""}
             </td>
           </tr>
         </table>`;
 }
 
+function signOff(language: EmailLanguage): string {
+  const t = LAYOUT_COPY[language];
+  return `
+        <p style="margin:32px 0 0; font-family:${FONT}; color:${INK_2}; font-size:15px; line-height:1.7;">${t.regards}<br /><strong style="color:${INK};">${t.team}</strong></p>`;
+}
+
+/** The letterhead page around an email's content. */
+function layout({
+  language,
+  preheader,
+  hasLogo,
+  content,
+  footerNote,
+}: {
+  language: EmailLanguage;
+  preheader: string;
+  hasLogo: boolean;
+  content: string;
+  footerNote: string;
+}): string {
+  const t = LAYOUT_COPY[language];
+  const brand = hasLogo
+    ? `<img src="cid:brand-logo.png" alt="NewSpace Africa Conference" width="140" height="52" style="display:block; width:140px; height:52px; border:0;" />`
+    : `<span style="font-family:${DISPLAY}; color:#ffffff; font-size:17px; font-weight:800;">NewSpace Africa Conference</span>`;
+  return `<!doctype html>
+<html lang="${language}">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light" />
+<meta name="supported-color-schemes" content="light" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&amp;family=Raleway:wght@800&amp;display=swap" rel="stylesheet" />
+</head>
+<body style="margin:0; padding:0; background:${IVORY};">
+  <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:${IVORY};">${preheader}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${IVORY};">
+    <tr>
+      <td align="center" style="padding:36px 12px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; background:#ffffff; border:1px solid ${HAIRLINE};">
+          <tr>
+            <td style="background:${NAVY}; padding:24px 32px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="vertical-align:middle;">${brand}</td>
+                  <td align="right" style="vertical-align:middle; font-family:${FONT}; color:#ffffff; font-size:11px; font-weight:700; letter-spacing:1.5px; line-height:1.7; text-transform:uppercase; text-align:right;">
+                    ${EVENT_INFO.date[language]}<br /><span style="color:#B9CCDA;">${EVENT_INFO.place[language]}</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr><td style="height:3px; background:${GOLD}; font-size:1px; line-height:3px;">&nbsp;</td></tr>
+          <tr>
+            <td style="padding:44px 36px 40px;">
+${content}
+            </td>
+          </tr>
+        </table>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+          <tr>
+            <td style="padding:24px 24px 0; text-align:center; font-family:${FONT}; color:${INK_3}; font-size:12px; line-height:1.7;">
+              <strong style="color:${INK_2}; white-space:nowrap;">${escapeHtml(EVENT_INFO.name[language])}</strong> &nbsp;·&nbsp; <span style="white-space:nowrap;">${EVENT_INFO.date[language]}</span> &nbsp;·&nbsp; <span style="white-space:nowrap;">${EVENT_INFO.place[language]}</span><br />
+              ${t.questions}<br />
+              <span style="color:#8A929B;">${footerNote}</span>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+const logoAttachment = (logoPngBuffer: Buffer) => ({
+  filename: "newspace-africa-logo.png",
+  content: logoPngBuffer,
+  contentType: "image/png",
+  contentId: "brand-logo.png",
+});
+
+// ---------- registration confirmed ----------
+
 const COPY = {
   en: {
     subject: (event: string) => `You're registered for the ${event}: your check-in QR code`,
-    heading: "Registration confirmed",
-    categoryNote: "Shown on your badge when you check in.",
-    greeting: (first: string) => `Hi ${first},`,
+    preheader: "Your place is confirmed. Your entry QR code is inside.",
+    eyebrow: "Registration confirmed",
+    heading: "Your place is confirmed",
+    greeting: (first: string) => `Dear ${first},`,
     thanks: (event: string) =>
-      `Thank you for registering for the <strong style="color:${BLUE};">${event}</strong>. Your place is confirmed.`,
-    instructions:
-      "Bring the QR code below, on your phone or printed, to the registration desk. It is scanned to check you in and print your badge.",
+      `Thank you for registering for the <strong style="color:${NAVY};">${event}</strong>. We look forward to welcoming you.`,
+    instructions: "Present this QR code at the registration desk, on your phone or printed. It checks you in and prints your badge.",
     qrAlt: "Your check-in QR code",
-    ticketAttached: "Your ticket is also attached to this email, ready to save or print.",
-    calendarTitle: "Add the conference to your calendar",
-    calendarAttached: "A calendar invite is also attached to this email.",
+    ticketAttached: "Your ticket is also attached, ready to save or print.",
+    calendar: "Add to your calendar",
+    calendarAttached: "An invite is also attached.",
     flyerCta: "Create your “I’m attending” flyer for LinkedIn",
-    footer: "Questions? Just reply to this email.",
+    footerNote: "You are receiving this email because you registered for the conference.",
   },
   fr: {
-    subject: (event: string) => `Votre inscription à la ${event} est confirmée\u00a0: votre QR code d'accès`,
-    heading: "Inscription confirmée",
-    categoryNote: "Indiquée sur votre badge lors de votre enregistrement.",
+    subject: (event: string) => `Votre inscription à la ${event} est confirmée : votre QR code d'accès`,
+    preheader: "Votre place est confirmée. Votre QR code d'accès est à l'intérieur.",
+    eyebrow: "Inscription confirmée",
+    heading: "Votre place est confirmée",
     greeting: (first: string) => `Bonjour ${first},`,
     thanks: (event: string) =>
-      `Merci pour votre inscription à la <strong style="color:${BLUE};">${event}</strong>. Votre place est confirmée.`,
+      `Merci pour votre inscription à la <strong style="color:${NAVY};">${event}</strong>. Nous nous réjouissons de vous accueillir.`,
     instructions:
-      "Présentez le QR code ci-dessous, sur votre téléphone ou imprimé, à l'accueil. Il sera scanné pour enregistrer votre arrivée et imprimer votre badge.",
+      "Présentez ce QR code à l'accueil, sur votre téléphone ou imprimé. Il sert à enregistrer votre arrivée et à imprimer votre badge.",
     qrAlt: "Votre QR code d'accès",
-    ticketAttached: "Votre billet est également joint à cet e-mail, pour l'enregistrer ou l'imprimer.",
-    calendarTitle: "Ajoutez la conférence à votre agenda",
-    calendarAttached: "Une invitation d'agenda est également jointe à cet e-mail.",
-    flyerCta: "Créez votre visuel «\u00a0J’y serai\u00a0» pour LinkedIn",
-    footer: "Des questions\u00a0? Répondez simplement à cet e-mail.",
+    ticketAttached: "Votre billet est également joint, pour l'enregistrer ou l'imprimer.",
+    calendar: "Ajouter à votre agenda",
+    calendarAttached: "Une invitation est également jointe.",
+    flyerCta: "Créez votre visuel « J’y serai » pour LinkedIn",
+    footerNote: "Vous recevez cet e-mail suite à votre inscription à la conférence.",
   },
 } as const;
 
@@ -141,10 +269,10 @@ export async function sendQrEmail({
   // The event's name in the email's language ("Conférence NewSpace Africa 2027").
   const event = eventName ?? EVENT_INFO.name[language === "fr" ? "fr" : "en"];
 
-  // "Add to calendar" buttons. Apple Calendar opens the .ics from our site
+  // "Add to calendar" links. Apple Calendar opens the .ics from our site
   // (only when the public address is configured; the invite is attached too).
   const base = publicBaseUrl();
-  const calendarButtons = [
+  const calendarLinks = [
     { label: "Google", href: googleCalendarUrl(language) },
     { label: "Outlook", href: outlookCalendarUrl(language) },
     ...(base ? [{ label: "Apple", href: `${base}/api/calendar?lang=${language}` }] : []),
@@ -152,9 +280,25 @@ export async function sendQrEmail({
 
   // Everything that came from a registrant is escaped before it goes into HTML.
   const firstName = escapeHtml(fullName.trim().split(/\s+/)[0] || fullName);
-  const safeEvent = escapeHtml(event);
   const safeRole = role ? escapeHtml(categoryName(role, language)) : "";
-  const font = "'DM Sans', Helvetica, Arial, 'Segoe UI', sans-serif";
+  const link = `color:${NAVY}; font-weight:700; text-decoration:underline; text-decoration-color:${GOLD};`;
+
+  const content = `
+        ${eyebrow(t.eyebrow)}
+        ${heading(t.heading)}
+        ${para(t.greeting(firstName), ` color:${INK};`)}
+        ${para(t.thanks(escapeHtml(event)))}
+        ${safeRole ? credentialCard({ category: safeRole, name: escapeHtml(fullName.trim()), language }) : ""}
+        ${entryPass({ text: t.instructions, qrAlt: t.qrAlt, note: ticketPngBuffer ? t.ticketAttached : undefined, language })}
+        <p style="margin:24px 0 0; font-family:${FONT}; color:${INK_3}; font-size:13px; line-height:1.7; text-align:center;">
+          ${t.calendar}: ${calendarLinks.map((l) => `<a href="${escapeHtml(l.href)}" style="${link}">${l.label}</a>`).join(" &nbsp;·&nbsp; ")}<br />${t.calendarAttached}
+        </p>
+        ${
+          flyerUrl
+            ? `<p style="margin:24px 0 0; text-align:center;"><a href="${escapeHtml(flyerUrl)}" style="display:inline-block; border:1px solid ${NAVY}; border-radius:4px; padding:12px 20px; font-family:${FONT}; color:${NAVY}; font-size:14px; font-weight:700; text-decoration:none;">${t.flyerCta}</a></p>`
+            : ""
+        }
+        ${signOff(language)}`;
 
   const message: OutgoingEmail = {
     from: fromAddress,
@@ -167,111 +311,39 @@ export async function sendQrEmail({
         contentType: "image/png",
         contentId: "checkin-qr.png",
       },
-      ...(logoPngBuffer
-        ? [{ filename: "newspace-africa-logo.png", content: logoPngBuffer, contentType: "image/png", contentId: "brand-logo.png" }]
-        : []),
+      ...(logoPngBuffer ? [logoAttachment(logoPngBuffer)] : []),
       ...(ticketPngBuffer
         ? [{ filename: "newspace-africa-2027-ticket.png", content: ticketPngBuffer, contentType: "image/png" }]
         : []),
       // "Add to calendar": the conference days as an .ics invite.
       { filename: icsFilename(), content: Buffer.from(buildIcs(language)), contentType: "text/calendar" },
     ],
-    html: `
-<body style="margin:0; padding:32px 16px; background:${CANVAS}; font-family:${font}; color:${INK};">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px; margin:0 auto; background:#ffffff; border:1px solid ${LINE}; border-radius:8px; overflow:hidden;">
-    <tr>
-      <td style="background:${BLUE}; padding:24px 32px; text-align:center;">
-        ${
-          logoPngBuffer
-            ? `<img src="cid:brand-logo.png" alt="NewSpace Africa Conference" width="170" height="63" style="display:block; margin:0 auto; width:170px; height:63px;" />`
-            : `<div style="color:#ffffff; font-size:20px; font-weight:700;">NewSpace Africa Conference</div>`
-        }
-      </td>
-    </tr>
-    <tr>
-      <td style="padding:32px 32px 8px; text-align:center;">
-        <h1 style="margin:0 0 16px; color:${BLUE}; font-size:24px; font-weight:800;">
-          ${t.heading}
-        </h1>
-        <p style="margin:0 0 4px; color:${INK}; font-size:16px; line-height:1.6;">
-          ${t.greeting(firstName)}
-        </p>
-        <p style="margin:0 0 4px; color:${INK_2}; font-size:16px; line-height:1.6;">
-          ${t.thanks(safeEvent)}
-        </p>
-        ${
-          // The pass shows the dates; without a category they get their own line.
-          safeRole
-            ? categoryPass({ category: safeRole, note: t.categoryNote, name: escapeHtml(fullName.trim()), language })
-            : `<p style="margin:14px 0 4px; color:${BLUE}; font-size:16px; font-weight:700; line-height:1.6;">${EVENT_INFO.date[language]} &nbsp;·&nbsp; ${EVENT_INFO.place[language]}</p>`
-        }
-      </td>
-    </tr>
-    <tr>
-      <td style="padding:20px 32px 8px; text-align:center;">
-        <p style="margin:0 0 20px; color:${INK_2}; font-size:15px; line-height:1.6;">
-          ${t.instructions}
-        </p>
-        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto; background:#ffffff; border:1px solid ${LINE}; border-radius:8px;">
-          <tr>
-            <td style="padding:16px;">
-              <img src="cid:checkin-qr.png" alt="${t.qrAlt}" width="200" height="200" style="display:block; width:200px; height:200px;" />
-            </td>
-          </tr>
-        </table>
-        ${
-          ticketPngBuffer
-            ? `<p style="margin:18px 0 0; color:${INK_3}; font-size:14px; line-height:1.6;">${t.ticketAttached}</p>`
-            : ""
-        }
-        <p style="margin:26px 0 10px; color:${BLUE}; font-size:14px; font-weight:700;">${t.calendarTitle}</p>
-        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
-          <tr>
-            ${calendarButtons
-              .map(
-                (b) =>
-                  `<td style="padding:0 4px;"><a href="${escapeHtml(b.href)}" style="display:inline-block; border:1px solid ${BLUE}; border-radius:6px; padding:10px 16px; color:${BLUE}; font-size:14px; font-weight:700; text-decoration:none; white-space:nowrap;">${b.label}</a></td>`
-              )
-              .join("")}
-          </tr>
-        </table>
-        <p style="margin:8px 0 0; color:${INK_3}; font-size:13px; line-height:1.6;">${t.calendarAttached}</p>
-        ${
-          flyerUrl
-            ? `<p style="margin:24px 0 0;"><a href="${escapeHtml(flyerUrl)}" style="display:inline-block; background:${GOLD}; color:#000000; font-size:15px; font-weight:700; text-decoration:none; padding:13px 22px; border-radius:6px;">${t.flyerCta}</a></p>`
-            : ""
-        }
-      </td>
-    </tr>
-    <tr>
-      <td style="padding:24px 32px 28px; text-align:center;">
-        <p style="margin:16px 0 0; padding-top:20px; border-top:1px solid ${LINE}; color:${INK_3}; font-size:13px;">
-          ${t.footer}
-        </p>
-      </td>
-    </tr>
-  </table>
-</body>
-    `,
+    html: layout({ language, preheader: t.preheader, hasLogo: Boolean(logoPngBuffer), content, footerNote: t.footerNote }),
   };
 
   await deliver(message);
 }
 
+// ---------- student code ----------
+
 const STUDENT_COPY = {
   en: {
     subject: (event: string) => `Your student code for the ${event}`,
+    preheader: "Your personal code for the Student ticket.",
+    eyebrow: "Student ticket",
     heading: "Your student code",
-    greeting: (first: string) => (first ? `Hi ${first},` : "Hello,"),
+    greeting: (first: string) => (first ? `Dear ${first},` : "Hello,"),
     intro: "Thank you for sending your student ID. Here is your personal code for the Student ticket:",
     how: "On the registration form, choose the <strong>Student</strong> ticket on the last step and enter this code.",
     only: (email: string, until: string) =>
       `It only works with this email address (${email}) and can be used once, until ${until}.`,
     cta: "Register now",
-    footer: "Questions? Just reply to this email.",
+    footerNote: "You are receiving this email because you asked for a student code.",
   },
   fr: {
     subject: (event: string) => `Votre code étudiant pour la ${event}`,
+    preheader: "Votre code personnel pour le billet Étudiant.",
+    eyebrow: "Billet étudiant",
     heading: "Votre code étudiant",
     greeting: (first: string) => (first ? `Bonjour ${first},` : "Bonjour,"),
     intro: "Merci de nous avoir envoyé votre carte d'étudiant. Voici votre code personnel pour le billet Étudiant :",
@@ -279,7 +351,7 @@ const STUDENT_COPY = {
     only: (email: string, until: string) =>
       `Il ne fonctionne qu'avec cette adresse e-mail (${email}) et ne peut être utilisé qu'une fois, jusqu'au ${until}.`,
     cta: "S'inscrire",
-    footer: "Des questions ? Répondez simplement à cet e-mail.",
+    footerNote: "Vous recevez cet e-mail suite à votre demande de code étudiant.",
   },
 } as const;
 
@@ -312,73 +384,65 @@ export async function sendStudentCodeEmail({
     timeZone: "Africa/Lagos",
   });
   const firstName = escapeHtml(name.trim().split(/\s+/)[0] ?? "");
-  const font = "'DM Sans', Helvetica, Arial, 'Segoe UI', sans-serif";
+
+  const content = `
+        ${eyebrow(t.eyebrow)}
+        ${heading(t.heading)}
+        ${para(t.greeting(firstName), ` color:${INK};`)}
+        ${para(t.intro)}
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 24px; background:${PANEL}; border:1px solid ${HAIRLINE}; border-top:3px solid ${GOLD}; border-collapse:collapse;">
+          <tr><td style="padding:22px 16px; text-align:center; font-family:'Courier New', Courier, monospace; color:${NAVY}; font-size:28px; font-weight:700; letter-spacing:4px;">${escapeHtml(code)}</td></tr>
+        </table>
+        ${para(t.how)}
+        ${para(t.only(escapeHtml(toEmail), until), ` color:${INK_3}; font-size:14px;`)}
+        <p style="margin:8px 0 0;"><a href="${escapeHtml(registerUrl)}" style="display:inline-block; background:${GOLD}; border-radius:4px; padding:13px 24px; font-family:${FONT}; color:#000000; font-size:15px; font-weight:700; text-decoration:none;">${t.cta}</a></p>
+        ${signOff(language)}`;
 
   await deliver({
     from: fromAddress,
     to: toEmail,
     subject: t.subject(event),
-    attachments: logoPngBuffer
-      ? [{ filename: "newspace-africa-logo.png", content: logoPngBuffer, contentType: "image/png", contentId: "brand-logo.png" }]
-      : [],
-    html: `
-<body style="margin:0; padding:32px 16px; background:${CANVAS}; font-family:${font}; color:${INK};">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px; margin:0 auto; background:#ffffff; border:1px solid ${LINE}; border-radius:8px; overflow:hidden;">
-    <tr>
-      <td style="background:${BLUE}; padding:24px 32px; text-align:center;">
-        ${
-          logoPngBuffer
-            ? `<img src="cid:brand-logo.png" alt="NewSpace Africa Conference" width="170" height="63" style="display:block; margin:0 auto; width:170px; height:63px;" />`
-            : `<div style="color:#ffffff; font-size:20px; font-weight:700;">NewSpace Africa Conference</div>`
-        }
-      </td>
-    </tr>
-    <tr>
-      <td style="padding:32px; text-align:center;">
-        <h1 style="margin:0 0 16px; color:${BLUE}; font-size:24px; font-weight:800;">${t.heading}</h1>
-        <p style="margin:0 0 4px; color:${INK}; font-size:16px; line-height:1.6;">${t.greeting(firstName)}</p>
-        <p style="margin:0 0 20px; color:${INK_2}; font-size:16px; line-height:1.6;">${t.intro}</p>
-        <p style="margin:0 auto 20px; display:inline-block; padding:14px 22px; border:2px dashed ${GOLD}; border-radius:8px; color:${BLUE}; font-family:'Courier New', monospace; font-size:28px; font-weight:800; letter-spacing:3px;">${escapeHtml(code)}</p>
-        <p style="margin:0 0 8px; color:${INK_2}; font-size:15px; line-height:1.6;">${t.how}</p>
-        <p style="margin:0 0 24px; color:${INK_3}; font-size:14px; line-height:1.6;">${t.only(escapeHtml(toEmail), until)}</p>
-        <a href="${escapeHtml(registerUrl)}" style="display:inline-block; background:${GOLD}; color:#000000; font-size:15px; font-weight:700; text-decoration:none; padding:13px 22px; border-radius:6px;">${t.cta}</a>
-        <p style="margin:28px 0 0; padding-top:20px; border-top:1px solid ${LINE}; color:${INK_3}; font-size:13px;">${t.footer}</p>
-      </td>
-    </tr>
-  </table>
-</body>
-    `,
+    attachments: logoPngBuffer ? [logoAttachment(logoPngBuffer)] : [],
+    html: layout({ language, preheader: t.preheader, hasLogo: Boolean(logoPngBuffer), content, footerNote: t.footerNote }),
   });
 }
+
+// ---------- category changed (from the dashboard) ----------
 
 const CATEGORY_COPY = {
   en: {
     subject: (event: string, vip: boolean) =>
       vip ? `You're a VIP guest at the ${event}` : `Your registration category for the ${event} has changed`,
-    heading: (vip: boolean) => (vip ? "You're a VIP" : "Your category has changed"),
-    greeting: (first: string) => `Hi ${first},`,
+    preheader: (category: string, vip: boolean) =>
+      vip ? "You are now a VIP guest. Your entry QR code is inside." : `Your registration category is now ${category}.`,
+    eyebrow: (vip: boolean) => (vip ? "VIP invitation" : "Registration update"),
+    heading: (vip: boolean) => (vip ? "Welcome as our VIP guest" : "Your registration category has been updated"),
+    greeting: (first: string) => `Dear ${first},`,
     changed: (event: string, category: string, vip: boolean) =>
       vip
-        ? `We're delighted to let you know that your registration for the <strong style="color:${BLUE};">${event}</strong> is now <strong>VIP</strong>.`
-        : `Your registration category for the <strong style="color:${BLUE};">${event}</strong> is now <strong>${category}</strong>.`,
-    badge: "Your badge will show it when you check in at the registration desk.",
-    qrIntro: "Your check-in QR code hasn't changed. Here it is again, so you have it to hand:",
+        ? `We are delighted to confirm that your registration for the <strong style="color:${NAVY};">${event}</strong> has been upgraded to <strong>VIP</strong>.`
+        : `Your registration category for the <strong style="color:${NAVY};">${event}</strong> has been updated to <strong>${category}</strong>.`,
+    badge: "Your badge will show your category when you check in at the registration desk.",
+    qrText: "Your QR code has not changed. Present it at the registration desk, on your phone or printed.",
     qrAlt: "Your check-in QR code",
-    footer: "Questions? Just reply to this email.",
+    footerNote: "You are receiving this email because you registered for the conference.",
   },
   fr: {
     subject: (event: string, vip: boolean) =>
       vip ? `Vous êtes invité(e) VIP à la ${event}` : `Votre catégorie d'inscription à la ${event} a changé`,
-    heading: (vip: boolean) => (vip ? "Vous êtes VIP" : "Votre catégorie a changé"),
+    preheader: (category: string, vip: boolean) =>
+      vip ? "Vous êtes désormais invité(e) VIP. Votre QR code d'accès est à l'intérieur." : `Votre catégorie d'inscription est désormais ${category}.`,
+    eyebrow: (vip: boolean) => (vip ? "Invitation VIP" : "Mise à jour de votre inscription"),
+    heading: (vip: boolean) => (vip ? "Bienvenue parmi nos invités VIP" : "Votre catégorie d'inscription a été mise à jour"),
     greeting: (first: string) => `Bonjour ${first},`,
     changed: (event: string, category: string, vip: boolean) =>
       vip
-        ? `Nous avons le plaisir de vous informer que votre inscription à la <strong style="color:${BLUE};">${event}</strong> passe en catégorie <strong>VIP</strong>.`
-        : `Votre catégorie d'inscription à la <strong style="color:${BLUE};">${event}</strong> est désormais <strong>${category}</strong>.`,
-    badge: "Votre badge l'indiquera lors de votre enregistrement à l'accueil.",
-    qrIntro: "Votre QR code d'accès ne change pas. Le voici à nouveau, pour l'avoir sous la main :",
+        ? `Nous avons le plaisir de vous confirmer que votre inscription à la <strong style="color:${NAVY};">${event}</strong> passe en catégorie <strong>VIP</strong>.`
+        : `Votre catégorie d'inscription à la <strong style="color:${NAVY};">${event}</strong> est désormais <strong>${category}</strong>.`,
+    badge: "Votre badge indiquera votre catégorie lors de votre enregistrement à l'accueil.",
+    qrText: "Votre QR code ne change pas. Présentez-le à l'accueil, sur votre téléphone ou imprimé.",
     qrAlt: "Votre QR code d'accès",
-    footer: "Des questions ? Répondez simplement à cet e-mail.",
+    footerNote: "Vous recevez cet e-mail suite à votre inscription à la conférence.",
   },
 } as const;
 
@@ -408,7 +472,16 @@ export async function sendCategoryChangeEmail({
   const event = EVENT_INFO.name[language === "fr" ? "fr" : "en"];
   const category = escapeHtml(categoryName(role, language));
   const firstName = escapeHtml(fullName.trim().split(/\s+/)[0] || fullName);
-  const font = "'DM Sans', Helvetica, Arial, 'Segoe UI', sans-serif";
+
+  const content = `
+        ${eyebrow(t.eyebrow(vip))}
+        ${heading(t.heading(vip))}
+        ${para(t.greeting(firstName), ` color:${INK};`)}
+        ${para(t.changed(escapeHtml(event), category, vip))}
+        ${credentialCard({ category, name: escapeHtml(fullName.trim()), language })}
+        ${para(t.badge, " margin-bottom:28px;")}
+        ${entryPass({ text: t.qrText, qrAlt: t.qrAlt, language })}
+        ${signOff(language)}`;
 
   await deliver({
     from: fromAddress,
@@ -416,50 +489,9 @@ export async function sendCategoryChangeEmail({
     subject: t.subject(event, vip),
     attachments: [
       { filename: "checkin-qr.png", content: qrPngBuffer, contentType: "image/png", contentId: "checkin-qr.png" },
-      ...(logoPngBuffer
-        ? [{ filename: "newspace-africa-logo.png", content: logoPngBuffer, contentType: "image/png", contentId: "brand-logo.png" }]
-        : []),
+      ...(logoPngBuffer ? [logoAttachment(logoPngBuffer)] : []),
     ],
-    html: `
-<body style="margin:0; padding:32px 16px; background:${CANVAS}; font-family:${font}; color:${INK};">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px; margin:0 auto; background:#ffffff; border:1px solid ${LINE}; border-radius:8px; overflow:hidden;">
-    <tr>
-      <td style="background:${BLUE}; padding:24px 32px; text-align:center;">
-        ${
-          logoPngBuffer
-            ? `<img src="cid:brand-logo.png" alt="NewSpace Africa Conference" width="170" height="63" style="display:block; margin:0 auto; width:170px; height:63px;" />`
-            : `<div style="color:#ffffff; font-size:20px; font-weight:700;">NewSpace Africa Conference</div>`
-        }
-      </td>
-    </tr>
-    <tr>
-      <td style="padding:32px 32px 8px; text-align:center;">
-        <h1 style="margin:0 0 16px; color:${BLUE}; font-size:24px; font-weight:800;">${t.heading(vip)}</h1>
-        <p style="margin:0 0 4px; color:${INK}; font-size:16px; line-height:1.6;">${t.greeting(firstName)}</p>
-        <p style="margin:0 0 4px; color:${INK_2}; font-size:16px; line-height:1.6;">${t.changed(escapeHtml(event), category, vip)}</p>
-        ${categoryPass({ category, note: t.badge, name: escapeHtml(fullName.trim()), language })}
-      </td>
-    </tr>
-    <tr>
-      <td style="padding:20px 32px 8px; text-align:center;">
-        <p style="margin:0 0 20px; color:${INK_2}; font-size:15px; line-height:1.6;">${t.qrIntro}</p>
-        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto; background:#ffffff; border:1px solid ${LINE}; border-radius:8px;">
-          <tr>
-            <td style="padding:16px;">
-              <img src="cid:checkin-qr.png" alt="${t.qrAlt}" width="200" height="200" style="display:block; width:200px; height:200px;" />
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-    <tr>
-      <td style="padding:24px 32px 28px; text-align:center;">
-        <p style="margin:16px 0 0; padding-top:20px; border-top:1px solid ${LINE}; color:${INK_3}; font-size:13px;">${t.footer}</p>
-      </td>
-    </tr>
-  </table>
-</body>
-    `,
+    html: layout({ language, preheader: t.preheader(category, vip), hasLogo: Boolean(logoPngBuffer), content, footerNote: t.footerNote }),
   });
 }
 

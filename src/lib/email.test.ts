@@ -12,12 +12,12 @@ afterEach(() => vi.unstubAllEnvs());
 
 beforeEach(() => mail.send.mockClear());
 
-it.each(["en", "fr"] as const)("renders the category pass in %s without sending real mail", async (language) => {
+it.each(["en", "fr"] as const)("renders the credential card in %s without sending real mail", async (language) => {
   await sendQrEmail({ toEmail: "attendee@example.com", fullName: "Ada Example", role: "delegate", language, qrPngBuffer: Buffer.from("test") });
   const message = mail.send.mock.calls[0][0];
-  expect(message.html).toContain(language === "en" ? "YOUR REGISTRATION CATEGORY" : "VOTRE CATÉGORIE D’INSCRIPTION");
+  expect(message.html).toContain(language === "en" ? "REGISTRATION CATEGORY" : "CATÉGORIE D’INSCRIPTION");
   // The category, large and in their language, then their name and the dates.
-  expect(message.html).toMatch(language === "en" ? /font-size:28px[^>]*>Delegate</ : /font-size:28px[^>]*>Délégué\(e\)</);
+  expect(message.html).toMatch(language === "en" ? /font-size:30px[^>]*>Delegate</ : /font-size:26px[^>]*>Délégué\(e\)</);
   expect(message.html).toContain(">Ada Example<");
   expect(message.html).toContain(language === "en" ? "19–23 April 2027" : "19–23 avril 2027");
   expect(message.html).toContain('src="cid:checkin-qr.png"');
