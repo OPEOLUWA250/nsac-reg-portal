@@ -33,7 +33,7 @@ import {
   type ValidationErrors,
 } from "@/lib/registration-fields";
 import { COUNTRY_CODES, EUROPEAN_VAT_COUNTRIES } from "@/lib/countries";
-import { discountedCents, formatPrice, requiresVipPayment, STUDENT_TICKET_ID } from "@/lib/tickets";
+import { discountedCents, formatPrice, STUDENT_TICKET_ID } from "@/lib/tickets";
 import { REGISTRATION_CATEGORIES, type RegistrationCategory } from "@/lib/types";
 import { EVENT_INFO } from "@/lib/event-info";
 
@@ -248,8 +248,16 @@ export default function RegistrationForm({
     const saved = draft.form as Partial<FormState>;
     // A ticket that has since gone off sale (e.g. Early Bird ended) is dropped.
     const ticketStillOnSale = tickets.some((tk) => tk.id === saved.ticket);
+    // So is a category no longer on the form (VIP, now given by admins).
+    const categoryStillOffered = (REGISTRATION_CATEGORIES as readonly unknown[]).includes(saved.category);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- restoring a draft saved in this browser
-    setForm((f) => ({ ...f, ...saved, ticket: ticketStillOnSale ? (saved.ticket as string) : f.ticket, website: "" }));
+    setForm((f) => ({
+      ...f,
+      ...saved,
+      ticket: ticketStillOnSale ? (saved.ticket as string) : f.ticket,
+      category: categoryStillOffered ? (saved.category as string) : f.category,
+      website: "",
+    }));
     if (draft.id) submissionId.current = draft.id;
     const savedStep = Math.min(Math.max(0, draft.step), LAST_STEP);
     setStep(paymentCancelled ? LAST_STEP : savedStep);
@@ -511,11 +519,6 @@ export default function RegistrationForm({
       return;
     }
 
-    if (priceCents !== null && requiresVipPayment(form.category, priceCents)) {
-      showErrors({ [appliedPromo ? "promoCode" : "ticket"]: "vip_payment_required" });
-      return;
-    }
-
     setPhase({ kind: "submitting" });
     let res: Response;
     let json: Record<string, unknown>;
@@ -645,7 +648,7 @@ export default function RegistrationForm({
         ? t.uploading(phase.pct)
         : phase.kind === "redirecting"
           ? t.redirecting
-          : selectedTicket && priceCents === 0 && form.category !== "vip"
+          : selectedTicket && priceCents === 0
             ? t.submitFree
             : t.submit(selectedTicket && priceCents !== null ? formatPrice(priceCents, selectedTicket.currency, lang) : "").replace(/ · $/, "");
 

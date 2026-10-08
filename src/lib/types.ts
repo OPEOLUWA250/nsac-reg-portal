@@ -10,8 +10,11 @@ export const ATTENDEE_ROLES = [
   "staff",
 ] as const;
 
-/** The categories a visitor picks on the registration form. */
-export const REGISTRATION_CATEGORIES = ["delegate", "speaker", "media", "exhibitor", "vip"] as const;
+/**
+ * The categories a visitor picks on the registration form. VIP isn't one:
+ * admins make people VIPs from the dashboard (api/admin/attendees PATCH).
+ */
+export const REGISTRATION_CATEGORIES = ["delegate", "speaker", "media", "exhibitor"] as const;
 export type RegistrationCategory = (typeof REGISTRATION_CATEGORIES)[number];
 export type AttendeeRole = (typeof ATTENDEE_ROLES)[number];
 

@@ -155,6 +155,10 @@ export async function createCheckoutSession({
       },
     },
     locale: language,
+    // Charge in the ticket's currency only. Adaptive Pricing is on for the
+    // shared Stripe account (the Space in Africa website uses it), so turn
+    // it off here rather than in the dashboard.
+    adaptive_pricing: { enabled: false },
     success_url: `${baseUrl}/register/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${baseUrl}/?payment=cancelled`,
   });

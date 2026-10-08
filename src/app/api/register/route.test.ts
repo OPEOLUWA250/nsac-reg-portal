@@ -14,7 +14,7 @@ vi.mock("@/lib/supabase-admin", () => ({ supabaseAdmin: () => ({}) }));
 vi.mock("@/lib/promo-codes", async () => ({ checkPromoCode: mocks.promo, discountedCents: (await import("@/lib/tickets")).discountedCents }));
 
 const input = {
-  id: "12345678-1234-4234-8234-123456789abc", category: "vip",
+  id: "12345678-1234-4234-8234-123456789abc", category: "delegate",
   firstName: "Ada", lastName: "Example", email: "ada@example.com", jobTitle: "Engineer",
   phone: "+2348012345678", nationality: "NG", residenceCountry: "GH",
   organization: "Example", organizationCountry: "NG", professionalCategory: "industry",
@@ -34,7 +34,7 @@ function request(body = input) {
   return new NextRequest("https://example.com/api/register", { method: "POST", body: JSON.stringify(body) });
 }
 
-it.each(["vip", "delegate", "speaker", "media", "exhibitor"])("creates a pending %s registration and requires Stripe checkout", async (category) => {
+it.each(["delegate", "speaker", "media", "exhibitor"])("creates a pending %s registration and requires Stripe checkout", async (category) => {
   const response = await POST(request({ ...input, category }));
   expect(response.status).toBe(200);
   expect(await response.json()).toMatchObject({ status: "payment_required", checkoutUrl: "https://checkout.stripe.com/test" });
@@ -43,20 +43,10 @@ it.each(["vip", "delegate", "speaker", "media", "exhibitor"])("creates a pending
   expect(mocks.email).not.toHaveBeenCalled();
 });
 
-it("rejects a free VIP ticket before creating a registration", async () => {
-  mocks.tickets.mockResolvedValue([{ id: "standard", amountCents: 0, currency: "eur" }]);
-  const response = await POST(request());
+it("doesn't let people register themselves as VIP (admins do that)", async () => {
+  const response = await POST(request({ ...input, category: "vip" }));
   expect(response.status).toBe(400);
-  expect(await response.json()).toMatchObject({ fields: { ticket: "vip_payment_required" } });
-  expect(mocks.create).not.toHaveBeenCalled();
-  expect(mocks.checkout).not.toHaveBeenCalled();
-});
-
-it("rejects a 100% VIP discount before creating a registration", async () => {
-  mocks.promo.mockResolvedValue({ ok: true, promo: { id: "promo", code: "FREE", percentOff: 100 } });
-  const response = await POST(request({ ...input, promoCode: "FREE" } as typeof input));
-  expect(response.status).toBe(400);
-  expect(await response.json()).toMatchObject({ fields: { promoCode: "vip_payment_required" } });
+  expect(await response.json()).toMatchObject({ fields: { category: "invalid_choice" } });
   expect(mocks.create).not.toHaveBeenCalled();
   expect(mocks.checkout).not.toHaveBeenCalled();
 });

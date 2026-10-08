@@ -60,6 +60,8 @@ it("sells every ticket as the portal's own product, naming the ticket on the pag
   expect(params.custom_text.submit.message).toBe("Standard FR");
   expect(params.invoice_creation.invoice_data.description).toContain("Standard");
   expect(params.invoice_creation.invoice_data.custom_fields).toEqual([{ name: "Ticket", value: "Standard" }]);
+  // Euros only: no converted price on the payment page.
+  expect(params.adaptive_pricing).toEqual({ enabled: false });
 });
 
 it("limits new promo codes to the portal's product", async () => {

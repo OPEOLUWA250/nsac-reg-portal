@@ -6,7 +6,6 @@ import { createAttendee, sendAttendeeQr, canResendQr } from "@/lib/attendee-serv
 import { isRegistrationOpen } from "@/lib/registration-config";
 import { createCheckoutSession } from "@/lib/payments";
 import { availableTickets } from "@/lib/ticket-store";
-import { requiresVipPayment } from "@/lib/tickets";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import type { Attendee } from "@/lib/types";
 import { describeError } from "@/lib/describe-error";
@@ -122,9 +121,6 @@ export async function POST(req: NextRequest) {
     }
   }
   const amountCents = promo ? discountedCents(ticket.amountCents, promo.percentOff) : ticket.amountCents;
-  if (requiresVipPayment(input.role, amountCents)) {
-    return NextResponse.json({ error: "validation", fields: { [promo ? "promoCode" : "ticket"]: "vip_payment_required" } }, { status: 400 });
-  }
 
   // Everything the form collected (besides name, email, role, organisation,
   // phone and language, which createAttendee takes separately).

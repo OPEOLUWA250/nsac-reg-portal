@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 // On-site walk-in registration, for attendees who show up without having
 // registered online. Creates the attendee record and emails their QR code
 // immediately, same as the public form does.
-export const POST = adminRoute(async (req: NextRequest) => {
+export const POST = adminRoute(async (req: NextRequest, _context, session) => {
   const body = await req.json();
   const fullName = typeof body.fullName === "string" ? body.fullName.trim() : "";
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
@@ -29,6 +29,9 @@ export const POST = adminRoute(async (req: NextRequest) => {
       { error: `Unknown role "${role}". Use one of: ${ATTENDEE_ROLES.join(", ")}.` },
       { status: 400 }
     );
+  }
+  if (role === "vip" && session.role !== "super_admin") {
+    return NextResponse.json({ error: "Only super admins can register someone as a VIP." }, { status: 403 });
   }
 
   let outcome;

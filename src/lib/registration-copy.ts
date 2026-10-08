@@ -193,7 +193,7 @@ export const COPY: Record<Language, Copy> = {
       optInSponsors: "I agree to receive communications from event sponsors and exhibitors",
     },
     selectPlaceholder: "Type or choose a country",
-    categories: { speaker: "Speaker", delegate: "Delegate", media: "Media", exhibitor: "Exhibitor", vip: "VIP" },
+    categories: { speaker: "Speaker", delegate: "Delegate", media: "Media", exhibitor: "Exhibitor" },
     shareYes: "Yes, share my details",
     shareNo: "No, keep them private",
     promo: {
@@ -231,7 +231,6 @@ export const COPY: Record<Language, Copy> = {
       invalid_phone: "Enter a valid phone number, with country code.",
       invalid_choice: "Please choose an option from the list.",
       consent_required: "Please tick this box to agree. It's required to register.",
-      vip_payment_required: "VIP registration requires payment. Choose a paid ticket and remove any code that makes the total free.",
       file_type: "Upload a photo (JPG, PNG, WebP) or a PDF.",
       file_too_large: "The file must be 10 MB or smaller.",
       ticket_unavailable: "This ticket is no longer available. Please choose another.",
@@ -379,7 +378,7 @@ export const COPY: Record<Language, Copy> = {
       optInSponsors: "J'accepte de recevoir des communications de la part des sponsors et des exposants",
     },
     selectPlaceholder: "Tapez ou choisissez un pays",
-    categories: { speaker: "Intervenant(e)", delegate: "Délégué(e)", media: "Médias", exhibitor: "Exposant(e)", vip: "VIP" },
+    categories: { speaker: "Intervenant(e)", delegate: "Délégué(e)", media: "Médias", exhibitor: "Exposant(e)" },
     shareYes: "Oui, partager mes coordonnées",
     shareNo: "Non, les garder privées",
     promo: {
@@ -417,7 +416,6 @@ export const COPY: Record<Language, Copy> = {
       invalid_phone: "Saisissez un numéro valide, avec l'indicatif du pays.",
       invalid_choice: "Veuillez choisir une option dans la liste.",
       consent_required: "Cochez cette case pour accepter. C'est obligatoire pour s'inscrire.",
-      vip_payment_required: "L'inscription VIP nécessite un paiement. Choisissez un billet payant et retirez tout code rendant le total gratuit.",
       file_type: "Joignez une photo (JPG, PNG, WebP) ou un PDF.",
       file_too_large: "Le fichier ne doit pas dépasser 10\u00a0Mo.",
       ticket_unavailable: "Ce billet n'est plus disponible. Veuillez en choisir un autre.",

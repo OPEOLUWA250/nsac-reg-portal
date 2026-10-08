@@ -58,7 +58,7 @@ const EMPTY_FORM: RegisterForm = { fullName: "", email: "", role: "delegate", or
 
 export default function AdminDashboard() {
   const { apiCall, requestedAttendee, setRequestedAttendee, me } = useAdmin();
-  // Passports and deleting registrations are for super admins only.
+  // Passports, deleting registrations and VIPs are for super admins only.
   const isSuper = me?.role === "super_admin";
   const [attendees, setAttendees] = useState<Attendee[] | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -244,6 +244,22 @@ export default function AdminDashboard() {
       return checkedIn ? "Checked in." : "Check-in undone.";
     });
 
+  const handleChangeRole = (before: Attendee, role: string, notify: boolean) =>
+    withRow(before.id, async () => {
+      const { attendee, changed, emailed } = (await apiCall("/api/admin/attendees", {
+        method: "PATCH",
+        body: JSON.stringify({ id: before.id, role, notify }),
+      })) as { attendee: Attendee; changed: boolean; emailed: boolean };
+      setAttendees((prev) => (prev ? prev.map((a) => (a.id === before.id ? attendee : a)) : prev));
+      const label = roleLabel(attendee.role);
+      if (!changed) return `Already ${label}.`;
+      const reprint = before.badge_print_count > 0 ? " Their badge was printed before: reprint it." : "";
+      if (role !== "vip") return `Category changed to ${label}.${reprint}`;
+      if (emailed) return `Now a VIP. We emailed ${attendee.email}.${reprint}`;
+      if (notify) return `Now a VIP, but the email didn't send. "Resend QR email" sends their confirmation, which shows VIP.${reprint}`;
+      return `Now a VIP. No email sent.${reprint}`;
+    });
+
   async function handleDelete(a: Attendee) {
     setRowBusy((s) => ({ ...s, [a.id]: true }));
     try {
@@ -383,7 +399,7 @@ export default function AdminDashboard() {
             </Field>
             <Field id="walkin-role" label="Role">
               <select id="walkin-role" className={inputClass()} value={form.role} onChange={(e) => updateForm("role", e.target.value)}>
-                {ATTENDEE_ROLES.map((role) => (
+                {ATTENDEE_ROLES.filter((role) => isSuper || role !== "vip").map((role) => (
                   <option key={role} value={role}>{roleLabel(role)}</option>
                 ))}
               </select>
@@ -615,6 +631,8 @@ export default function AdminDashboard() {
           onClose={() => setSelectedId(null)}
           onResend={() => handleResend(selected.id)}
           onToggleCheckIn={() => handleToggleCheckIn(selected.id, !selected.checked_in)}
+          onChangeRole={(role, notify) => handleChangeRole(selected, role, notify)}
+          canManageVip={isSuper}
           onPassport={isSuper ? () => handleViewPassport(selected.id) : undefined}
           onDelete={isSuper ? () => setDeleteTarget(selected) : undefined}
         />

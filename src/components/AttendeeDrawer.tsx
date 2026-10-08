@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
-import { Button, cx, linkClass, PaymentBadge, RolePill, StatusPill } from "@/components/ui";
+import { Button, cx, inputClass, linkClass, PaymentBadge, RolePill, StatusPill } from "@/components/ui";
 import { IconClose, IconExternal } from "@/components/icons";
 import {
   categoryLabel,
@@ -11,7 +11,8 @@ import {
   paymentLabel,
   stripeSessionUrl,
 } from "@/lib/admin-format";
-import type { Attendee } from "@/lib/types";
+import { roleLabel } from "@/lib/role-style";
+import { ATTENDEE_ROLES, hasValidTicket, type Attendee } from "@/lib/types";
 
 // Slide-over with everything we know about one registrant, plus the
 // actions staff need (resend QR, check in, passport, Stripe).
@@ -26,6 +27,8 @@ export default function AttendeeDrawer({
   onClose,
   onResend,
   onToggleCheckIn,
+  onChangeRole,
+  canManageVip,
   onPassport,
   onDelete,
 }: {
@@ -36,6 +39,10 @@ export default function AttendeeDrawer({
   onClose: () => void;
   onResend: () => void;
   onToggleCheckIn: () => void;
+  /** Changes their category; `notify` emails them when they become a VIP. */
+  onChangeRole: (role: string, notify: boolean) => void;
+  /** Making someone a VIP, or removing it, is for super admins only. */
+  canManageVip: boolean;
   /** Omitted for admins who may not open passports (super admins only). */
   onPassport?: () => void;
   /** Deletes this registration (asks for confirmation first). Super admins only. */
@@ -162,6 +169,8 @@ export default function AttendeeDrawer({
         </div>
 
         <div className="space-y-4 p-5 sm:p-6">
+          <RoleEditor key={`${a.id}:${a.role}`} attendee={a} busy={busy} onChangeRole={onChangeRole} canManageVip={canManageVip} />
+
           <Section title="Contact">
             <Row label="Email" value={<a className={linkClass} href={`mailto:${a.email}`}>{a.email}</a>} />
             <Row label="Phone" value={a.phone ? <a className={linkClass} href={`tel:${a.phone.replace(/\s/g, "")}`}>{a.phone}</a> : null} />
@@ -269,6 +278,78 @@ export function Avatar({ name, large = false }: { name: string; large?: boolean 
     >
       {initials || "?"}
     </span>
+  );
+}
+
+// VIP isn't on the registration form: people register as Delegate, Speaker
+// and so on, and an admin makes them a VIP here (with an email to tell them).
+function RoleEditor({
+  attendee: a,
+  busy,
+  onChangeRole,
+  canManageVip,
+}: {
+  attendee: Attendee;
+  busy: boolean;
+  onChangeRole: (role: string, notify: boolean) => void;
+  canManageVip: boolean;
+}) {
+  const [role, setRole] = useState(a.role);
+  const [notify, setNotify] = useState(true);
+  const changed = role !== a.role;
+  const becomingVip = changed && role === "vip";
+  const canEmail = hasValidTicket(a);
+  const firstName = a.full_name.trim().split(/\s+/)[0] || a.full_name;
+  // Older rows may hold a category that's no longer in the list.
+  const all: readonly string[] = (ATTENDEE_ROLES as readonly string[]).includes(a.role) ? ATTENDEE_ROLES : [a.role, ...ATTENDEE_ROLES];
+  const options = canManageVip ? all : all.filter((r) => r !== "vip");
+
+  // Other admins can't change a VIP's category (the server refuses it too).
+  if (a.role === "vip" && !canManageVip) {
+    return (
+      <section className="space-y-1 rounded-lg border border-line bg-surface p-5">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-3">Registration category</h3>
+        <p className="text-sm text-ink">VIP. Only super admins can change this.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="space-y-3 rounded-lg border border-line bg-surface p-5">
+      <div className="space-y-1">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-3">Registration category</h3>
+        <p className="text-sm text-ink-3">
+          {canManageVip
+            ? "VIP isn't on the registration form. Make someone a VIP here; their badge will show it."
+            : "VIP isn't on the registration form. Ask a super admin to make someone a VIP."}
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor="drawer-role" className="sr-only">Registration category</label>
+        <select id="drawer-role" className={inputClass(false, "w-auto min-w-44 flex-1 sm:flex-none")} value={role} onChange={(e) => setRole(e.target.value)} disabled={busy}>
+          {options.map((r) => (
+            <option key={r} value={r}>{roleLabel(r)}</option>
+          ))}
+        </select>
+        <Button variant={becomingVip ? "primary" : "secondary"} onClick={() => onChangeRole(role, becomingVip && canEmail && notify)} disabled={!changed} loading={busy && changed}>
+          {becomingVip ? (canEmail && notify ? "Make VIP and email them" : "Make VIP") : "Save category"}
+        </Button>
+      </div>
+      {becomingVip &&
+        (canEmail ? (
+          <label className="flex min-h-11 items-center gap-3 text-sm text-ink">
+            <input type="checkbox" className="h-5 w-5" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
+            Email {firstName} to tell them they&apos;re a VIP (with their QR code)
+          </label>
+        ) : (
+          <p className="text-sm text-ink-3">
+            They haven&apos;t paid yet, so no email now. Their confirmation email will show VIP once they pay.
+          </p>
+        ))}
+      {changed && a.badge_print_count > 0 && (
+        <p className="text-sm text-ink-2">Their badge was already printed as {roleLabel(a.role)}. Reprint it after saving.</p>
+      )}
+    </section>
   );
 }
 

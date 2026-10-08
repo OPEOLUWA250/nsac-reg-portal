@@ -308,6 +308,117 @@ export async function sendStudentCodeEmail({
   });
 }
 
+const VIP_COPY = {
+  en: {
+    subject: (event: string) => `You're a VIP guest at the ${event}`,
+    heading: "You're a VIP",
+    greeting: (first: string) => `Hi ${first},`,
+    upgraded: (event: string) =>
+      `We're delighted to let you know that your registration for the <strong style="color:${BLUE};">${event}</strong> is now <strong>VIP</strong>.`,
+    badge: "Your badge will show it when you check in at the registration desk.",
+    category: "YOUR REGISTRATION CATEGORY",
+    qrIntro: "Your check-in QR code hasn't changed. Here it is again, so you have it to hand:",
+    qrAlt: "Your check-in QR code",
+    footer: "Questions? Just reply to this email.",
+  },
+  fr: {
+    subject: (event: string) => `Vous êtes invité(e) VIP à la ${event}`,
+    heading: "Vous êtes VIP",
+    greeting: (first: string) => `Bonjour ${first},`,
+    upgraded: (event: string) =>
+      `Nous avons le plaisir de vous informer que votre inscription à la <strong style="color:${BLUE};">${event}</strong> passe en catégorie <strong>VIP</strong>.`,
+    badge: "Votre badge l'indiquera lors de votre enregistrement à l'accueil.",
+    category: "VOTRE CATÉGORIE D’INSCRIPTION",
+    qrIntro: "Votre QR code d'accès ne change pas. Le voici à nouveau, pour l'avoir sous la main :",
+    qrAlt: "Votre QR code d'accès",
+    footer: "Des questions ? Répondez simplement à cet e-mail.",
+  },
+} as const;
+
+/** Tells an attendee an admin has made them a VIP (from the dashboard). */
+export async function sendVipEmail({
+  toEmail,
+  fullName,
+  qrPngBuffer,
+  logoPngBuffer,
+  language = "en",
+}: {
+  toEmail: string;
+  fullName: string;
+  qrPngBuffer: Buffer;
+  logoPngBuffer?: Buffer | null;
+  language?: EmailLanguage;
+}) {
+  const fromAddress = process.env.EMAIL_FROM;
+  if (!fromAddress) throw new Error("Missing EMAIL_FROM environment variable");
+  const t = VIP_COPY[language] ?? VIP_COPY.en;
+  const event = EVENT_INFO.name[language === "fr" ? "fr" : "en"];
+  const firstName = escapeHtml(fullName.trim().split(/\s+/)[0] || fullName);
+  const font = "'DM Sans', Helvetica, Arial, 'Segoe UI', sans-serif";
+
+  await deliver({
+    from: fromAddress,
+    to: toEmail,
+    subject: t.subject(event),
+    attachments: [
+      { filename: "checkin-qr.png", content: qrPngBuffer, contentType: "image/png", contentId: "checkin-qr.png" },
+      ...(logoPngBuffer
+        ? [{ filename: "newspace-africa-logo.png", content: logoPngBuffer, contentType: "image/png", contentId: "brand-logo.png" }]
+        : []),
+    ],
+    html: `
+<body style="margin:0; padding:32px 16px; background:${CANVAS}; font-family:${font}; color:${INK};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px; margin:0 auto; background:#ffffff; border:1px solid ${LINE}; border-radius:8px; overflow:hidden;">
+    <tr>
+      <td style="background:${BLUE}; padding:24px 32px; text-align:center;">
+        ${
+          logoPngBuffer
+            ? `<img src="cid:brand-logo.png" alt="NewSpace Africa Conference" width="170" height="63" style="display:block; margin:0 auto; width:170px; height:63px;" />`
+            : `<div style="color:#ffffff; font-size:20px; font-weight:700;">NewSpace Africa Conference</div>`
+        }
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:32px 32px 8px; text-align:center;">
+        <h1 style="margin:0 0 16px; color:${BLUE}; font-size:24px; font-weight:800;">${t.heading}</h1>
+        <p style="margin:0 0 4px; color:${INK}; font-size:16px; line-height:1.6;">${t.greeting(firstName)}</p>
+        <p style="margin:0 0 4px; color:${INK_2}; font-size:16px; line-height:1.6;">${t.upgraded(escapeHtml(event))}</p>
+        <p style="margin:14px 0 4px; color:${BLUE}; font-size:16px; font-weight:700; line-height:1.6;">
+          ${EVENT_INFO.date[language]} &nbsp;·&nbsp; ${EVENT_INFO.place[language]}
+        </p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 8px; background:${BLUE}; border-radius:10px; border:1px solid ${BLUE};">
+          <tr><td style="height:5px; background:${GOLD}; border-radius:10px 10px 0 0; font-size:1px; line-height:5px;">&nbsp;</td></tr>
+          <tr><td style="padding:22px 16px; text-align:center;">
+            <p style="margin:0 0 10px; color:${GOLD}; font-size:11px; font-weight:700; letter-spacing:2px;">${t.category}</p>
+            <p style="margin:0; color:#ffffff; font-size:28px; line-height:1.3; font-weight:800; letter-spacing:2px;">VIP</p>
+            <p style="margin:10px 0 0; color:#ffffff; font-size:13px; line-height:1.5;">${t.badge}</p>
+          </td></tr>
+        </table>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:20px 32px 8px; text-align:center;">
+        <p style="margin:0 0 20px; color:${INK_2}; font-size:15px; line-height:1.6;">${t.qrIntro}</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto; background:#ffffff; border:1px solid ${LINE}; border-radius:8px;">
+          <tr>
+            <td style="padding:16px;">
+              <img src="cid:checkin-qr.png" alt="${t.qrAlt}" width="200" height="200" style="display:block; width:200px; height:200px;" />
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:24px 32px 28px; text-align:center;">
+        <p style="margin:16px 0 0; padding-top:20px; border-top:1px solid ${LINE}; color:${INK_3}; font-size:13px;">${t.footer}</p>
+      </td>
+    </tr>
+  </table>
+</body>
+    `,
+  });
+}
+
 interface OutgoingEmail {
   from: string;
   to: string;

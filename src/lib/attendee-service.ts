@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { generateUniqueCode, generateQrPngBuffer, ticketQrContent } from "@/lib/qrcode";
-import { sendQrEmail, type EmailLanguage } from "@/lib/email";
+import { sendQrEmail, sendVipEmail, type EmailLanguage } from "@/lib/email";
 import { hasValidTicket, type Attendee } from "@/lib/types";
 import { brandLogoPng, renderTicketPng } from "@/lib/ticket-image";
 import { publicBaseUrl } from "@/lib/public-url";
@@ -186,6 +186,35 @@ export async function sendAttendeeQr(attendee: Attendee): Promise<boolean> {
     return true;
   } catch (err) {
     console.error(`Failed to send QR email to attendee ${attendee.id}: ${describeError(err)}`);
+    return false;
+  }
+}
+
+/**
+ * Emails an attendee that they're now a VIP, with their (unchanged) QR code.
+ * Returns false (and logs) instead of throwing: the role is already saved.
+ */
+export async function sendVipNotice(attendee: Attendee): Promise<boolean> {
+  if (!hasValidTicket(attendee)) {
+    // Their confirmation email will say VIP once they pay.
+    console.warn(`Not sending VIP email to attendee ${attendee.id}: payment pending`);
+    return false;
+  }
+  try {
+    const [qrPngBuffer, logoPngBuffer] = await Promise.all([
+      generateQrPngBuffer(ticketQrContent(attendee.unique_code)),
+      brandLogoPng(),
+    ]);
+    await sendVipEmail({
+      toEmail: attendee.email,
+      fullName: attendee.full_name,
+      language: attendee.language === "fr" ? "fr" : "en",
+      qrPngBuffer,
+      logoPngBuffer,
+    });
+    return true;
+  } catch (err) {
+    console.error(`Failed to send VIP email to attendee ${attendee.id}: ${describeError(err)}`);
     return false;
   }
 }
