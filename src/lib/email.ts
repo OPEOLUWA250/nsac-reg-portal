@@ -47,7 +47,8 @@ const LAYOUT_COPY = {
     venue: "VENUE",
     entryPass: "YOUR ENTRY PASS",
     calendar: "Add to your calendar",
-    calendarAttached: "An invite is also attached.",
+    saveDate: "SAVE THE DATE",
+    calendarAttached: "A calendar invite is also attached: open it to add the conference to any calendar.",
     flyerCta: "Create your “I’m attending” flyer for LinkedIn",
     regards: "Kind regards,",
     team: "The NewSpace Africa Conference team",
@@ -60,7 +61,8 @@ const LAYOUT_COPY = {
     venue: "LIEU",
     entryPass: "VOTRE ACCÈS",
     calendar: "Ajouter à votre agenda",
-    calendarAttached: "Une invitation est également jointe.",
+    saveDate: "RÉSERVEZ LA DATE",
+    calendarAttached: "Une invitation d'agenda est également jointe : ouvrez-la pour ajouter la conférence à n'importe quel agenda.",
     flyerCta: "Créez votre visuel « J’y serai » pour LinkedIn",
     regards: "Bien cordialement,",
     team: "L’équipe de la Conférence NewSpace Africa",
@@ -120,11 +122,24 @@ function extras({ language, flyerUrl }: { language: EmailLanguage; flyerUrl?: st
     { label: "Outlook", href: outlookCalendarUrl(language) },
     ...(base ? [{ label: "Apple", href: `${base}/api/calendar?lang=${language}` }] : []),
   ];
-  const link = `color:${NAVY}; font-weight:700; text-decoration:underline; text-decoration-color:${GOLD};`;
+  const button = `display:inline-block; background:#ffffff; border:1px solid ${NAVY}; border-radius:4px; padding:10px 14px; font-family:${FONT}; color:${NAVY}; font-size:13px; font-weight:700; text-decoration:none; white-space:nowrap;`;
+  // A "save the date" panel: the dates and venue, a button per calendar
+  // app, and a note about the attached invite (for any other calendar).
   return `
-        <p style="margin:24px 0 0; font-family:${FONT}; color:${INK_3}; font-size:13px; line-height:1.7; text-align:center;">
-          ${t.calendar}: ${links.map((l) => `<a href="${escapeHtml(l.href)}" style="${link}">${l.label}</a>`).join(" &nbsp;·&nbsp; ")}<br />${t.calendarAttached}
-        </p>${
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:28px 0 0; background:${PANEL}; border:1px solid ${HAIRLINE}; border-collapse:collapse;">
+          <tr>
+            <td style="padding:24px 16px 22px; text-align:center;">
+              ${eyebrow(t.saveDate, "center")}
+              <p style="margin:0; font-family:${DISPLAY}; color:${NAVY}; font-size:20px; line-height:1.3; font-weight:800;">${EVENT_INFO.date[language]}</p>
+              <p style="margin:4px 0 18px; font-family:${FONT}; color:${INK_3}; font-size:13px; line-height:1.5;">${EVENT_INFO.place[language]}</p>
+              <p style="margin:0 0 10px; font-family:${FONT}; color:${INK_2}; font-size:13px; font-weight:600;">${t.calendar}</p>
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                <tr>${links.map((l) => `<td style="padding:0 3px;"><a href="${escapeHtml(l.href)}" style="${button}">${l.label}</a></td>`).join("")}</tr>
+              </table>
+              <p style="margin:14px auto 0; max-width:380px; font-family:${FONT}; color:${INK_3}; font-size:12px; line-height:1.6;">${t.calendarAttached}</p>
+            </td>
+          </tr>
+        </table>${
           flyerUrl
             ? `
         <p style="margin:24px 0 0; text-align:center;"><a href="${escapeHtml(flyerUrl)}" style="display:inline-block; background:${NAVY}; border:1px solid ${NAVY}; border-radius:4px; padding:13px 22px; font-family:${FONT}; color:#ffffff; font-size:14px; font-weight:700; text-decoration:none;">${t.flyerCta}</a></p>`
