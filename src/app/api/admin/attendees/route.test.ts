@@ -5,7 +5,7 @@ import { PATCH } from "./route";
 
 const mocks = vi.hoisted(() => ({ session: vi.fn(), update: vi.fn(), read: vi.fn(), vip: vi.fn(), updates: [] as unknown[] }));
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/attendee-service", () => ({ sendVipNotice: mocks.vip }));
+vi.mock("@/lib/attendee-service", () => ({ sendCategoryChangeNotice: mocks.vip }));
 vi.mock("@/lib/server/admin-auth", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/server/admin-auth")>();
   return { ...actual, adminRoute: actual.createAdminRoute(mocks.session) };
@@ -57,9 +57,13 @@ describe("changing a registration category", () => {
     expect(mocks.vip).not.toHaveBeenCalled();
   });
 
-  it("doesn't email for other categories", async () => {
-    mocks.update.mockResolvedValue({ data: { ...attendee, role: "speaker" }, error: null });
-    await patch({ id, role: "speaker", notify: true });
+  it("emails other category changes too, when asked", async () => {
+    const speaker = { ...attendee, role: "speaker" };
+    mocks.update.mockResolvedValue({ data: speaker, error: null });
+    expect(await (await patch({ id, role: "speaker", notify: true })).json()).toMatchObject({ emailed: true });
+    expect(mocks.vip).toHaveBeenCalledWith(speaker);
+    mocks.vip.mockClear();
+    await patch({ id, role: "speaker", notify: false });
     expect(mocks.vip).not.toHaveBeenCalled();
   });
 

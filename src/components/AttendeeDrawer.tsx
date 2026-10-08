@@ -39,7 +39,7 @@ export default function AttendeeDrawer({
   onClose: () => void;
   onResend: () => void;
   onToggleCheckIn: () => void;
-  /** Changes their category; `notify` emails them when they become a VIP. */
+  /** Changes their category; `notify` emails them the new one. */
   onChangeRole: (role: string, notify: boolean) => void;
   /** Making someone a VIP, or removing it, is for super admins only. */
   canManageVip: boolean;
@@ -331,19 +331,21 @@ function RoleEditor({
             <option key={r} value={r}>{roleLabel(r)}</option>
           ))}
         </select>
-        <Button variant={becomingVip ? "primary" : "secondary"} onClick={() => onChangeRole(role, becomingVip && canEmail && notify)} disabled={!changed} loading={busy && changed}>
-          {becomingVip ? (canEmail && notify ? "Make VIP and email them" : "Make VIP") : "Save category"}
+        <Button variant={becomingVip ? "primary" : "secondary"} onClick={() => onChangeRole(role, canEmail && notify)} disabled={!changed} loading={busy && changed}>
+          {becomingVip
+            ? canEmail && notify ? "Make VIP and email them" : "Make VIP"
+            : canEmail && notify ? "Save and email them" : "Save category"}
         </Button>
       </div>
-      {becomingVip &&
+      {changed &&
         (canEmail ? (
           <label className="flex min-h-11 items-center gap-3 text-sm text-ink">
             <input type="checkbox" className="h-5 w-5" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
-            Email {firstName} to tell them they&apos;re a VIP (with their QR code)
+            Email {firstName} their new category, {roleLabel(role)} (with their QR code)
           </label>
         ) : (
           <p className="text-sm text-ink-3">
-            They haven&apos;t paid yet, so no email now. Their confirmation email will show VIP once they pay.
+            They haven&apos;t paid yet, so no email now. Their confirmation email will show {roleLabel(role)} once they pay.
           </p>
         ))}
       {changed && a.badge_print_count > 0 && (

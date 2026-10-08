@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { adminRoute } from "@/lib/server/admin-auth";
 import { describeError } from "@/lib/describe-error";
-import { sendVipNotice } from "@/lib/attendee-service";
+import { sendCategoryChangeNotice } from "@/lib/attendee-service";
 import { ATTENDEE_ROLES, isAttendeeRole, type Attendee } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -24,9 +24,9 @@ export const GET = adminRoute(async (req: NextRequest) => {
 
 // PATCH /api/admin/attendees  { id, role, notify }
 // Changes someone's registration category, e.g. makes them a VIP (VIP
-// isn't offered on the public form). Becoming a VIP emails them when
-// `notify` is set and their ticket is valid; other changes send nothing.
-// Their QR code doesn't change, and the badge shows the new category.
+// isn't offered on the public form). With `notify`, emails them their new
+// category when their ticket is valid. Their QR code doesn't change, and
+// the badge shows the new category.
 // Making someone a VIP, or taking it away, is for super admins only.
 export const PATCH = adminRoute(async (req: NextRequest, _context, session) => {
   const isSuper = session.role === "super_admin";
@@ -44,7 +44,7 @@ export const PATCH = adminRoute(async (req: NextRequest, _context, session) => {
 
   try {
     // Only the request that actually changes the role goes on to email, so
-    // two admins clicking at once don't send two VIP emails. Other admins
+    // two admins clicking at once don't send two emails. Other admins
     // can't change a VIP's category either.
     let query = supabaseAdmin().from("attendees").update({ role }).eq("id", id).neq("role", role);
     if (!isSuper) query = query.neq("role", "vip");
@@ -60,7 +60,7 @@ export const PATCH = adminRoute(async (req: NextRequest, _context, session) => {
     }
 
     const attendee = updated as Attendee;
-    const emailed = role === "vip" && body?.notify === true ? await sendVipNotice(attendee) : false;
+    const emailed = body?.notify === true ? await sendCategoryChangeNotice(attendee) : false;
     return NextResponse.json({ attendee, changed: true, emailed });
   } catch (err) {
     console.error(`Change category failed for ${id}: ${describeError(err)}`);

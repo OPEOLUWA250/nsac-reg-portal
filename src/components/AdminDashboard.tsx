@@ -254,10 +254,10 @@ export default function AdminDashboard() {
       const label = roleLabel(attendee.role);
       if (!changed) return `Already ${label}.`;
       const reprint = before.badge_print_count > 0 ? " Their badge was printed before: reprint it." : "";
-      if (role !== "vip") return `Category changed to ${label}.${reprint}`;
-      if (emailed) return `Now a VIP. We emailed ${attendee.email}.${reprint}`;
-      if (notify) return `Now a VIP, but the email didn't send. "Resend QR email" sends their confirmation, which shows VIP.${reprint}`;
-      return `Now a VIP. No email sent.${reprint}`;
+      const done = role === "vip" ? "Now a VIP." : `Category changed to ${label}.`;
+      if (emailed) return `${done} We emailed ${attendee.email}.${reprint}`;
+      if (notify) return `${done} The email didn't send: "Resend QR email" sends their confirmation, which shows ${label}.${reprint}`;
+      return `${done} No email sent.${reprint}`;
     });
 
   async function handleDelete(a: Attendee) {

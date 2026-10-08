@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { generateUniqueCode, generateQrPngBuffer, ticketQrContent } from "@/lib/qrcode";
-import { sendQrEmail, sendVipEmail, type EmailLanguage } from "@/lib/email";
+import { sendCategoryChangeEmail, sendQrEmail, type EmailLanguage } from "@/lib/email";
 import { hasValidTicket, type Attendee } from "@/lib/types";
 import { brandLogoPng, renderTicketPng } from "@/lib/ticket-image";
 import { publicBaseUrl } from "@/lib/public-url";
@@ -191,13 +191,15 @@ export async function sendAttendeeQr(attendee: Attendee): Promise<boolean> {
 }
 
 /**
- * Emails an attendee that they're now a VIP, with their (unchanged) QR code.
- * Returns false (and logs) instead of throwing: the role is already saved.
+ * Emails an attendee their new registration category (e.g. VIP), with their
+ * unchanged QR code. Returns false (and logs) instead of throwing: the
+ * category is already saved.
  */
-export async function sendVipNotice(attendee: Attendee): Promise<boolean> {
+export async function sendCategoryChangeNotice(attendee: Attendee): Promise<boolean> {
   if (!hasValidTicket(attendee)) {
-    // Their confirmation email will say VIP once they pay.
-    console.warn(`Not sending VIP email to attendee ${attendee.id}: payment pending`);
+    // Never email an entry QR code for an unpaid registration. Their
+    // confirmation email shows the new category once they pay.
+    console.warn(`Not sending category email to attendee ${attendee.id}: payment pending`);
     return false;
   }
   try {
@@ -205,16 +207,17 @@ export async function sendVipNotice(attendee: Attendee): Promise<boolean> {
       generateQrPngBuffer(ticketQrContent(attendee.unique_code)),
       brandLogoPng(),
     ]);
-    await sendVipEmail({
+    await sendCategoryChangeEmail({
       toEmail: attendee.email,
       fullName: attendee.full_name,
+      role: attendee.role,
       language: attendee.language === "fr" ? "fr" : "en",
       qrPngBuffer,
       logoPngBuffer,
     });
     return true;
   } catch (err) {
-    console.error(`Failed to send VIP email to attendee ${attendee.id}: ${describeError(err)}`);
+    console.error(`Failed to send category email to attendee ${attendee.id}: ${describeError(err)}`);
     return false;
   }
 }

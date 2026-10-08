@@ -308,13 +308,22 @@ export async function sendStudentCodeEmail({
   });
 }
 
-const VIP_COPY = {
+// Category names in the attendee's language (the form only lists some).
+const CATEGORY_NAMES: Record<EmailLanguage, Record<string, string>> = {
+  en: { delegate: "Delegate", speaker: "Speaker", media: "Media", exhibitor: "Exhibitor", vip: "VIP", host: "Host", staff: "Staff" },
+  fr: { delegate: "Délégué(e)", speaker: "Intervenant(e)", media: "Médias", exhibitor: "Exposant(e)", vip: "VIP", host: "Hôte", staff: "Équipe" },
+};
+
+const CATEGORY_COPY = {
   en: {
-    subject: (event: string) => `You're a VIP guest at the ${event}`,
-    heading: "You're a VIP",
+    subject: (event: string, vip: boolean) =>
+      vip ? `You're a VIP guest at the ${event}` : `Your registration category for the ${event} has changed`,
+    heading: (vip: boolean) => (vip ? "You're a VIP" : "Your category has changed"),
     greeting: (first: string) => `Hi ${first},`,
-    upgraded: (event: string) =>
-      `We're delighted to let you know that your registration for the <strong style="color:${BLUE};">${event}</strong> is now <strong>VIP</strong>.`,
+    changed: (event: string, category: string, vip: boolean) =>
+      vip
+        ? `We're delighted to let you know that your registration for the <strong style="color:${BLUE};">${event}</strong> is now <strong>VIP</strong>.`
+        : `Your registration category for the <strong style="color:${BLUE};">${event}</strong> is now <strong>${category}</strong>.`,
     badge: "Your badge will show it when you check in at the registration desk.",
     category: "YOUR REGISTRATION CATEGORY",
     qrIntro: "Your check-in QR code hasn't changed. Here it is again, so you have it to hand:",
@@ -322,11 +331,14 @@ const VIP_COPY = {
     footer: "Questions? Just reply to this email.",
   },
   fr: {
-    subject: (event: string) => `Vous êtes invité(e) VIP à la ${event}`,
-    heading: "Vous êtes VIP",
+    subject: (event: string, vip: boolean) =>
+      vip ? `Vous êtes invité(e) VIP à la ${event}` : `Votre catégorie d'inscription à la ${event} a changé`,
+    heading: (vip: boolean) => (vip ? "Vous êtes VIP" : "Votre catégorie a changé"),
     greeting: (first: string) => `Bonjour ${first},`,
-    upgraded: (event: string) =>
-      `Nous avons le plaisir de vous informer que votre inscription à la <strong style="color:${BLUE};">${event}</strong> passe en catégorie <strong>VIP</strong>.`,
+    changed: (event: string, category: string, vip: boolean) =>
+      vip
+        ? `Nous avons le plaisir de vous informer que votre inscription à la <strong style="color:${BLUE};">${event}</strong> passe en catégorie <strong>VIP</strong>.`
+        : `Votre catégorie d'inscription à la <strong style="color:${BLUE};">${event}</strong> est désormais <strong>${category}</strong>.`,
     badge: "Votre badge l'indiquera lors de votre enregistrement à l'accueil.",
     category: "VOTRE CATÉGORIE D’INSCRIPTION",
     qrIntro: "Votre QR code d'accès ne change pas. Le voici à nouveau, pour l'avoir sous la main :",
@@ -335,31 +347,38 @@ const VIP_COPY = {
   },
 } as const;
 
-/** Tells an attendee an admin has made them a VIP (from the dashboard). */
-export async function sendVipEmail({
+/**
+ * Tells an attendee an admin changed their registration category (from the
+ * dashboard), with their unchanged QR code. Becoming a VIP gets its own wording.
+ */
+export async function sendCategoryChangeEmail({
   toEmail,
   fullName,
+  role,
   qrPngBuffer,
   logoPngBuffer,
   language = "en",
 }: {
   toEmail: string;
   fullName: string;
+  role: string;
   qrPngBuffer: Buffer;
   logoPngBuffer?: Buffer | null;
   language?: EmailLanguage;
 }) {
   const fromAddress = process.env.EMAIL_FROM;
   if (!fromAddress) throw new Error("Missing EMAIL_FROM environment variable");
-  const t = VIP_COPY[language] ?? VIP_COPY.en;
+  const t = CATEGORY_COPY[language] ?? CATEGORY_COPY.en;
+  const vip = role === "vip";
   const event = EVENT_INFO.name[language === "fr" ? "fr" : "en"];
+  const category = escapeHtml(CATEGORY_NAMES[language]?.[role] ?? role.charAt(0).toUpperCase() + role.slice(1));
   const firstName = escapeHtml(fullName.trim().split(/\s+/)[0] || fullName);
   const font = "'DM Sans', Helvetica, Arial, 'Segoe UI', sans-serif";
 
   await deliver({
     from: fromAddress,
     to: toEmail,
-    subject: t.subject(event),
+    subject: t.subject(event, vip),
     attachments: [
       { filename: "checkin-qr.png", content: qrPngBuffer, contentType: "image/png", contentId: "checkin-qr.png" },
       ...(logoPngBuffer
@@ -380,9 +399,9 @@ export async function sendVipEmail({
     </tr>
     <tr>
       <td style="padding:32px 32px 8px; text-align:center;">
-        <h1 style="margin:0 0 16px; color:${BLUE}; font-size:24px; font-weight:800;">${t.heading}</h1>
+        <h1 style="margin:0 0 16px; color:${BLUE}; font-size:24px; font-weight:800;">${t.heading(vip)}</h1>
         <p style="margin:0 0 4px; color:${INK}; font-size:16px; line-height:1.6;">${t.greeting(firstName)}</p>
-        <p style="margin:0 0 4px; color:${INK_2}; font-size:16px; line-height:1.6;">${t.upgraded(escapeHtml(event))}</p>
+        <p style="margin:0 0 4px; color:${INK_2}; font-size:16px; line-height:1.6;">${t.changed(escapeHtml(event), category, vip)}</p>
         <p style="margin:14px 0 4px; color:${BLUE}; font-size:16px; font-weight:700; line-height:1.6;">
           ${EVENT_INFO.date[language]} &nbsp;·&nbsp; ${EVENT_INFO.place[language]}
         </p>
@@ -390,7 +409,7 @@ export async function sendVipEmail({
           <tr><td style="height:5px; background:${GOLD}; border-radius:10px 10px 0 0; font-size:1px; line-height:5px;">&nbsp;</td></tr>
           <tr><td style="padding:22px 16px; text-align:center;">
             <p style="margin:0 0 10px; color:${GOLD}; font-size:11px; font-weight:700; letter-spacing:2px;">${t.category}</p>
-            <p style="margin:0; color:#ffffff; font-size:28px; line-height:1.3; font-weight:800; letter-spacing:2px;">VIP</p>
+            <p style="margin:0; color:#ffffff; font-size:28px; line-height:1.3; font-weight:800; letter-spacing:2px; text-transform:uppercase;">${category}</p>
             <p style="margin:10px 0 0; color:#ffffff; font-size:13px; line-height:1.5;">${t.badge}</p>
           </td></tr>
         </table>
