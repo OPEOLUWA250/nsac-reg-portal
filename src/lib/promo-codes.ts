@@ -10,6 +10,12 @@ export { discountedCents } from "@/lib/tickets";
 // promotion code (the code people type, its usage limit and expiry). Stripe
 // counts each completed checkout as one use. Only codes created here (tagged
 // with APP_TAG) are accepted by the form. Server-only.
+//
+// Stripe can't change a promotion code's discount, limit or expiry, so an
+// edit to those switches the old one off (tagged "replaced", hidden from
+// then on) and creates a new one with the same code. The new one carries the
+// old one's uses (metadata used_before) and the full limit (max_uses), so the
+// admin page and the form's check see one code all along.
 
 const APP_TAG = "nsac-reg-portal";
 
@@ -33,22 +39,26 @@ export type PromoProblem = "unknown" | "expired" | "used_up" | "not_for_ticket";
 
 function toPromoCode(p: Stripe.PromotionCode): PromoCode | null {
   if (p.metadata?.app !== APP_TAG) return null;
+  // An earlier version of an edited code: the new one stands in for it.
+  if (p.metadata?.replaced) return null;
   const coupon = p.promotion?.coupon;
   const percentOff = coupon && typeof coupon === "object" ? (coupon.percent_off ?? 0) : 0;
   // Its discount was deleted in Stripe: the code can never work again.
   if (!percentOff) return null;
   const tickets = p.metadata?.tickets?.trim();
+  const usedBefore = Number(p.metadata?.used_before) || 0;
+  const maxUses = Number(p.metadata?.max_uses) || null;
   return {
     id: p.id,
     code: p.code,
     label: p.metadata?.label ?? "",
     percentOff,
-    maxUses: p.max_redemptions,
-    used: p.times_redeemed,
+    maxUses: maxUses ?? p.max_redemptions,
+    used: usedBefore + p.times_redeemed,
     expiresAt: p.expires_at ? new Date(p.expires_at * 1000).toISOString() : null,
     active: p.active,
     ticketIds: tickets ? tickets.split(",") : null,
-    createdAt: new Date(p.created * 1000).toISOString(),
+    createdAt: p.metadata?.created_at || new Date(p.created * 1000).toISOString(),
   };
 }
 
@@ -59,7 +69,13 @@ export async function listPromoCodes(): Promise<PromoCode[]> {
     if (promo) out.push(promo);
     if (out.length >= 500) break;
   }
-  return out;
+  // Newest first by when the code was first made, so an edit doesn't move it.
+  return out.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** One of our codes, or null for any other promotion code in the account. */
+export async function getPromoCode(id: string): Promise<PromoCode | null> {
+  return toPromoCode(await stripe().promotionCodes.retrieve(id, { expand: ["promotion.coupon"] }));
 }
 
 // NSAC-7K3QXP: no 0/O or 1/I, so codes read out loud or copied by hand work.
@@ -78,28 +94,111 @@ export interface NewPromoCode {
   ticketIds: string[] | null;
 }
 
-export async function createPromoCode(input: NewPromoCode): Promise<PromoCode> {
-  const code = (input.code?.trim() || generateCode()).toUpperCase();
-  const label = input.label.trim();
+// Shown on the Stripe payment page and receipt.
+const couponName = (label: string, percentOff: number) =>
+  (label ? `${label} (${percentOff}% off)` : `${percentOff}% off`).slice(0, 40);
+
+async function createCoupon(label: string, percentOff: number): Promise<string> {
   const coupon = await stripe().coupons.create({
-    percent_off: input.percentOff,
+    percent_off: percentOff,
     duration: "once",
     // Conference tickets only: the Stripe account also sells for the Space in
     // Africa website, where this code must not work (payments.ts).
     applies_to: { products: [await ticketProduct()] },
-    // Shown on the Stripe payment page and receipt.
-    name: (label ? `${label} (${input.percentOff}% off)` : `${input.percentOff}% off`).slice(0, 40),
+    name: couponName(label, percentOff),
     metadata: { app: APP_TAG },
   });
+  return coupon.id;
+}
+
+const unixTime = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
+
+export async function createPromoCode(input: NewPromoCode): Promise<PromoCode> {
+  const code = (input.code?.trim() || generateCode()).toUpperCase();
+  const label = input.label.trim();
   const promo = await stripe().promotionCodes.create({
-    promotion: { type: "coupon", coupon: coupon.id },
+    promotion: { type: "coupon", coupon: await createCoupon(label, input.percentOff) },
     code,
     ...(input.maxUses ? { max_redemptions: input.maxUses } : {}),
-    ...(input.expiresAt ? { expires_at: Math.floor(new Date(input.expiresAt).getTime() / 1000) } : {}),
+    ...(input.expiresAt ? { expires_at: unixTime(input.expiresAt) } : {}),
     metadata: { app: APP_TAG, label: label.slice(0, 200), tickets: input.ticketIds?.join(",") ?? "" },
     expand: ["promotion.coupon"],
   });
   return toPromoCode(promo)!;
+}
+
+export type PromoCodeChanges = Omit<NewPromoCode, "code" | "ticketIds"> & { ticketIds: string[] };
+
+/** True when the edit needs a new Stripe promotion code (see the top of this file). */
+export function needsNewStripeCode(current: PromoCode, changes: PromoCodeChanges): boolean {
+  const seconds = (iso: string | null) => (iso ? unixTime(iso) : null);
+  return (
+    changes.percentOff !== current.percentOff ||
+    changes.maxUses !== current.maxUses ||
+    seconds(changes.expiresAt) !== seconds(current.expiresAt)
+  );
+}
+
+/**
+ * Edits one of our codes, keeping the code people were sent and its uses so
+ * far. The caller checks the changes first: maxUses at least `used`, and a
+ * future expiry if needsNewStripeCode.
+ */
+export async function updatePromoCode(current: PromoCode, changes: PromoCodeChanges): Promise<PromoCode> {
+  const label = changes.label.trim();
+  const tickets = changes.ticketIds.join(",");
+  const raw = await stripe().promotionCodes.retrieve(current.id, { expand: ["promotion.coupon"] });
+  const coupon = raw.promotion?.coupon;
+  const couponId = typeof coupon === "string" ? coupon : coupon?.id;
+
+  if (!needsNewStripeCode(current, changes)) {
+    // Who it's for and the tickets live in metadata, which Stripe can change.
+    if (couponId && label !== current.label) {
+      await stripe().coupons.update(couponId, { name: couponName(label, current.percentOff) });
+    }
+    const promo = await stripe().promotionCodes.update(current.id, {
+      metadata: { label: label.slice(0, 200), tickets },
+      expand: ["promotion.coupon"],
+    });
+    return toPromoCode(promo)!;
+  }
+
+  const newCouponId =
+    changes.percentOff === current.percentOff && couponId ? couponId : await createCoupon(label, changes.percentOff);
+  if (newCouponId === couponId && label !== current.label) {
+    await stripe().coupons.update(couponId, { name: couponName(label, changes.percentOff) });
+  }
+
+  // Codes must be unique among active ones, so the old one goes off first.
+  await stripe().promotionCodes.update(current.id, { active: false, metadata: { replaced: "true" } });
+  try {
+    const promo = await stripe().promotionCodes.create({
+      promotion: { type: "coupon", coupon: newCouponId },
+      code: current.code,
+      active: current.active,
+      // Stripe's own limit counts only this new code's uses (at least 1); the
+      // form's check holds the code to the full limit (checkPromoCode).
+      ...(changes.maxUses ? { max_redemptions: Math.max(1, changes.maxUses - current.used) } : {}),
+      ...(changes.expiresAt ? { expires_at: unixTime(changes.expiresAt) } : {}),
+      metadata: {
+        app: APP_TAG,
+        label: label.slice(0, 200),
+        tickets,
+        used_before: String(current.used),
+        max_uses: changes.maxUses ? String(changes.maxUses) : "",
+        created_at: current.createdAt,
+        replaces: current.id,
+      },
+      expand: ["promotion.coupon"],
+    });
+    return toPromoCode(promo)!;
+  } catch (err) {
+    // Put the old one back as it was, so the code keeps working.
+    await stripe()
+      .promotionCodes.update(current.id, { active: current.active, metadata: { replaced: "" } })
+      .catch(() => {});
+    throw err;
+  }
 }
 
 /** Turns one of our codes on or off. Null (and nothing changed) for any other promotion code in the account. */

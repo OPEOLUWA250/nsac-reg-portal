@@ -5,7 +5,7 @@ import type { Ticket } from "./tickets";
 const api = vi.hoisted(() => ({
   products: { retrieve: vi.fn(), create: vi.fn(), update: vi.fn() },
   checkout: { sessions: { create: vi.fn(), retrieve: vi.fn(), expire: vi.fn() } },
-  coupons: { create: vi.fn() },
+  coupons: { create: vi.fn(), update: vi.fn() },
   promotionCodes: { create: vi.fn(), retrieve: vi.fn(), update: vi.fn(), list: vi.fn() },
 }));
 vi.mock("stripe", () => ({ default: vi.fn(() => api) }));
@@ -16,7 +16,7 @@ vi.mock("@/lib/attendee-service", () => ({ sendAttendeeQr: vi.fn() }));
 const used = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/student-codes", () => ({ markStudentCodeUsed: used }));
 import { checkoutAttendeeId, createCheckoutSession, fulfillCheckoutSession, TICKET_PRODUCT_ID } from "./payments";
-import { createPromoCode, setPromoCodeActive } from "./promo-codes";
+import { createPromoCode, setPromoCodeActive, updatePromoCode, type PromoCode } from "./promo-codes";
 
 const session = (fields: Partial<Stripe.Checkout.Session>) => fields as Stripe.Checkout.Session;
 const ticket = {
@@ -97,6 +97,47 @@ it("never switches off another site's promo code", async () => {
   api.promotionCodes.retrieve.mockResolvedValue({ id: "promo_sia", metadata: {}, promotion: { coupon: { percent_off: 20 } } });
   expect(await setPromoCodeActive("promo_sia", false)).toBeNull();
   expect(api.promotionCodes.update).not.toHaveBeenCalled();
+});
+
+const asvCode: PromoCode = {
+  id: "promo_old", code: "ASV-2027", label: "ASV", percentOff: 20, maxUses: 15, used: 4,
+  expiresAt: "2026-12-31T00:00:00.000Z", active: true, ticketIds: ["standard"], createdAt: "2026-10-01T00:00:00.000Z",
+};
+const asvChanges = { label: "ASV", percentOff: 20, maxUses: 15, expiresAt: "2026-12-31T00:00:00.000Z", ticketIds: ["standard"] };
+
+it("edits who a promo code is for and its tickets in place", async () => {
+  api.promotionCodes.retrieve.mockResolvedValue({ id: "promo_old", promotion: { coupon: { id: "co_1", percent_off: 20 } } });
+  api.promotionCodes.update.mockResolvedValue({
+    id: "promo_old", code: "ASV-2027", metadata: { app: "nsac-reg-portal", label: "ASV team", tickets: "standard,early" },
+    promotion: { coupon: { percent_off: 20 } }, max_redemptions: 15, times_redeemed: 4, expires_at: 1798675200, active: true, created: 1,
+  });
+  const promo = await updatePromoCode(asvCode, { ...asvChanges, label: "ASV team", ticketIds: ["standard", "early"] });
+  expect(api.promotionCodes.create).not.toHaveBeenCalled();
+  expect(api.coupons.update).toHaveBeenCalledWith("co_1", { name: "ASV team (20% off)" });
+  expect(promo.ticketIds).toEqual(["standard", "early"]);
+});
+
+it("replaces a promo code to change its end date, keeping the code and its uses", async () => {
+  api.promotionCodes.retrieve.mockResolvedValue({ id: "promo_old", promotion: { coupon: { id: "co_1", percent_off: 20 } } });
+  api.promotionCodes.create.mockImplementation(async (params) => ({
+    id: "promo_new", code: params.code, metadata: params.metadata, promotion: { coupon: { percent_off: 20 } },
+    max_redemptions: params.max_redemptions, times_redeemed: 0, expires_at: params.expires_at, active: true, created: 2,
+  }));
+  const promo = await updatePromoCode(asvCode, { ...asvChanges, expiresAt: "2027-01-31T00:00:00.000Z" });
+  expect(api.promotionCodes.update).toHaveBeenCalledWith("promo_old", { active: false, metadata: { replaced: "true" } });
+  const params = api.promotionCodes.create.mock.calls[0][0];
+  expect(params.code).toBe("ASV-2027");
+  expect(params.promotion.coupon).toBe("co_1"); // same discount, same coupon
+  expect(params.max_redemptions).toBe(11); // 15 minus the 4 already used
+  expect(promo).toMatchObject({ code: "ASV-2027", used: 4, maxUses: 15, createdAt: asvCode.createdAt, expiresAt: "2027-01-31T00:00:00.000Z" });
+});
+
+it("puts the old promo code back if Stripe refuses the new one", async () => {
+  api.promotionCodes.retrieve.mockResolvedValue({ id: "promo_old", promotion: { coupon: { id: "co_1", percent_off: 20 } } });
+  api.promotionCodes.update.mockResolvedValue({});
+  api.promotionCodes.create.mockRejectedValue(new Error("Stripe is down"));
+  await expect(updatePromoCode(asvCode, { ...asvChanges, maxUses: 20 })).rejects.toThrow("Stripe is down");
+  expect(api.promotionCodes.update).toHaveBeenLastCalledWith("promo_old", { active: true, metadata: { replaced: "" } });
 });
 
 it("uses up a student code only once the payment has gone through", async () => {

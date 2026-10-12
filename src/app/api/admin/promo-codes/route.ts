@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminRoute } from "@/lib/server/admin-auth";
-import { createPromoCode, listPromoCodes, setPromoCodeActive } from "@/lib/promo-codes";
+import {
+  createPromoCode,
+  getPromoCode,
+  listPromoCodes,
+  needsNewStripeCode,
+  setPromoCodeActive,
+  updatePromoCode,
+} from "@/lib/promo-codes";
 import { PROMO_CODE_RE } from "@/lib/registration-fields";
 import { describeError } from "@/lib/describe-error";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -9,7 +16,7 @@ import { STUDENT_TICKET_ID } from "@/lib/tickets";
 
 export const runtime = "nodejs";
 
-// /admin/promo-codes: list (GET), create (POST), switch on/off (PATCH).
+// /admin/promo-codes: list (GET), create (POST), switch on/off or edit (PATCH).
 // Super admins only: seeing a free-pass code is as good as having one.
 
 export const GET = adminRoute(async () => {
@@ -25,39 +32,56 @@ export const GET = adminRoute(async () => {
   }
 }, { superAdmin: true });
 
-export const POST = adminRoute(async (req: NextRequest) => {
-  const body = await req.json().catch(() => ({}));
+// The fields a code is created or edited with, checked. Every code names the
+// tickets it works with (the form starts on Standard), so a free pass can't
+// silently apply to every ticket.
+async function readChanges(body: Record<string, unknown>) {
   const fields: Record<string, string> = {};
-  const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
   const label = typeof body.label === "string" ? body.label.trim() : "";
   const percentOff = Number(body.percentOff);
   const maxUses = body.maxUses === null || body.maxUses === "" || body.maxUses === undefined ? null : Number(body.maxUses);
   const expiresAt = typeof body.expiresAt === "string" && body.expiresAt ? body.expiresAt : null;
-  // Every new code names the tickets it works with (the form starts on
-  // Standard), so a free pass can't silently apply to every ticket.
   const ticketIds: string[] = Array.isArray(body.ticketIds) ? [...new Set<string>(body.ticketIds.map(String))] : [];
-  let knownTickets: string[];
-  try {
-    // Not the Student ticket: its price is fixed (student codes unlock it).
-    knownTickets = (await listTickets()).map((t) => t.id).filter((id) => id !== STUDENT_TICKET_ID);
-  } catch (err) {
-    console.error(`Load tickets for promo code failed: ${describeError(err)}`);
-    return NextResponse.json({ error: "Couldn't load the tickets. Try again." }, { status: 500 });
-  }
+  // Not the Student ticket: its price is fixed (student codes unlock it).
+  const knownTickets = (await listTickets()).map((t) => t.id).filter((id) => id !== STUDENT_TICKET_ID);
 
-  if (code && !PROMO_CODE_RE.test(code)) fields.code = "3 to 40 letters, numbers, dashes or underscores. Leave empty to generate one.";
   if (!label) fields.label = "Say who it's for, e.g. \"AfSA sponsor passes\".";
   if (label.length > 200) fields.label = "Keep it under 200 characters.";
   if (!Number.isInteger(percentOff) || percentOff < 1 || percentOff > 100) fields.percentOff = "A whole number from 1 to 100. 100 = free pass.";
   if (maxUses === null) fields.maxUses = "Say how many people can use this code, e.g. 10.";
   else if (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 100_000) fields.maxUses = "A whole number, at least 1.";
-  if (expiresAt && !(new Date(expiresAt).getTime() > Date.now())) fields.expiresAt = "Pick a date in the future, or leave empty.";
+  if (expiresAt && Number.isNaN(new Date(expiresAt).getTime())) fields.expiresAt = "Pick a date, or leave empty.";
   if (!ticketIds.length) fields.ticketIds = "Tick at least one ticket.";
   else if (ticketIds.some((id) => !knownTickets.includes(id))) fields.ticketIds = "Tick tickets from the list.";
-  if (Object.keys(fields).length) return NextResponse.json({ error: "Check the highlighted fields.", fields }, { status: 400 });
+  return { changes: { label, percentOff, maxUses, expiresAt, ticketIds }, fields };
+}
+
+const inFuture = (iso: string | null) => !iso || new Date(iso).getTime() > Date.now();
+
+const invalid = (fields: Record<string, string>) =>
+  NextResponse.json({ error: "Check the highlighted fields.", fields }, { status: 400 });
+
+const ticketsUnavailable = (err: unknown) => {
+  console.error(`Load tickets for promo code failed: ${describeError(err)}`);
+  return NextResponse.json({ error: "Couldn't load the tickets. Try again." }, { status: 500 });
+};
+
+export const POST = adminRoute(async (req: NextRequest) => {
+  const body = await req.json().catch(() => ({}));
+  const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
+  let read: Awaited<ReturnType<typeof readChanges>>;
+  try {
+    read = await readChanges(body);
+  } catch (err) {
+    return ticketsUnavailable(err);
+  }
+  const { changes, fields } = read;
+  if (code && !PROMO_CODE_RE.test(code)) fields.code = "3 to 40 letters, numbers, dashes or underscores. Leave empty to generate one.";
+  if (!fields.expiresAt && !inFuture(changes.expiresAt)) fields.expiresAt = "Pick a date in the future, or leave empty.";
+  if (Object.keys(fields).length) return invalid(fields);
 
   try {
-    const promo = await createPromoCode({ code: code || undefined, label, percentOff, maxUses, expiresAt, ticketIds });
+    const promo = await createPromoCode({ code: code || undefined, ...changes });
     return NextResponse.json({ code: promo });
   } catch (err) {
     const message = describeError(err);
@@ -69,11 +93,12 @@ export const POST = adminRoute(async (req: NextRequest) => {
   }
 }, { superAdmin: true });
 
+// { id, active } switches a code on or off; { id, label, percentOff, maxUses,
+// expiresAt, ticketIds } edits it (the code itself stays the same).
 export const PATCH = adminRoute(async (req: NextRequest) => {
   const body = await req.json().catch(() => ({}));
-  if (typeof body.id !== "string" || typeof body.active !== "boolean") {
-    return NextResponse.json({ error: "Missing id or active." }, { status: 400 });
-  }
+  if (typeof body.id !== "string") return NextResponse.json({ error: "Missing id." }, { status: 400 });
+  if (typeof body.active !== "boolean") return edit(body.id, body);
   try {
     const promo = await setPromoCodeActive(body.id, body.active);
     if (!promo) return NextResponse.json({ error: "No such promo code." }, { status: 404 });
@@ -83,6 +108,33 @@ export const PATCH = adminRoute(async (req: NextRequest) => {
     return NextResponse.json({ error: "Couldn't update the code in Stripe. Try again." }, { status: 502 });
   }
 }, { superAdmin: true });
+
+async function edit(id: string, body: Record<string, unknown>) {
+  let read: Awaited<ReturnType<typeof readChanges>>;
+  try {
+    read = await readChanges(body);
+  } catch (err) {
+    return ticketsUnavailable(err);
+  }
+  const { changes, fields } = read;
+  try {
+    const current = await getPromoCode(id);
+    if (!current) return NextResponse.json({ error: "No such promo code. Refresh the page." }, { status: 404 });
+    if (!fields.maxUses && changes.maxUses !== null && changes.maxUses < current.used) {
+      fields.maxUses = `It has been used ${current.used} ${current.used === 1 ? "time" : "times"}, so at least ${current.used}.`;
+    }
+    // A date already passed can stay if it isn't being changed (and nothing
+    // else needs a new Stripe code); Stripe takes only future dates.
+    if (!fields.expiresAt && !inFuture(changes.expiresAt) && needsNewStripeCode(current, changes)) {
+      fields.expiresAt = "Pick a date in the future, or leave empty.";
+    }
+    if (Object.keys(fields).length) return invalid(fields);
+    return NextResponse.json({ code: await updatePromoCode(current, changes) });
+  } catch (err) {
+    console.error(`Edit promo code failed: ${describeError(err)}`);
+    return NextResponse.json({ error: "Couldn't update the code in Stripe. Try again." }, { status: 502 });
+  }
+}
 
 // Our own view of each code's use: completed registrations (paid, including
 // free passes) and ones started but not paid yet. Stripe's own count only
