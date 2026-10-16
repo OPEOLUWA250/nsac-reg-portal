@@ -8,7 +8,25 @@ const valid = {
   organization: "Example", organizationCountry: "NG", professionalCategory: "industry",
   jobFunction: "engineering", invitationLetter: "no", foodAllergies: "None", ticket: "standard",
   safetyConsent: true, optInOrganizer: true, optInSponsors: true, shareDetails: "yes",
+  passport: { mime: "image/jpeg", size: 200_000 },
 };
+
+describe("passport", () => {
+  it("is required from everyone, with or without an invitation letter", () => {
+    for (const invitationLetter of ["yes", "no"]) {
+      const result = validateRegistration({ ...valid, invitationLetter, passport: null }, ["standard"]);
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.errors.passport).toBe("required");
+    }
+  });
+
+  it("rejects files that aren't a photo or PDF, or are too large", () => {
+    const wrongType = validateRegistration({ ...valid, passport: { mime: "text/plain", size: 100 } }, ["standard"]);
+    expect(!wrongType.ok && wrongType.errors.passport).toBe("file_type");
+    const tooLarge = validateRegistration({ ...valid, passport: { mime: "application/pdf", size: 11 * 1024 * 1024 } }, ["standard"]);
+    expect(!tooLarge.ok && tooLarge.errors.passport).toBe("file_too_large");
+  });
+});
 
 describe("required registration agreements", () => {
   it.each(["yes", "no"])("accepts the explicit sharing choice %s", (shareDetails) => {

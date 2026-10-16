@@ -56,7 +56,7 @@ function PrivacyEn() {
         <ul>
           <li>Your registration category (delegate, speaker, media, exhibitor or VIP), name, email address, phone number and job title.</li>
           <li>Your nationality, country of residence, organisation, its country, your professional category and job function.</li>
-          <li>Whether you need an invitation letter and, if you upload it, a copy of your passport.</li>
+          <li>A copy of your international passport (the page with your photo and details), and whether you need an invitation letter.</li>
           <li>Food allergies, so the catering can plan for them.</li>
           <li>Your ticket, the amount paid, and a VAT number or invoice ID if you give one.</li>
           <li>Your answers to the consent, communication and sharing questions, and the time you gave them.</li>
@@ -69,7 +69,7 @@ function PrivacyEn() {
       <LegalSection title="Why we use it">
         <ul>
           <li>To register you, take payment, send your ticket and check you in at the event.</li>
-          <li>To prepare an invitation letter for your visa, if you asked for one. Your passport is used for nothing else.</li>
+          <li>To confirm who is attending and, if you asked for one, to prepare an invitation letter for your visa. Your passport is used for nothing else.</li>
           <li>To confirm you&apos;re a student before giving you a Student ticket code. Your student ID is used for nothing else.</li>
           <li>To plan the event, for example catering and attendance numbers.</li>
           <li>To send you news about the conference, or share your details with sponsors and exhibitors, only if you ticked those boxes.</li>
@@ -137,7 +137,7 @@ function PrivacyFr() {
         <ul>
           <li>Votre catégorie d&apos;inscription (délégué, intervenant, médias, exposant ou VIP), vos nom et prénom, votre adresse e-mail, votre numéro de téléphone et l&apos;intitulé de votre poste.</li>
           <li>Votre nationalité, votre pays de résidence, votre organisation et son pays, votre catégorie professionnelle et le domaine d&apos;activité de votre poste.</li>
-          <li>Si vous avez besoin d&apos;une lettre d&apos;invitation et, si vous la joignez, une copie de votre passeport.</li>
+          <li>Une copie de votre passeport international (la page avec votre photo et vos informations), et si vous avez besoin d&apos;une lettre d&apos;invitation.</li>
           <li>Vos allergies alimentaires, pour que le traiteur puisse en tenir compte.</li>
           <li>Votre billet, le montant payé et, si vous les indiquez, un numéro de TVA ou une référence de facture.</li>
           <li>Vos réponses aux questions de consentement, de communication et de partage, avec leur date.</li>
@@ -150,7 +150,7 @@ function PrivacyFr() {
       <LegalSection title="Pourquoi nous les utilisons">
         <ul>
           <li>Pour vous inscrire, encaisser votre paiement, vous envoyer votre billet et enregistrer votre arrivée à l&apos;événement.</li>
-          <li>Pour établir une lettre d&apos;invitation pour votre visa, si vous en avez demandé une. Votre passeport ne sert à rien d&apos;autre.</li>
+          <li>Pour confirmer l&apos;identité des participants et, si vous en avez demandé une, établir une lettre d&apos;invitation pour votre visa. Votre passeport ne sert à rien d&apos;autre.</li>
           <li>Pour vérifier que vous êtes étudiant(e) avant de vous envoyer un code pour le billet Étudiant. Votre carte d&apos;étudiant ne sert à rien d&apos;autre.</li>
           <li>Pour organiser l&apos;événement, par exemple la restauration et le nombre de participants.</li>
           <li>Pour vous envoyer des nouvelles de la conférence, ou transmettre vos coordonnées aux sponsors et exposants, uniquement si vous avez coché les cases correspondantes.</li>

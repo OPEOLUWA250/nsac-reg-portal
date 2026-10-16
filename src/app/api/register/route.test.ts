@@ -10,7 +10,12 @@ vi.mock("@/lib/turnstile", () => ({ verifyTurnstile: async () => true }));
 vi.mock("@/lib/ticket-store", () => ({ availableTickets: mocks.tickets }));
 vi.mock("@/lib/attendee-service", () => ({ createAttendee: mocks.create, sendAttendeeQr: mocks.email, canResendQr: () => false }));
 vi.mock("@/lib/payments", () => ({ createCheckoutSession: mocks.checkout }));
-vi.mock("@/lib/supabase-admin", () => ({ supabaseAdmin: () => ({}) }));
+vi.mock("@/lib/supabase-admin", () => ({
+  supabaseAdmin: () => ({
+    storage: { from: () => ({ createSignedUploadUrl: async () => ({ data: { signedUrl: "https://storage.example/upload" }, error: null }) }) },
+    from: () => ({ update: () => ({ eq: async () => ({ error: null }) }) }),
+  }),
+}));
 vi.mock("@/lib/promo-codes", async () => ({ checkPromoCode: mocks.promo, discountedCents: (await import("@/lib/tickets")).discountedCents }));
 
 const input = {
@@ -20,6 +25,7 @@ const input = {
   organization: "Example", organizationCountry: "NG", professionalCategory: "industry",
   jobFunction: "engineering", invitationLetter: "no", foodAllergies: "None", ticket: "standard",
   safetyConsent: true, optInOrganizer: true, optInSponsors: true, shareDetails: "yes",
+  passport: { mime: "image/jpeg", size: 200_000 },
 };
 beforeEach(() => {
   mocks.tickets.mockResolvedValue([{ id: "standard", amountCents: 50000, currency: "eur" }]);
@@ -41,6 +47,19 @@ it.each(["delegate", "speaker", "media", "exhibitor"])("creates a pending %s reg
   expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ role: category, details: expect.objectContaining({ payment_status: "pending", amount_cents: 50000, share_details: true, residence_country: "Ghana" }) }));
   expect(mocks.checkout).toHaveBeenCalledOnce();
   expect(mocks.email).not.toHaveBeenCalled();
+});
+
+it("hands out a passport upload link with the payment link", async () => {
+  const response = await POST(request());
+  expect(await response.json()).toMatchObject({ status: "payment_required", passportUploadUrl: "https://storage.example/upload" });
+});
+
+it("refuses a registration without a passport", async () => {
+  const response = await POST(request({ ...input, passport: null } as unknown as typeof input));
+  expect(response.status).toBe(400);
+  expect(await response.json()).toMatchObject({ fields: { passport: "required" } });
+  expect(mocks.create).not.toHaveBeenCalled();
+  expect(mocks.checkout).not.toHaveBeenCalled();
 });
 
 it("doesn't let people register themselves as VIP (admins do that)", async () => {

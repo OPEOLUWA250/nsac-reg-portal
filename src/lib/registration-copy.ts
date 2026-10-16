@@ -166,9 +166,9 @@ export const COPY: Record<Language, Copy> = {
       professionalCategory: "Professional category",
       jobFunction: "Category of your job function",
       invitationLetter: "Do you require an invitation letter?",
-      passport: "Upload your passport",
+      passport: "Upload your international passport",
       passportHint:
-        "Every delegate requires an invitation letter to enter Senegal. Your passport will enable us to process such a letter. Photo or PDF, up to 10 MB.",
+        "A clear photo or scan of the page with your photo and details. Required for every attendee, and used to prepare your invitation letter if you need one. Photo or PDF, up to 10 MB.",
       passportChoose: "Choose file",
       passportRemove: "Remove",
       foodAllergies: "Any food allergies?",
@@ -188,7 +188,7 @@ export const COPY: Record<Language, Copy> = {
       vatRequiredHint: "Required for organisations located in Europe.",
       invoiceId: "Invoice ID",
       safetyConsent: (privacyLink) =>
-        `By submitting this registration form, I agree to the conference safety guideline and to Space in Africa processing my details (including my passport, if uploaded) as described in the ${privacyLink}.`,
+        `By submitting this registration form, I agree to the conference safety guideline and to Space in Africa processing my details (including my passport) as described in the ${privacyLink}.`,
       optInOrganizer: "I agree to receive further communications from the event organisers",
       optInSponsors: "I agree to receive communications from event sponsors and exhibitors",
     },
@@ -351,9 +351,9 @@ export const COPY: Record<Language, Copy> = {
       professionalCategory: "Catégorie professionnelle",
       jobFunction: "Domaine d'activité de votre poste",
       invitationLetter: "Avez-vous besoin d'une lettre d'invitation\u00a0?",
-      passport: "Joignez votre passeport",
+      passport: "Joignez votre passeport international",
       passportHint:
-        "Chaque délégué(e) a besoin d'une lettre d'invitation pour entrer au Sénégal. Votre passeport nous permet de l'établir. Photo ou PDF, 10\u00a0Mo maximum.",
+        "Une photo ou un scan net de la page avec votre photo et vos informations. Obligatoire pour chaque participant(e), il sert aussi à établir votre lettre d'invitation si vous en avez besoin. Photo ou PDF, 10\u00a0Mo maximum.",
       passportChoose: "Choisir un fichier",
       passportRemove: "Retirer",
       foodAllergies: "Avez-vous des allergies alimentaires\u00a0?",
@@ -373,7 +373,7 @@ export const COPY: Record<Language, Copy> = {
       vatRequiredHint: "Obligatoire pour les organisations situées en Europe.",
       invoiceId: "Référence de facture",
       safetyConsent: (privacyLink) =>
-        `En envoyant ce formulaire, j'accepte les consignes de sécurité de la conférence et le traitement de mes données par Space in Africa (y compris mon passeport, le cas échéant) conformément à la ${privacyLink}.`,
+        `En envoyant ce formulaire, j'accepte les consignes de sécurité de la conférence et le traitement de mes données par Space in Africa (y compris mon passeport) conformément à la ${privacyLink}.`,
       optInOrganizer: "J'accepte de recevoir d'autres communications de la part des organisateurs",
       optInSponsors: "J'accepte de recevoir des communications de la part des sponsors et des exposants",
     },

@@ -779,32 +779,30 @@ export default function RegistrationForm({
                         error={err("invitationLetter")}
                         inline
                       />
-                      {form.invitationLetter === "yes" && (
-                        <Field id="field-passport" as="div" label={t.fields.passport} optionalLabel={t.optional} hint={t.fields.passportHint} error={err("passport")}>
-                          <div className="flex flex-wrap items-center gap-3">
-                            <label className={buttonClass("outline", "md", "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-blue")}>
-                              {t.fields.passportChoose}
-                              <input
-                                id="field-passport"
-                                type="file"
-                                accept={PASSPORT_MIME_TYPES.join(",")}
-                                className="sr-only"
-                                onChange={(e) => onPassportChange(e.target.files?.[0] ?? null)}
-                                aria-describedby={describedBy("field-passport", { hint: true, error: err("passport") })}
-                              />
-                            </label>
-                            {passportFile && (
-                              <span className="flex min-w-0 items-center gap-2 text-sm text-ink-2">
-                                <span className="max-w-56 truncate">{passportFile.name}</span>
-                                <span className="text-ink-3">({(passportFile.size / 1_048_576).toFixed(1)} MB)</span>
-                                <Button variant="ghost" size="sm" onClick={() => onPassportChange(null)}>
-                                  {t.fields.passportRemove}
-                                </Button>
-                              </span>
-                            )}
-                          </div>
-                        </Field>
-                      )}
+                      <Field id="field-passport" as="div" label={t.fields.passport} required hint={t.fields.passportHint} error={err("passport")}>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <label className={buttonClass("outline", "md", "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-blue")}>
+                            {t.fields.passportChoose}
+                            <input
+                              id="field-passport"
+                              type="file"
+                              accept={PASSPORT_MIME_TYPES.join(",")}
+                              className="sr-only"
+                              onChange={(e) => onPassportChange(e.target.files?.[0] ?? null)}
+                              aria-describedby={describedBy("field-passport", { hint: true, error: err("passport") })}
+                            />
+                          </label>
+                          {passportFile && (
+                            <span className="flex min-w-0 items-center gap-2 text-sm text-ink-2">
+                              <span className="max-w-56 truncate">{passportFile.name}</span>
+                              <span className="text-ink-3">({(passportFile.size / 1_048_576).toFixed(1)} MB)</span>
+                              <Button variant="ghost" size="sm" onClick={() => onPassportChange(null)}>
+                                {t.fields.passportRemove}
+                              </Button>
+                            </span>
+                          )}
+                        </div>
+                      </Field>
                       <Field id="field-foodAllergies" label={t.fields.foodAllergies} required hint={t.fields.foodAllergiesHint} error={err("foodAllergies")}>
                         <textarea
                           id="field-foodAllergies"

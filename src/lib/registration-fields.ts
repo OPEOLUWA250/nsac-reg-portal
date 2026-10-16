@@ -145,8 +145,8 @@ export interface CleanRegistration {
   professionalCategory: ProfessionalCategory;
   jobFunction: JobFunction;
   needsInvitationLetter: boolean;
-  /** Set when the browser is about to upload a passport file. */
-  passport: { mime: string; size: number } | null;
+  /** The passport photo page the browser is about to upload (required). */
+  passport: { mime: string; size: number };
   foodAllergies: string;
   optInOrganizer: boolean;
   optInSponsors: boolean;
@@ -254,7 +254,8 @@ export function validateRegistration(
   else if (invitationLetter !== "yes" && invitationLetter !== "no")
     errors.invitationLetter = "invalid_choice";
 
-  let passport: CleanRegistration["passport"] = null;
+  // Everyone uploads their passport photo page (not only letter requests).
+  let passport: CleanRegistration["passport"] | null = null;
   if (raw.passport && typeof raw.passport === "object") {
     const p = raw.passport as { mime?: unknown; size?: unknown };
     const mime = typeof p.mime === "string" ? p.mime : "";
@@ -262,6 +263,8 @@ export function validateRegistration(
     if (!(PASSPORT_MIME_TYPES as readonly string[]).includes(mime)) errors.passport = "file_type";
     else if (size <= 0 || size > PASSPORT_MAX_BYTES) errors.passport = "file_too_large";
     else passport = { mime, size };
+  } else {
+    errors.passport = "required";
   }
 
   requireText(errors, "foodAllergies", foodAllergies, LIMITS.foodAllergies);
@@ -288,7 +291,7 @@ export function validateRegistration(
   if (invoiceId.length > LIMITS.invoiceId) errors.invoiceId = "too_long";
 
   const badId = !UUID_RE.test(id);
-  if (Object.keys(errors).length > 0 || badId) {
+  if (Object.keys(errors).length > 0 || badId || !passport) {
     return { ok: false, errors, badId };
   }
 
