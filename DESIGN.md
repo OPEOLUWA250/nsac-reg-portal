@@ -58,8 +58,10 @@ Status is a coloured dot or border with ink text, never a pastel fill.
 
 ## Type
 
-The conference website's two families, loaded with `next/font` in
-`src/app/layout.tsx`. The ticket image, share image and flyer use them too.
+The conference website's two families, self-hosted from `src/app/fonts`
+and loaded with `next/font/local` in `src/app/layout.tsx` (not
+`next/font/google`, whose font links sometimes break Turbopack). The ticket
+image, share image and flyer use them too.
 
 - **Raleway** (`font-display`), weights 700 and 800: titles, big numbers,
   prices. The website sets its headings in Raleway 800.

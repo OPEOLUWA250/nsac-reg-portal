@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Sans, Raleway } from "next/font/google";
+import localFont from "next/font/local";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import { EVENT_INFO } from "@/lib/event-info";
@@ -9,16 +9,26 @@ import "./globals.css";
 // Brand type, the same as the conference website (see DESIGN.md): Raleway
 // for titles and numbers, DM Sans for everything else. The flyer and ticket
 // images use the same two.
-const raleway = Raleway({
+//
+// Self-hosted (src/app/fonts) rather than next/font/google: Google Fonts
+// sometimes answers with font links that Turbopack can't load ("next/font/
+// google queries have exactly one entry"), which broke `next dev` and could
+// break a deploy. The files are the open-source fonts (SIL OFL, licences
+// alongside), cut to the weights used and to Latin plus Latin Extended,
+// matching what Google served. The Raleway cut is named "NSAC Display"
+// inside the file, as its licence's Reserved Font Name requires.
+const raleway = localFont({
+  src: "./fonts/nsac-display.woff2",
   variable: "--font-raleway",
-  subsets: ["latin"],
-  weight: ["700", "800"],
+  weight: "700 800",
+  display: "swap",
 });
 
-const dmSans = DM_Sans({
+const dmSans = localFont({
+  src: "./fonts/dm-sans.woff2",
   variable: "--font-dm-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: "400 700",
+  display: "swap",
 });
 
 const SHARE_TITLE = `Register for ${EVENT_INFO.name.en}`;
