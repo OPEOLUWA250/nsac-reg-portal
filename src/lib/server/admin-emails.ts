@@ -32,6 +32,24 @@ async function adminUserExists(email: string): Promise<boolean> {
 }
 
 /**
+ * Every admin's email right now: owners plus admin_users. Used to give the
+ * dashboard button in registration alerts only to people who can sign in.
+ * If the table can't be read, owners only: never a button that leads nowhere.
+ */
+export async function currentAdminEmails(): Promise<Set<string>> {
+  const emails = new Set(ownerEmails());
+  try {
+    const { supabaseAdmin } = await import("@/lib/supabase-admin");
+    const { data, error } = await supabaseAdmin().from("admin_users").select("email");
+    if (error) throw error;
+    for (const row of data ?? []) if (typeof row.email === "string") emails.add(row.email.trim().toLowerCase());
+  } catch (err) {
+    console.warn(`Couldn't list admins, treating only owners as admins: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  return emails;
+}
+
+/**
  * Before signing in: may this email be an admin at all? Owners, or someone in
  * admin_users. Used by the login and forgot-password routes. Fails closed.
  */

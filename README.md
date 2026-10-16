@@ -14,7 +14,7 @@ Jotform form is closed.
 1. Attendee fills in the form at `/` (same questions as the old Jotform form:
    name, email, job title, phone, nationality, country of residence,
    organisation + location, professional category, job function, invitation
-   letter + optional passport upload, food allergies, safety/privacy consent,
+   letter, passport upload (required for everyone), food allergies, safety/privacy consent,
    communication opt-ins, ticket, VAT number, invoice ID).
 2. `POST /api/register` validates it, saves the attendee with
    `payment_status = 'pending'`, returns a signed upload link for the
@@ -22,7 +22,9 @@ Jotform form is closed.
    link. The browser uploads the passport, then goes to Stripe.
 3. Stripe confirms payment → `POST /api/stripe-webhook` (and/or the
    `/register/success` page, whichever comes first) marks the attendee
-   `paid` and emails the QR code. The success page also shows the QR code.
+   `paid` and emails the QR code, and emails a new registration alert to
+   the list in Admin → Settings (plus `ADMIN_NOTIFY_EMAILS`). The success
+   page also shows the QR code.
    **No QR code is ever sent for an unpaid registration**, and the scanner
    refuses to check in anyone whose payment is still pending.
 4. Event day: admins open `/checkin`, sign in with their admin account,
@@ -132,6 +134,10 @@ Jotform form is closed.
    - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` — admin
      sign-in (public values, Supabase → Project Settings → API).
    - `ADMIN_EMAILS` — the owners: always super admins, comma-separated.
+   - `ADMIN_NOTIFY_EMAILS` — optional; always emailed for every confirmed
+     registration, comma-separated. Usually you manage the list in
+     **Admin → Settings → Registration alerts** instead (super admins,
+     no redeploy); both lists get the email.
    - `CRON_SECRET` — any long random string; protects the daily
      keep-alive job (see **Keeping the free database awake**).
 

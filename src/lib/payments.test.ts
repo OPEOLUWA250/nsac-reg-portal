@@ -12,7 +12,8 @@ vi.mock("stripe", () => ({ default: vi.fn(() => api) }));
 vi.mock("@/lib/supabase-admin", () => ({
   supabaseAdmin: vi.fn(() => ({ from: () => ({ update: () => ({ eq: async () => ({}) }) }) })),
 }));
-vi.mock("@/lib/attendee-service", () => ({ sendAttendeeQr: vi.fn() }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/attendee-service", () => ({ sendAttendeeQr: vi.fn(), notifyAdminsOfRegistration: notify }));
 const used = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/student-codes", () => ({ markStudentCodeUsed: used }));
 import { checkoutAttendeeId, createCheckoutSession, fulfillCheckoutSession, TICKET_PRODUCT_ID } from "./payments";
@@ -152,8 +153,12 @@ it("uses up a student code only once the payment has gone through", async () => 
   const meta = { attendee_id: "a1", ticket_type: "student", promo_code: "STU-7K3QXP", student_code: "STU-7K3QXP" };
   await fulfillCheckoutSession(session({ client_reference_id: "a1", metadata: meta, payment_status: "unpaid" }));
   expect(used).not.toHaveBeenCalled();
+  expect(notify).not.toHaveBeenCalled();
   await fulfillCheckoutSession(session({ client_reference_id: "a1", metadata: meta, payment_status: "paid", amount_total: 20000, currency: "eur" }));
   expect(used).toHaveBeenCalledWith("STU-7K3QXP", "a1");
+  // The organisers hear about it once, when the payment goes through.
+  expect(notify).toHaveBeenCalledOnce();
+  expect(notify).toHaveBeenCalledWith(paidRow);
 });
 
 it("puts the student code on the payment, as the code used", async () => {

@@ -1,16 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { AdminPage, Alert, Button, Card, cx, ErrorState, linkClass, LoadingLabel, PageHeader, Skeleton, Spinner } from "@/components/ui";
+import { AdminPage, Alert, Button, Card, cx, describedBy, ErrorState, Field, inputClass, linkClass, LoadingLabel, PageHeader, Skeleton, Spinner } from "@/components/ui";
 import DeleteDialog from "@/components/admin/DeleteDialog";
 import { useAdmin } from "@/components/admin/AdminContext";
 import { EVENT_INFO } from "@/lib/event-info";
+import { MAX_ALERT_EMAILS, mergeAlertRecipients, parseAlertEmailList } from "@/lib/alert-emails";
 
-// /admin/settings: open/close registration, plus a read-only view of how
-// payments, email and security are set up.
+// /admin/settings: open/close registration, who gets the registration
+// alerts, plus a read-only view of how payments, email and security are set up.
 
 interface SettingsResponse {
-  settings: { registrationOpen: boolean };
+  settings: { registrationOpen: boolean; alertEmails: string[] };
+  /** From the ADMIN_NOTIFY_EMAILS server setting: always emailed, not editable here. */
+  alertEmailsFromEnv: string[];
   closedByEnv: boolean;
   ticketsOnSale: number;
   status: {
@@ -140,6 +143,17 @@ export default function SettingsPanel() {
         </div>
       </Card>
 
+      <AlertRecipients
+        saved={data.settings.alertEmails}
+        fromEnv={data.alertEmailsFromEnv}
+        canEdit={me?.role === "super_admin"}
+        onSave={async (alertEmails) => {
+          const json = await apiCall("/api/admin/settings", { method: "POST", body: JSON.stringify({ alertEmails }) });
+          setData((d) => (d ? { ...d, settings: json.settings as SettingsResponse["settings"] } : d));
+          return (json.settings as SettingsResponse["settings"]).alertEmails;
+        }}
+      />
+
       {/* Event */}
       <Card className="space-y-3 p-5 sm:p-6">
         <h2 className="font-display text-xl font-bold text-blue">Event</h2>
@@ -223,6 +237,123 @@ export default function SettingsPanel() {
         </div>
       </Card>
     </AdminPage>
+  );
+}
+
+// Who gets the "new registration" email. They don't need an admin account.
+function AlertRecipients({
+  saved,
+  fromEnv,
+  canEdit,
+  onSave,
+}: {
+  saved: string[];
+  fromEnv: string[];
+  canEdit: boolean;
+  /** Saves the list and returns it as stored. Throws with a message on failure. */
+  onSave: (emails: string[]) => Promise<string[]>;
+}) {
+  const [text, setText] = useState(saved.join("\n"));
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
+  const [saving, setSaving] = useState(false);
+  const changed = text.trim() !== saved.join("\n");
+  const total = mergeAlertRecipients(saved, fromEnv).length;
+
+  async function save() {
+    setStatus("");
+    const { emails, invalid } = parseAlertEmailList(text);
+    if (invalid.length > 0) {
+      setError(`${invalid.length === 1 ? "This isn't an email address" : "These aren't email addresses"}: ${invalid.join(", ")}`);
+      return;
+    }
+    if (emails.length > MAX_ALERT_EMAILS) {
+      setError(`Up to ${MAX_ALERT_EMAILS} addresses. Remove ${emails.length - MAX_ALERT_EMAILS}.`);
+      return;
+    }
+    setError("");
+    setSaving(true);
+    try {
+      const stored = await onSave(emails);
+      setText(stored.join("\n"));
+      setStatus(stored.length ? `Saved. ${stored.length} address${stored.length === 1 ? "" : "es"} on the list.` : "Saved. The list is empty.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save the list.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="space-y-4 p-5 sm:p-6">
+      <div className="max-w-xl space-y-2">
+        <h2 className="font-display text-xl font-bold text-blue">Registration alerts</h2>
+        <p className="text-sm text-ink-2">
+          Everyone listed gets an email when a registration is confirmed: after payment, or straight away for a free
+          ticket. They don&apos;t need an admin account. The email includes the registrant&apos;s contact details, so
+          list company staff only. Passports are never attached.
+        </p>
+        <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+          <span aria-hidden="true" className={cx("h-2 w-2 shrink-0 rounded-full", total ? "bg-success" : "bg-line-strong")} />
+          {total ? `${total} ${total === 1 ? "person gets" : "people get"} these emails` : "Nobody gets these emails yet"}
+        </p>
+      </div>
+
+      {canEdit ? (
+        <div className="max-w-xl space-y-3">
+          <Field
+            id="alert-emails"
+            label="Email addresses"
+            hint={`One per line, up to ${MAX_ALERT_EMAILS}.`}
+            error={error || undefined}
+          >
+            <textarea
+              id="alert-emails"
+              rows={4}
+              spellCheck={false}
+              autoCapitalize="none"
+              autoComplete="off"
+              className={inputClass(Boolean(error), "min-h-32")}
+              value={text}
+              onChange={(e) => {
+                setText(e.target.value);
+                setError("");
+                setStatus("");
+              }}
+              aria-invalid={Boolean(error)}
+              aria-describedby={describedBy("alert-emails", { hint: true, error })}
+            />
+          </Field>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button onClick={save} disabled={!changed} loading={saving}>
+              Save list
+            </Button>
+            <p role="status" className="text-sm font-semibold text-success">
+              {status}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="max-w-xl space-y-2">
+          {saved.length ? (
+            <ul className="divide-y divide-line rounded-lg border border-line">
+              {saved.map((email) => (
+                <li key={email} className="wrap-break-word px-4 py-2.5 text-sm text-ink">{email}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-ink-3">No addresses on the list.</p>
+          )}
+          <p className="text-sm text-ink-3">Only super admins can change this list.</p>
+        </div>
+      )}
+
+      {fromEnv.length > 0 && (
+        <p className="max-w-xl text-sm text-ink-3">
+          Also always emailed, from the server setting ADMIN_NOTIFY_EMAILS: {fromEnv.join(", ")}.
+        </p>
+      )}
+    </Card>
   );
 }
 

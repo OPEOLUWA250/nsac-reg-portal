@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { mapJotformSubmission } from "@/lib/jotform-mapping";
-import { createAttendee, sendAttendeeQr, canResendQr } from "@/lib/attendee-service";
+import { createAttendee, sendAttendeeQr, canResendQr, notifyAdminsOfRegistration } from "@/lib/attendee-service";
 
 export const runtime = "nodejs";
 
@@ -84,6 +84,7 @@ export async function POST(req: NextRequest) {
   // Now: a retry leaves the record (and its QR) untouched.
   if (outcome.status === "created") {
     await sendAttendeeQr(outcome.attendee);
+    await notifyAdminsOfRegistration(outcome.attendee);
   } else if (outcome.status === "retry" && !outcome.attendee.qr_email_sent_at) {
     await sendAttendeeQr(outcome.attendee);
   } else if (outcome.status === "duplicate_email" && canResendQr(outcome.attendee)) {

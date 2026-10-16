@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { sendAttendeeQr } from "@/lib/attendee-service";
+import { notifyAdminsOfRegistration, sendAttendeeQr } from "@/lib/attendee-service";
 import type { Attendee } from "@/lib/types";
 import type { Ticket } from "@/lib/tickets";
 import type { PromoCode } from "@/lib/promo-codes";
@@ -9,7 +9,8 @@ import { markStudentCodeUsed } from "@/lib/student-codes";
 // Stripe Checkout: we create a Checkout Session and send the registrant to
 // Stripe's hosted payment page. Card details never touch our server. When
 // Stripe reports the payment as complete (webhook, or the success page —
-// whichever comes first) we mark the attendee paid and email their QR code.
+// whichever comes first) we mark the attendee paid, email their QR code and
+// tell the organisers.
 
 let stripeClient: Stripe | null = null;
 
@@ -253,6 +254,7 @@ export async function fulfillCheckoutSession(
   if (updated) {
     if (session.metadata?.student_code) await markStudentCodeUsed(session.metadata.student_code, attendeeId);
     await sendAttendeeQr(updated as Attendee);
+    await notifyAdminsOfRegistration(updated as Attendee);
     return updated as Attendee;
   }
 

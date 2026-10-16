@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publicBaseUrl } from "@/lib/public-url";
 import { adminRoute } from "@/lib/server/admin-auth";
-import { ownerEmails } from "@/lib/server/admin-emails";
+import { ownerEmails, parseAdminEmails } from "@/lib/server/admin-emails";
 import { supabaseAuthConfig } from "@/lib/server/admin-roles";
 import { getSettings, updateSettings } from "@/lib/settings-store";
 import { registrationClosedByEnv } from "@/lib/registration-config";
 import { availableTickets } from "@/lib/ticket-store";
 import { describeError } from "@/lib/describe-error";
+import { cleanAlertEmails, MAX_ALERT_EMAILS } from "@/lib/alert-emails";
 
 export const runtime = "nodejs";
 
@@ -48,12 +49,15 @@ export const GET = adminRoute(async (req: NextRequest) => {
     closedByEnv: registrationClosedByEnv(),
     ticketsOnSale: onSale.length,
     status: systemStatus(),
+    // Always emailed too, from the server setting (read-only on the page).
+    alertEmailsFromEnv: parseAdminEmails(process.env.ADMIN_NOTIFY_EMAILS),
   });
 });
 
-// Body: { registrationOpen?: boolean }
-export const POST = adminRoute(async (req: NextRequest) => {
-  let body: { registrationOpen?: unknown };
+// Body: { registrationOpen?: boolean, alertEmails?: string[] }
+// The alert list holds who gets registrants' details by email: super admins only.
+export const POST = adminRoute(async (req: NextRequest, _context: unknown, session) => {
+  let body: { registrationOpen?: unknown; alertEmails?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -62,9 +66,20 @@ export const POST = adminRoute(async (req: NextRequest) => {
   if (body.registrationOpen !== undefined && typeof body.registrationOpen !== "boolean") {
     return NextResponse.json({ error: "registrationOpen must be true or false" }, { status: 400 });
   }
+  let alertEmails: string[] | undefined;
+  if (body.alertEmails !== undefined) {
+    if (session.role !== "super_admin") {
+      return NextResponse.json({ error: "Only super admins can change who gets registration alerts." }, { status: 403 });
+    }
+    alertEmails = cleanAlertEmails(body.alertEmails) ?? undefined;
+    if (!alertEmails) {
+      return NextResponse.json({ error: `Enter up to ${MAX_ALERT_EMAILS} valid email addresses.` }, { status: 400 });
+    }
+  }
   try {
-    const settings = await updateSettings({ registrationOpen: body.registrationOpen as boolean | undefined });
-    console.info(`Settings updated: registrationOpen=${settings.registrationOpen}`);
+    const settings = await updateSettings({ registrationOpen: body.registrationOpen as boolean | undefined, alertEmails });
+    if (alertEmails) console.info(`Registration alert list updated by ${session.email}: ${alertEmails.length} address(es)`);
+    if (body.registrationOpen !== undefined) console.info(`Settings updated: registrationOpen=${settings.registrationOpen}`);
     return NextResponse.json({ settings });
   } catch (err) {
     console.error(`Could not save settings: ${describeError(err)}`);

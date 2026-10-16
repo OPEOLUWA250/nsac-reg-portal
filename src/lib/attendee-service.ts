@@ -1,10 +1,14 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { generateUniqueCode, generateQrPngBuffer, ticketQrContent } from "@/lib/qrcode";
-import { sendCategoryChangeEmail, sendQrEmail, type EmailLanguage } from "@/lib/email";
+import { sendAdminRegistrationEmail, sendCategoryChangeEmail, sendQrEmail, type EmailLanguage } from "@/lib/email";
 import { hasValidTicket, type Attendee } from "@/lib/types";
 import { brandLogoPng, renderTicketPng } from "@/lib/ticket-image";
 import { publicBaseUrl } from "@/lib/public-url";
 import { describeError } from "@/lib/describe-error";
+import { currentAdminEmails, parseAdminEmails } from "@/lib/server/admin-emails";
+import { listTickets } from "@/lib/ticket-store";
+import { getSettings } from "@/lib/settings-store";
+import { mergeAlertRecipients } from "@/lib/alert-emails";
 
 // Single place that creates attendees, used by the public registration form,
 // the admin walk-in form and the (legacy) Jotform webhook, so every path
@@ -220,6 +224,53 @@ export async function sendCategoryChangeNotice(attendee: Attendee): Promise<bool
   } catch (err) {
     console.error(`Failed to send category email to attendee ${attendee.id}: ${describeError(err)}`);
     return false;
+  }
+}
+
+/**
+ * Emails the organisers that someone has registered: the list in
+ * /admin → Settings plus ADMIN_NOTIFY_EMAILS. Each person gets their own copy
+ * (nobody sees the other addresses), with the dashboard button only if they
+ * are an admin at the time of sending. Call once, when a registration is
+ * confirmed. Never throws: a failed alert must not affect the registration.
+ */
+export async function notifyAdminsOfRegistration(attendee: Attendee): Promise<void> {
+  try {
+    const to = mergeAlertRecipients(parseAdminEmails(process.env.ADMIN_NOTIFY_EMAILS), (await getSettings()).alertEmails);
+    if (to.length === 0) return;
+    const [admins, tickets, files, logoPngBuffer] = await Promise.all([
+      currentAdminEmails(),
+      listTickets().catch(() => []),
+      // passport_path is set when the upload link is handed out: check the
+      // file actually arrived.
+      attendee.passport_path
+        ? supabaseAdmin().storage.from("passports").list(attendee.id).then(({ data }) => data ?? [])
+        : Promise.resolve([]),
+      brandLogoPng(),
+    ]);
+    const base = publicBaseUrl();
+    const ticketName = tickets.find((t) => t.id === attendee.ticket_type)?.name.en ?? attendee.ticket_type ?? "Unknown";
+    const passportUploaded = files.some((f) => f.name.startsWith("passport."));
+    // All at once, so a payment confirmation isn't held up by a long list.
+    const results = await Promise.allSettled(
+      to.map((email) =>
+        sendAdminRegistrationEmail({
+          to: email,
+          attendee,
+          ticketName,
+          passportUploaded,
+          dashboardUrl: base && admins.has(email) ? `${base}/admin` : null,
+          logoPngBuffer,
+        })
+      )
+    );
+    results.forEach((result, i) => {
+      if (result.status === "rejected") {
+        console.error(`Failed to send the new registration alert for attendee ${attendee.id} to ${to[i]}: ${describeError(result.reason)}`);
+      }
+    });
+  } catch (err) {
+    console.error(`Failed to send the new registration alert for attendee ${attendee.id}: ${describeError(err)}`);
   }
 }
 

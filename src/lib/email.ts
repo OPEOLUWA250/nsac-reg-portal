@@ -4,6 +4,7 @@ import { escapeHtml } from "@/lib/escape-html";
 import { EVENT_INFO } from "@/lib/event-info";
 import { publicBaseUrl } from "@/lib/public-url";
 import { buildIcs, googleCalendarUrl, icsFilename, outlookCalendarUrl } from "@/lib/calendar";
+import { buildAdminRegistrationEmail } from "@/lib/admin-registration-email";
 
 // Every email shares one letterhead layout: a navy band with the logo and
 // the dates, a thin gold rule, a white page with a left-aligned letter, a
@@ -534,9 +535,28 @@ export async function sendCategoryChangeEmail({
   });
 }
 
+// ---------- new registration (to the organisers) ----------
+
+/**
+ * Tells the organisers someone has just registered (after payment, or a
+ * free ticket). Laid out like the dashboard, not the attendee letterhead:
+ * see admin-registration-email.ts. One recipient per email, so nobody sees
+ * the other addresses. The passport itself is never attached.
+ */
+export async function sendAdminRegistrationEmail({
+  to,
+  logoPngBuffer,
+  ...details
+}: { to: string; logoPngBuffer?: Buffer | null } & Omit<Parameters<typeof buildAdminRegistrationEmail>[0], "hasLogo">) {
+  const fromAddress = process.env.EMAIL_FROM;
+  if (!fromAddress) throw new Error("Missing EMAIL_FROM environment variable");
+  const { subject, html } = buildAdminRegistrationEmail({ ...details, hasLogo: Boolean(logoPngBuffer) });
+  await deliver({ from: fromAddress, to, subject, html, attachments: logoPngBuffer ? [logoAttachment(logoPngBuffer)] : [] });
+}
+
 interface OutgoingEmail {
   from: string;
-  to: string;
+  to: string | string[];
   subject: string;
   html: string;
   attachments: { filename: string; content: Buffer; contentType: string; contentId?: string }[];

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { sendCategoryChangeEmail, sendQrEmail } from "./email";
+import { sendAdminRegistrationEmail, sendCategoryChangeEmail, sendQrEmail } from "./email";
+import type { Attendee } from "./types";
 
 const mail = vi.hoisted(() => ({ send: vi.fn().mockResolvedValue({}) }));
 vi.mock("nodemailer", () => ({ default: { createTransport: () => ({ sendMail: mail.send }) } }));
@@ -48,4 +49,52 @@ it("ends every email with the calendar links and invite, and the flyer when ther
   expect(message.html).toContain("Add to your calendar");
   expect(message.html).toContain('href="https://event.example.com/flyer"');
   expect(message.attachments.some((a: { contentType: string }) => a.contentType === "text/calendar")).toBe(true);
+});
+
+it("tells the organisers about a new registration, laid out like the dashboard, without the passport", async () => {
+  const attendee = {
+    id: "c1e00a55-9281-4643-b3ca-89e6a447fbf5", full_name: "Ada Example<script>x</script>", email: "ada@example.com", role: "speaker",
+    phone: "+234 801 234 5678", job_title: "Engineer", organization: "Example Space", language: "en", food_allergies: "Nuts\nShellfish",
+    promo_code: null, amount_cents: 35000, currency: "eur", payment_status: "paid", source: "web", paid_at: "2026-10-14T19:42:21Z",
+    needs_invitation_letter: true, passport_path: null,
+  } as unknown as Attendee;
+  await sendAdminRegistrationEmail({
+    to: "organiser@example.com",
+    attendee,
+    ticketName: "Standard",
+    passportUploaded: false,
+    dashboardUrl: "https://event.example.com/admin",
+  });
+  const message = mail.send.mock.calls[0][0];
+  expect(message.to).toBe("organiser@example.com");
+  expect(message.subject).toBe("New registration: Ada Example<script>x</script> (Standard)");
+  expect(message.html).toContain("Ada Example&lt;script&gt;x&lt;/script&gt;");
+  expect(message.html).not.toContain("<script>");
+  // Name, category and payment, then the drawer sections. No avatar or id.
+  expect(message.html).toMatch(/>Speaker</);
+  expect(message.html).toMatch(/>€350</);
+  expect(message.html).toContain("Travel and logistics");
+  expect(message.html).not.toContain("#C1E00A55");
+  expect(message.html).toContain("Nuts<br />Shellfish");
+  expect(message.html).toContain("14 Oct 2026, 20:42 WAT");
+  expect(message.html).not.toContain("Promo code");
+  expect(message.html).toContain("Not received. Email them to collect it.");
+  expect(message.html).toContain('href="https://event.example.com/admin"');
+  // The dashboard fonts, not the letterhead.
+  expect(message.html).toContain("'DM Sans', Arial, Helvetica, sans-serif");
+  expect(message.html).not.toContain("Questions? Simply reply");
+  expect(message.attachments).toEqual([]);
+});
+
+it("puts the brand logo in the alert header when there is one", async () => {
+  const attendee = { id: "a1", full_name: "Ada Example", email: "ada@example.com", role: "delegate", amount_cents: null } as unknown as Attendee;
+  await sendAdminRegistrationEmail({ to: "o@example.com", attendee, ticketName: "Free pass", passportUploaded: true, logoPngBuffer: Buffer.from("png") });
+  const message = mail.send.mock.calls[0][0];
+  expect(message.html).toContain('src="cid:brand-logo.png"');
+  expect(message.attachments).toEqual([expect.objectContaining({ cid: "brand-logo.png" })]);
+  expect(message.html).toMatch(/>Free</);
+  // Blue and greys only: the brand gold is kept out of the organiser alert.
+  expect(message.html).not.toMatch(/#F09F07/i);
+  // No dashboard link for this recipient (not an admin): no button.
+  expect(message.html).not.toContain("Open the dashboard");
 });
