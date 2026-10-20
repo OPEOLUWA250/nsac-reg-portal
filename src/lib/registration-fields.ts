@@ -37,7 +37,9 @@ export const JOB_FUNCTIONS = [
 export type JobFunction = (typeof JOB_FUNCTIONS)[number];
 
 export const PASSPORT_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"] as const;
-export const PASSPORT_MAX_BYTES = 10 * 1024 * 1024;
+// After photos are shrunk in the browser (a few hundred KB), so in practice
+// this limits PDFs. Keep it in step with the passports bucket's file size limit.
+export const PASSPORT_MAX_BYTES = 2 * 1024 * 1024;
 
 export const LIMITS = {
   name: 60,

@@ -9,6 +9,7 @@ import { currentAdminEmails, parseAdminEmails } from "@/lib/server/admin-emails"
 import { listTickets } from "@/lib/ticket-store";
 import { getSettings } from "@/lib/settings-store";
 import { mergeAlertRecipients } from "@/lib/alert-emails";
+import { getPassportFile } from "@/lib/server/passport-file";
 
 // Single place that creates attendees, used by the public registration form,
 // the admin walk-in form and the (legacy) Jotform webhook, so every path
@@ -238,19 +239,15 @@ export async function notifyAdminsOfRegistration(attendee: Attendee): Promise<vo
   try {
     const to = mergeAlertRecipients(parseAdminEmails(process.env.ADMIN_NOTIFY_EMAILS), (await getSettings()).alertEmails);
     if (to.length === 0) return;
-    const [admins, tickets, files, logoPngBuffer] = await Promise.all([
+    const [admins, tickets, passport, logoPngBuffer] = await Promise.all([
       currentAdminEmails(),
       listTickets().catch(() => []),
-      // passport_path is set when the upload link is handed out: check the
-      // file actually arrived.
-      attendee.passport_path
-        ? supabaseAdmin().storage.from("passports").list(attendee.id).then(({ data }) => data ?? [])
-        : Promise.resolve([]),
+      // Downloaded once for every recipient.
+      passportForAlert(attendee),
       brandLogoPng(),
     ]);
     const base = publicBaseUrl();
     const ticketName = tickets.find((t) => t.id === attendee.ticket_type)?.name.en ?? attendee.ticket_type ?? "Unknown";
-    const passportUploaded = files.some((f) => f.name.startsWith("passport."));
     // All at once, so a payment confirmation isn't held up by a long list.
     const results = await Promise.allSettled(
       to.map((email) =>
@@ -258,7 +255,7 @@ export async function notifyAdminsOfRegistration(attendee: Attendee): Promise<vo
           to: email,
           attendee,
           ticketName,
-          passportUploaded,
+          ...passport,
           dashboardUrl: base && admins.has(email) ? `${base}/admin` : null,
           logoPngBuffer,
         })
@@ -271,6 +268,26 @@ export async function notifyAdminsOfRegistration(attendee: Attendee): Promise<vo
     });
   } catch (err) {
     console.error(`Failed to send the new registration alert for attendee ${attendee.id}: ${describeError(err)}`);
+  }
+}
+
+/**
+ * The passport for the alert, attached as uploaded. passport_path is set
+ * when the upload link is handed out, so this checks the file actually
+ * arrived. If it can't be read, the alert still goes out, saying it was
+ * uploaded.
+ */
+async function passportForAlert(attendee: Attendee): Promise<{
+  passportUploaded: boolean;
+  passportFile?: { content: Buffer; contentType: string } | null;
+}> {
+  if (!attendee.passport_path) return { passportUploaded: false };
+  try {
+    const file = await getPassportFile(attendee.id);
+    return file ? { passportUploaded: true, passportFile: file } : { passportUploaded: false };
+  } catch (err) {
+    console.warn(`Couldn't read the passport of attendee ${attendee.id} for the registration alert: ${describeError(err)}`);
+    return { passportUploaded: true };
   }
 }
 

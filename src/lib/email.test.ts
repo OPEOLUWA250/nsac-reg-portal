@@ -51,7 +51,7 @@ it("ends every email with the calendar links and invite, and the flyer when ther
   expect(message.attachments.some((a: { contentType: string }) => a.contentType === "text/calendar")).toBe(true);
 });
 
-it("tells the organisers about a new registration, laid out like the dashboard, without the passport", async () => {
+it("tells the organisers about a new registration, laid out like the dashboard", async () => {
   const attendee = {
     id: "c1e00a55-9281-4643-b3ca-89e6a447fbf5", full_name: "Ada Example<script>x</script>", email: "ada@example.com", role: "speaker",
     phone: "+234 801 234 5678", job_title: "Engineer", organization: "Example Space", language: "en", food_allergies: "Nuts\nShellfish",
@@ -97,4 +97,50 @@ it("puts the brand logo in the alert header when there is one", async () => {
   expect(message.html).not.toMatch(/#F09F07/i);
   // No dashboard link for this recipient (not an admin): no button.
   expect(message.html).not.toContain("Open the dashboard");
+});
+
+it("attaches the passport as uploaded, not as a picture in the email", async () => {
+  const attendee = { id: "a1", full_name: "Adá Example", email: "ada@example.com", role: "delegate", amount_cents: null, registration_number: 7 } as unknown as Attendee;
+  for (const [contentType, ext] of [["application/pdf", "pdf"], ["image/png", "png"]]) {
+    mail.send.mockClear();
+    await sendAdminRegistrationEmail({
+      to: "o@example.com", attendee, ticketName: "Free pass", passportUploaded: true,
+      passportFile: { content: Buffer.from("file"), contentType },
+    });
+    const message = mail.send.mock.calls[0][0];
+    expect(message.html).not.toContain("cid:passport");
+    expect(message.html).toContain("Uploaded, attached to this email");
+    expect(message.html).toContain("please don't forward it");
+    expect(message.attachments).toEqual([expect.objectContaining({ filename: `7-passport-ada-example.${ext}`, contentType })]);
+    expect(message.attachments[0].cid).toBeUndefined();
+  }
+});
+
+it("groups alerts in threads of 100 by registration number", async () => {
+  vi.stubEnv("EMAIL_FROM", "NewSpace Africa <hello@newspace.example.com>");
+  const send = async (registration_number: number | null) => {
+    mail.send.mockClear();
+    const attendee = { id: "a1", full_name: "Ada Example", email: "ada@example.com", role: "delegate", amount_cents: null, registration_number } as unknown as Attendee;
+    await sendAdminRegistrationEmail({ to: "o@example.com", attendee, ticketName: "Standard", passportUploaded: false });
+    return mail.send.mock.calls[0][0];
+  };
+  const first = await send(1);
+  const hundredth = await send(100);
+  const next = await send(101);
+  expect(first.subject).toBe("New registrations 1 to 100 · NewSpace Africa 2027");
+  expect(hundredth.subject).toBe(first.subject);
+  expect(first.headers).toEqual({
+    "In-Reply-To": "<registration-alerts-2027-1-100@newspace.example.com>",
+    References: "<registration-alerts-2027-1-100@newspace.example.com>",
+  });
+  expect(hundredth.headers).toEqual(first.headers);
+  expect(next.subject).toBe("New registrations 101 to 200 · NewSpace Africa 2027");
+  expect(next.headers.References).toBe("<registration-alerts-2027-101-200@newspace.example.com>");
+  // Who it is shows in the inbox preview and the heading.
+  expect(next.html).toContain("#101 Ada Example: Delegate, Standard, Free");
+  expect(next.html).toContain("#101</strong>");
+  // No number yet (database not updated): a standalone alert, as before.
+  const unnumbered = await send(null);
+  expect(unnumbered.subject).toBe("New registration: Ada Example (Standard)");
+  expect(unnumbered.headers).toBeUndefined();
 });

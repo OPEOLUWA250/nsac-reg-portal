@@ -9,6 +9,7 @@ import {
   Alert,
   Button,
   Card,
+  Chip,
   cx,
   describedBy,
   EmptyState,
@@ -33,7 +34,7 @@ const POLL_INTERVAL_MS = 20_000;
 const PAGE_SIZE = 25;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-type Sort = "newest" | "oldest" | "name";
+type Sort = "newest" | "oldest" | "number" | "name";
 
 interface Filters {
   search: string;
@@ -186,7 +187,9 @@ export default function AdminDashboard() {
       if (filters.checkin === "in" && !a.checked_in) return false;
       if (filters.checkin === "out" && a.checked_in) return false;
       if (filters.letter && !a.needs_invitation_letter) return false;
-      if (q) {
+      // "134" or "#134" finds registration 134 (and anything else containing 134).
+      const number = /^#?\d+$/.test(q) ? Number(q.replace("#", "")) : null;
+      if (q && !(number !== null && a.registration_number === number)) {
         const haystack = [a.full_name, a.email, a.organization, a.job_title, a.phone, a.nationality, a.id.slice(0, 8)]
           .filter(Boolean)
           .join(" ")
@@ -197,6 +200,8 @@ export default function AdminDashboard() {
     });
     return list.sort((x, y) => {
       if (sort === "name") return x.full_name.localeCompare(y.full_name);
+      // 1, 2, 3..., then those still awaiting payment (no number yet).
+      if (sort === "number") return (x.registration_number ?? Infinity) - (y.registration_number ?? Infinity) || x.created_at.localeCompare(y.created_at);
       const diff = new Date(x.created_at).getTime() - new Date(y.created_at).getTime();
       return sort === "oldest" ? diff : -diff;
     });
@@ -466,12 +471,12 @@ export default function AdminDashboard() {
                     id="search"
                     type="search"
                     className={inputClass(false, "pl-10")}
-                    placeholder="Search name, email, organisation, phone, reference"
+                    placeholder="Search name, email, organisation, phone, number"
                     value={filters.search}
                     onChange={(e) => setFilter("search", e.target.value)}
                   />
                 </div>
-                <FilterSelect label="Sort" value={sort} onChange={(v) => setSort(v as Sort)} active={false} options={[["newest", "Newest first"], ["oldest", "Oldest first"], ["name", "Name A to Z"]]} />
+                <FilterSelect label="Sort" value={sort} onChange={(v) => setSort(v as Sort)} active={false} options={[["newest", "Newest first"], ["oldest", "Oldest first"], ["number", "By number"], ["name", "Name A to Z"]]} />
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <FilterSelect label="Payment" value={filters.payment} onChange={(v) => setFilter("payment", v as Filters["payment"])} options={[["all", "All payments"], ["paid", `Paid (${stats.paid})`], ["walk_in", `Walk-in (${stats.walkIns})`], ["pending", `Awaiting payment (${stats.pending})`]]} />
@@ -524,7 +529,10 @@ export default function AdminDashboard() {
                       <div className="flex items-center gap-3">
                         <Avatar name={a.full_name} />
                         <div className="min-w-0">
-                          <p className="truncate font-semibold text-ink">{a.full_name}</p>
+                          <p className="truncate font-semibold text-ink">
+                            {a.registration_number != null && <span className="mr-1.5 font-normal tabular-nums text-ink-3">#{a.registration_number}</span>}
+                            {a.full_name}
+                          </p>
                           <p className="truncate text-sm text-ink-3">{a.email}</p>
                         </div>
                       </div>
@@ -532,6 +540,7 @@ export default function AdminDashboard() {
                         <PaymentBadge status={a.payment_status} source={a.source} />
                         <StatusPill checkedIn={a.checked_in} />
                         {a.role !== "delegate" && <RolePill role={a.role} />}
+                        <PassportTag a={a} onOpen={isSuper ? () => handleViewPassport(a.id) : undefined} />
                       </div>
                       <p className="text-sm text-ink-3">
                         {[ticketName(a.ticket_type), money(a.amount_cents, a.currency), relativeTime(a.created_at)].filter(Boolean).join(" · ")}
@@ -546,6 +555,9 @@ export default function AdminDashboard() {
                   <table className="w-full text-sm">
                     <thead className="bg-subtle text-left text-xs font-semibold uppercase tracking-wider text-ink-3">
                       <tr>
+                        <th scope="col" className="w-px whitespace-nowrap py-3 pl-4 pr-0 text-right">
+                          <abbr title="Registration number" className="no-underline">No.</abbr>
+                        </th>
                         <th scope="col" className="px-4 py-3">Attendee</th>
                         <th scope="col" className="hidden px-4 py-3 @6xl:table-cell">Organisation</th>
                         <th scope="col" className="px-4 py-3">Ticket and payment</th>
@@ -563,6 +575,9 @@ export default function AdminDashboard() {
                           onClick={() => setSelectedId(a.id)}
                           className="cursor-pointer border-t border-line align-middle transition-colors duration-150 hover:bg-canvas"
                         >
+                          <td className="w-px whitespace-nowrap py-3 pl-4 pr-0 text-right tabular-nums">
+                            <RegistrationNo a={a} />
+                          </td>
                           <td className="px-4 py-3">
                             <div className="flex min-w-0 items-center gap-3">
                               <Avatar name={a.full_name} />
@@ -581,6 +596,7 @@ export default function AdminDashboard() {
                               <PaymentBadge status={a.payment_status} source={a.source} />
                               {a.role !== "delegate" && <RolePill role={a.role} />}
                               {a.needs_invitation_letter && <span className="rounded-sm border border-line px-1.5 py-0.5 text-xs font-semibold text-ink-2">Letter</span>}
+                              <PassportTag a={a} onOpen={isSuper ? () => handleViewPassport(a.id) : undefined} />
                             </div>
                             <div className="mt-1 text-ink-3">
                               {[ticketName(a.ticket_type), money(a.amount_cents, a.currency)].filter(Boolean).join(" · ") || "No ticket"}
@@ -644,6 +660,45 @@ export default function AdminDashboard() {
         </DeleteDialog>
       )}
     </AdminPage>
+  );
+}
+
+// The registration number, given once a registration is confirmed.
+function RegistrationNo({ a }: { a: Attendee }) {
+  if (a.registration_number != null) return <span className="font-semibold text-ink">#{a.registration_number}</span>;
+  return (
+    <span className="text-ink-3" title={a.payment_status === "pending" ? "Numbered once they pay" : "No number yet"}>
+      <span aria-hidden="true">–</span>
+      <span className="sr-only">{a.payment_status === "pending" ? "Numbered once they pay" : "No number yet"}</span>
+    </span>
+  );
+}
+
+// Whether a passport came in. Super admins can open it straight from the list
+// (without opening the row's details).
+function PassportTag({ a, onOpen }: { a: Attendee; onOpen?: () => void }) {
+  if (!a.passport_path) {
+    return (
+      <Chip dot="var(--color-danger)" className="text-ink-3">
+        No passport
+      </Chip>
+    );
+  }
+  if (!onOpen) return <Chip dot="var(--color-success)">Passport</Chip>;
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen();
+      }}
+      className="rounded-sm transition-colors duration-150 hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue"
+      aria-label={`View ${a.full_name}'s passport`}
+    >
+      <Chip dot="var(--color-success)" className="underline decoration-line-strong underline-offset-2 hover:decoration-blue">
+        Passport
+      </Chip>
+    </button>
   );
 }
 

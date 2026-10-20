@@ -76,6 +76,12 @@ export interface Attendee {
   share_details: boolean | null;
   /** Promo code used at registration, if any. */
   promo_code: string | null;
+  /**
+   * 1, 2, 3...: given by the database once a registration is confirmed (paid,
+   * walk-in or Jotform), in that order. Null while awaiting payment; missing
+   * until the registration_number SQL has been run.
+   */
+  registration_number?: number | null;
 }
 
 /** Can this attendee enter / receive their QR ticket? */

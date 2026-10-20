@@ -31,6 +31,28 @@ const DISPLAY = "Raleway, Arial, Helvetica, sans-serif";
 /** Content id of the logo attachment (see logoAttachment in email.ts). */
 export const ADMIN_EMAIL_LOGO_CID = "brand-logo.png";
 
+/** Registration alerts per email thread (Gmail's own limit is 100). */
+export const ALERTS_PER_THREAD = 100;
+
+/**
+ * Which thread an alert goes in. Mail apps put emails in one thread when
+ * they share a subject and point at the same parent message, so every alert
+ * for registrations 1 to 100 gets the same subject and `threadKey`, 101 to
+ * 200 the next, and so on. The parent is never sent: it only ties the
+ * thread together. Without a number (before the database has the column),
+ * each alert stands alone, as before.
+ */
+export function alertThread(number: number | null): { subject: string; threadKey: string } | null {
+  if (!number || number < 1) return null;
+  const batch = Math.floor((number - 1) / ALERTS_PER_THREAD);
+  const from = batch * ALERTS_PER_THREAD + 1;
+  const to = from + ALERTS_PER_THREAD - 1;
+  return {
+    subject: `New registrations ${from} to ${to} · NewSpace Africa 2027`,
+    threadKey: `registration-alerts-2027-${from}-${to}`,
+  };
+}
+
 type Value = string | null | undefined;
 
 function dotMark(color: string): string {
@@ -92,6 +114,8 @@ function lagosTime(iso: string | null): string | null {
 export interface AdminRegistrationEmail {
   subject: string;
   html: string;
+  /** Set when the alert belongs in a thread (see alertThread). */
+  threadKey: string | null;
 }
 
 export function buildAdminRegistrationEmail({
@@ -100,6 +124,7 @@ export function buildAdminRegistrationEmail({
   passportUploaded,
   dashboardUrl,
   hasLogo = false,
+  passportAttached = false,
 }: {
   attendee: Attendee;
   ticketName: string;
@@ -108,17 +133,23 @@ export function buildAdminRegistrationEmail({
   dashboardUrl?: string | null;
   /** The white logo is attached as ADMIN_EMAIL_LOGO_CID. */
   hasLogo?: boolean;
+  /** The passport is attached as uploaded (PDF or photo). */
+  passportAttached?: boolean;
 }): AdminRegistrationEmail {
   const name = a.full_name.trim();
+  const number = a.registration_number ?? null;
+  const thread = alertThread(number);
   const amount = a.amount_cents ? money(a.amount_cents, a.currency) : "Free";
   const role = roleLabel(a.role);
   const subtitle = [a.job_title, a.organization].filter(Boolean).join(" · ");
   const when = lagosTime(a.paid_at ?? a.created_at);
   const paymentDot =
     a.source === "walk_in" ? C.lineStrong : a.payment_status === "paid" ? C.success : a.payment_status === "pending" ? C.danger : C.lineStrong;
-  const passport = passportUploaded
-    ? `${dotMark(C.success)}Uploaded`
-    : `${dotMark(C.danger)}Not received. Email them to collect it.`;
+  const passport = !passportUploaded
+    ? `${dotMark(C.danger)}Not received. Email them to collect it.`
+    : passportAttached
+      ? `${dotMark(C.success)}Uploaded, attached to this email`
+      : `${dotMark(C.success)}Uploaded. Open it in the dashboard.`;
 
   const brand = hasLogo
     ? `<img src="cid:${ADMIN_EMAIL_LOGO_CID}" alt="NewSpace Africa Conference" width="140" height="52" style="display:block; width:140px; height:52px; border:0;" />`
@@ -183,7 +214,7 @@ export function buildAdminRegistrationEmail({
 </style>
 </head>
 <body style="margin:0; padding:0; background:${C.canvas};">
-  <div style="display:none; max-height:0; overflow:hidden; opacity:0;">${escapeHtml(`${role}, ${ticketName}, ${amount}`)}</div>
+  <div style="display:none; max-height:0; overflow:hidden; opacity:0;">${escapeHtml(`${number ? `#${number} ` : ""}${name}: ${role}, ${ticketName}, ${amount}`)}</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.canvas};">
     <tr>
       <td class="page" align="center" style="padding:24px 16px 32px;">
@@ -201,7 +232,7 @@ export function buildAdminRegistrationEmail({
                 </td>
               </tr>
               <tr><td class="pad" style="padding:20px 20px 20px;">
-                <p style="margin:0; font-family:${SANS}; color:${C.ink3}; font-size:13px; line-height:20px;">New registration${when ? ` · ${escapeHtml(when)}` : ""}</p>
+                <p style="margin:0; font-family:${SANS}; color:${C.ink3}; font-size:13px; line-height:20px;">New registration${number ? ` <strong style="color:${C.ink};">#${number}</strong>` : ""}${when ?` · ${escapeHtml(when)}` : ""}</p>
                 <h1 style="margin:6px 0 0; font-family:${DISPLAY}; color:${C.blue}; font-size:24px; font-weight:700; line-height:30px; word-break:break-word;">${escapeHtml(name)}</h1>
                 ${subtitle ? `<p style="margin:4px 0 0; font-family:${SANS}; color:${C.ink2}; font-size:14px; line-height:20px; word-break:break-word;">${escapeHtml(subtitle)}</p>` : ""}
                 <p style="margin:14px 0 0;">${chip(role, roleAccent(a.role))}${chip(paymentLabel(a.payment_status, a.source), paymentDot)}</p>${button}
@@ -209,7 +240,7 @@ export function buildAdminRegistrationEmail({
             </table>
           </td></tr>${sections}
           <tr><td style="padding:20px 4px 0; font-family:${SANS}; color:${C.ink3}; font-size:12px; line-height:18px;">
-            Sent to the registration alert list, which super admins manage in the dashboard settings. Passports are never attached: open them in the dashboard.
+            Sent to the registration alert list, which super admins manage in the dashboard settings.${passportUploaded && passportAttached ? " This email contains a passport: please don't forward it." : ""}
           </td></tr>
         </table>
       </td>
@@ -218,5 +249,9 @@ export function buildAdminRegistrationEmail({
 </body>
 </html>`;
 
-  return { subject: `New registration: ${name} (${ticketName})`, html };
+  return {
+    subject: thread?.subject ?? `New registration: ${name} (${ticketName})`,
+    html,
+    threadKey: thread?.threadKey ?? null,
+  };
 }

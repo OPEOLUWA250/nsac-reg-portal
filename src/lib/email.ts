@@ -541,17 +541,71 @@ export async function sendCategoryChangeEmail({
  * Tells the organisers someone has just registered (after payment, or a
  * free ticket). Laid out like the dashboard, not the attendee letterhead:
  * see admin-registration-email.ts. One recipient per email, so nobody sees
- * the other addresses. The passport itself is never attached.
+ * the other addresses. The passport is attached as uploaded (PDF or photo).
+ * Alerts are grouped in threads of 100 by registration number (alertThread).
  */
 export async function sendAdminRegistrationEmail({
   to,
   logoPngBuffer,
+  passportFile,
   ...details
-}: { to: string; logoPngBuffer?: Buffer | null } & Omit<Parameters<typeof buildAdminRegistrationEmail>[0], "hasLogo">) {
+}: {
+  to: string;
+  logoPngBuffer?: Buffer | null;
+  /** The passport as uploaded. */
+  passportFile?: { content: Buffer; contentType: string } | null;
+} & Omit<Parameters<typeof buildAdminRegistrationEmail>[0], "hasLogo" | "passportAttached">) {
   const fromAddress = process.env.EMAIL_FROM;
   if (!fromAddress) throw new Error("Missing EMAIL_FROM environment variable");
-  const { subject, html } = buildAdminRegistrationEmail({ ...details, hasLogo: Boolean(logoPngBuffer) });
-  await deliver({ from: fromAddress, to, subject, html, attachments: logoPngBuffer ? [logoAttachment(logoPngBuffer)] : [] });
+  const { subject, html, threadKey } = buildAdminRegistrationEmail({
+    ...details,
+    hasLogo: Boolean(logoPngBuffer),
+    passportAttached: Boolean(passportFile),
+  });
+  const attachments: OutgoingEmail["attachments"] = logoPngBuffer ? [logoAttachment(logoPngBuffer)] : [];
+  if (passportFile) {
+    const number = details.attendee.registration_number;
+    attachments.push({
+      filename: `${number ? `${number}-` : ""}passport-${slugForFilename(details.attendee.full_name)}.${PASSPORT_EXTENSIONS[passportFile.contentType] ?? "pdf"}`,
+      content: passportFile.content,
+      contentType: passportFile.contentType,
+    });
+  }
+  // The thread's (never sent) parent message: same id in every alert of the thread.
+  const parent = threadKey ? `<${threadKey}@${emailDomain(fromAddress)}>` : null;
+  await deliver({
+    from: fromAddress,
+    to,
+    subject,
+    html,
+    attachments,
+    ...(parent ? { headers: { "In-Reply-To": parent, References: parent } } : {}),
+  });
+}
+
+const PASSPORT_EXTENSIONS: Record<string, string> = {
+  "application/pdf": "pdf",
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+/** "NewSpace Africa <hello@spaceinafrica.com>" -> "spaceinafrica.com". */
+function emailDomain(from: string): string {
+  return from.match(/@([^\s>]+)/)?.[1]?.toLowerCase() ?? "newspace.spaceinafrica.com";
+}
+
+/** "Ada Óbí-Example" -> "ada-obi-example". */
+function slugForFilename(name: string): string {
+  return (
+    name
+      .normalize("NFKD")
+      .replace(/\p{M}/gu, "") // accents
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "attendee"
+  );
 }
 
 interface OutgoingEmail {
@@ -560,6 +614,7 @@ interface OutgoingEmail {
   subject: string;
   html: string;
   attachments: { filename: string; content: Buffer; contentType: string; contentId?: string }[];
+  headers?: Record<string, string>;
 }
 
 // Two ways to send, chosen by environment:
@@ -587,6 +642,7 @@ async function deliver(message: OutgoingEmail) {
         contentType: a.contentType,
         ...(a.contentId ? { cid: a.contentId } : {}),
       })),
+      ...(message.headers ? { headers: message.headers } : {}),
     });
     return;
   }

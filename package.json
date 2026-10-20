@@ -2,6 +2,9 @@
   "name": "nsac-reg-portal",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,11 +13,13 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^1.0.11",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.112.3",
     "html5-qrcode": "^2.3.8",
     "next": "16.3.2",
     "nodemailer": "^8.0.11",
+    "pdfjs-dist": "^6.4.299",
     "qrcode": "^1.5.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",

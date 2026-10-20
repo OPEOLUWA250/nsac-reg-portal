@@ -143,7 +143,15 @@ export default function AttendeeDrawer({
             <RolePill role={a.role} />
             <PaymentBadge status={a.payment_status} source={a.source} />
             <StatusPill checkedIn={a.checked_in} />
-            <span className="ml-auto font-mono text-xs text-white/65">#{a.id.slice(0, 8).toUpperCase()}</span>
+            {a.registration_number != null ? (
+              <span className="ml-auto text-sm font-semibold tabular-nums text-white" title="Registration number">
+                No. {a.registration_number}
+              </span>
+            ) : (
+              <span className="ml-auto font-mono text-xs text-white/65" title="Reference">
+                {a.id.slice(0, 8).toUpperCase()}
+              </span>
+            )}
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
             <Button variant="on-dark" size="sm" onClick={onToggleCheckIn} loading={busy}>
@@ -198,8 +206,20 @@ export default function AttendeeDrawer({
                 )
               }
             />
+            <Row
+              label="Passport"
+              value={
+                a.passport_path ? (
+                  onPassport ? "Uploaded, shown below" : "Uploaded. Super admins can view it."
+                ) : (
+                  <span className="font-semibold">Not uploaded</span>
+                )
+              }
+            />
             <Row label="Food allergies" value={a.food_allergies} />
           </Section>
+
+          {a.passport_path && onPassport && <PassportPreview key={a.id} attendeeId={a.id} name={a.full_name} onOpen={onPassport} />}
 
           <Section title="Ticket and payment">
             <Row label="Ticket" value={ticketName || null} />
@@ -237,6 +257,11 @@ export default function AttendeeDrawer({
           </Section>
 
           <Section title="Record">
+            <Row
+              label="Registration number"
+              value={a.registration_number != null ? `No. ${a.registration_number}` : a.payment_status === "pending" ? "Given once they pay" : null}
+            />
+            <Row label="Reference" value={<span className="font-mono">{a.id.slice(0, 8).toUpperCase()}</span>} />
             <Row label="Registered" value={formatDateTime(a.created_at)} />
             <Row label="Last updated" value={formatDateTime(a.updated_at)} />
             <Row label="Source" value={a.source === "web" ? "Registration form" : a.source === "walk_in" ? "Walk-in (admin)" : a.source === "jotform" ? "Jotform" : a.source} />
@@ -369,6 +394,44 @@ function emailSubject(role: string, language: string | null): string {
   const fr = language === "fr";
   if (role === "vip") return fr ? "Vous êtes invité(e) VIP…" : "You're a VIP guest…";
   return fr ? "Votre catégorie d'inscription… a changé" : "Your registration category… has changed";
+}
+
+// The passport photo page (page 1 if it's a PDF), drawn by the server so it
+// shows the same for photos and PDFs. Super admins only.
+function PassportPreview({ attendeeId, name, onOpen }: { attendeeId: string; name: string; onOpen: () => void }) {
+  const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
+  return (
+    <section className="rounded-lg border border-line bg-surface">
+      <div className="flex items-center justify-between gap-3 px-5 pb-2 pt-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-3">Passport</h3>
+        <button type="button" onClick={onOpen} className={cx(linkClass, "inline-flex items-center gap-1 text-sm")}>
+          Open original file <IconExternal />
+        </button>
+      </div>
+      <div className="px-5 pb-5">
+        {state === "failed" ? (
+          <p className="text-sm text-ink-3">The preview couldn&apos;t be loaded. Open the original file instead.</p>
+        ) : (
+          <button
+            type="button"
+            onClick={onOpen}
+            className="block w-full overflow-hidden rounded-md border border-line bg-subtle"
+            aria-label={`Open ${name}'s passport in a new tab`}
+          >
+            {state === "loading" && <span className="block aspect-3/4 w-full animate-pulse bg-subtle" aria-hidden="true" />}
+            {/* eslint-disable-next-line @next/next/no-img-element -- a private, signed-in image, not for the optimiser */}
+            <img
+              src={`/api/admin/passport?id=${encodeURIComponent(attendeeId)}`}
+              alt={`Passport photo page of ${name}`}
+              className={cx("block h-auto w-full", state !== "ready" && "hidden")}
+              onLoad={() => setState("ready")}
+              onError={() => setState("failed")}
+            />
+          </button>
+        )}
+      </div>
+    </section>
+  );
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {

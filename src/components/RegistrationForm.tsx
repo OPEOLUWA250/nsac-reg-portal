@@ -136,21 +136,28 @@ function errorsForStep(all: ValidationErrors, step: number): ValidationErrors {
   return out;
 }
 
-// Large phone photos are shrunk before upload (still sharp enough to read a
-// passport) so the upload works on slow mobile connections. PDFs go as-is.
-async function preparePassport(file: File): Promise<Blob> {
-  if (!file.type.startsWith("image/") || file.size < 1_500_000) return file;
+// Every photo is shrunk to a JPEG as soon as it's chosen (1600px on the long
+// side is still sharp enough to read a passport): a 12 MB phone photo ends up
+// a few hundred KB, which keeps storage small and uploads quick on slow
+// connections. The size limit then applies to what we store. PDFs go as-is.
+async function preparePassport(file: File): Promise<File> {
+  if (!file.type.startsWith("image/")) return file;
   try {
     const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
-    const scale = Math.min(1, 2400 / Math.max(bitmap.width, bitmap.height));
+    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(bitmap.width * scale);
     canvas.height = Math.round(bitmap.height * scale);
-    canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/jpeg", 0.85)
-    );
-    return blob && blob.size < file.size ? blob : file;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    // White under transparent PNGs, which JPEG would otherwise turn black.
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.8));
+    if (!blob || (blob.size >= file.size && file.type === "image/jpeg")) return file;
+    return new File([blob], file.name.replace(/\.[^.]*$/, "") + ".jpg", { type: "image/jpeg" });
   } catch {
     return file;
   }
@@ -201,6 +208,8 @@ export default function RegistrationForm({
     ticket: tickets.length === 1 ? tickets[0].id : "",
   }));
   const [passportFile, setPassportFile] = useState<File | null>(null);
+  // Counts file choices, so a slow shrink can't overwrite a newer choice.
+  const passportPick = useRef(0);
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [banner, setBanner] = useState<string>("");
   const [notice, setNotice] = useState<string>("");
@@ -570,8 +579,8 @@ export default function RegistrationForm({
       if (typeof json.passportUploadUrl === "string" && passportFile) {
         setPhase({ kind: "uploading", pct: 0 });
         try {
-          const blob = await preparePassport(passportFile);
-          await uploadWithProgress(json.passportUploadUrl, blob, (pct) =>
+          // Already shrunk when it was chosen (onPassportChange).
+          await uploadWithProgress(json.passportUploadUrl, passportFile, (pct) =>
             setPhase({ kind: "uploading", pct })
           );
         } catch {
@@ -589,17 +598,21 @@ export default function RegistrationForm({
     setBanner(t.errors.server);
   }
 
-  function onPassportChange(file: File | null) {
+  async function onPassportChange(chosen: File | null) {
+    const pick = ++passportPick.current;
     setErrors((e) => ({ ...e, passport: undefined }));
-    if (!file) {
+    if (!chosen) {
       setPassportFile(null);
       return;
     }
-    if (!(PASSPORT_MIME_TYPES as readonly string[]).includes(file.type)) {
+    if (!(PASSPORT_MIME_TYPES as readonly string[]).includes(chosen.type)) {
       setErrors((e) => ({ ...e, passport: "file_type" }));
       setPassportFile(null);
       return;
     }
+    // Photos are shrunk first, so the limit applies to what we store.
+    const file = await preparePassport(chosen);
+    if (pick !== passportPick.current) return; // another file was chosen meanwhile
     if (file.size > PASSPORT_MAX_BYTES) {
       setErrors((e) => ({ ...e, passport: "file_too_large" }));
       setPassportFile(null);
@@ -788,7 +801,7 @@ export default function RegistrationForm({
                               type="file"
                               accept={PASSPORT_MIME_TYPES.join(",")}
                               className="sr-only"
-                              onChange={(e) => onPassportChange(e.target.files?.[0] ?? null)}
+                              onChange={(e) => void onPassportChange(e.target.files?.[0] ?? null)}
                               aria-describedby={describedBy("field-passport", { hint: true, error: err("passport") })}
                             />
                           </label>
@@ -796,7 +809,7 @@ export default function RegistrationForm({
                             <span className="flex min-w-0 items-center gap-2 text-sm text-ink-2">
                               <span className="max-w-56 truncate">{passportFile.name}</span>
                               <span className="text-ink-3">({(passportFile.size / 1_048_576).toFixed(1)} MB)</span>
-                              <Button variant="ghost" size="sm" onClick={() => onPassportChange(null)}>
+                              <Button variant="ghost" size="sm" onClick={() => void onPassportChange(null)}>
                                 {t.fields.passportRemove}
                               </Button>
                             </span>

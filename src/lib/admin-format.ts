@@ -102,6 +102,7 @@ function csvCell(value: unknown): string {
 }
 
 const COLUMNS: [string, (a: Attendee, ticketName: (id: string | null) => string) => unknown][] = [
+  ["No.", (a) => a.registration_number ?? ""],
   ["Reference", (a) => a.id.slice(0, 8).toUpperCase()],
   ["First Name", (a) => a.first_name ?? a.full_name.split(" ")[0]],
   ["Last Name", (a) => a.last_name ?? a.full_name.split(" ").slice(1).join(" ")],

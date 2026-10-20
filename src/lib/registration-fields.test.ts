@@ -23,7 +23,7 @@ describe("passport", () => {
   it("rejects files that aren't a photo or PDF, or are too large", () => {
     const wrongType = validateRegistration({ ...valid, passport: { mime: "text/plain", size: 100 } }, ["standard"]);
     expect(!wrongType.ok && wrongType.errors.passport).toBe("file_type");
-    const tooLarge = validateRegistration({ ...valid, passport: { mime: "application/pdf", size: 11 * 1024 * 1024 } }, ["standard"]);
+    const tooLarge = validateRegistration({ ...valid, passport: { mime: "application/pdf", size: 2 * 1024 * 1024 + 1 } }, ["standard"]);
     expect(!tooLarge.ok && tooLarge.errors.passport).toBe("file_too_large");
   });
 });

@@ -290,8 +290,8 @@ function AlertRecipients({
         <h2 className="font-display text-xl font-bold text-blue">Registration alerts</h2>
         <p className="text-sm text-ink-2">
           Everyone listed gets an email when a registration is confirmed: after payment, or straight away for a free
-          ticket. They don&apos;t need an admin account. The email includes the registrant&apos;s contact details, so
-          list company staff only. Passports are never attached.
+          ticket. They don&apos;t need an admin account. The email includes the registrant&apos;s contact details and
+          their passport, so list only the company staff who handle registrations.
         </p>
         <p className="flex items-center gap-2 text-sm font-semibold text-ink">
           <span aria-hidden="true" className={cx("h-2 w-2 shrink-0 rounded-full", total ? "bg-success" : "bg-line-strong")} />

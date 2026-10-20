@@ -1,7 +1,8 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import type { Attendee } from "./types";
 
-const mocks = vi.hoisted(() => ({ send: vi.fn(), admins: vi.fn(), settings: vi.fn() }));
+const mocks = vi.hoisted(() => ({ send: vi.fn(), admins: vi.fn(), settings: vi.fn(), passportFile: vi.fn() }));
+vi.mock("@/lib/server/passport-file", () => ({ getPassportFile: mocks.passportFile }));
 vi.mock("@/lib/email", () => ({ sendAdminRegistrationEmail: mocks.send, sendQrEmail: vi.fn(), sendCategoryChangeEmail: vi.fn() }));
 vi.mock("@/lib/server/admin-emails", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/server/admin-emails")>()),
@@ -46,6 +47,22 @@ it("still emails the others when one address fails, and never throws", async () 
   });
   await expect(notifyAdminsOfRegistration(attendee)).resolves.toBeUndefined();
   expect(mocks.send).toHaveBeenCalledTimes(3);
+});
+
+it("attaches the passport as uploaded, downloaded once for everyone", async () => {
+  const file = { content: Buffer.from("pdf"), contentType: "application/pdf", name: "passport.pdf" };
+  mocks.passportFile.mockReset().mockResolvedValue(file);
+  await notifyAdminsOfRegistration({ ...attendee, passport_path: "a1/passport.pdf" });
+  expect(mocks.passportFile).toHaveBeenCalledTimes(1);
+  expect(mocks.send.mock.calls.every(([args]) => args.passportUploaded && args.passportFile === file)).toBe(true);
+});
+
+it("still sends the alert when the passport can't be read", async () => {
+  mocks.passportFile.mockReset().mockRejectedValue(new Error("storage down"));
+  await notifyAdminsOfRegistration({ ...attendee, passport_path: "a1/passport.jpg" });
+  expect(mocks.send).toHaveBeenCalledTimes(3);
+  expect(mocks.send.mock.calls[0][0]).toMatchObject({ passportUploaded: true });
+  expect(mocks.send.mock.calls[0][0].passportFile).toBeUndefined();
 });
 
 it("sends nothing when nobody is on either list", async () => {

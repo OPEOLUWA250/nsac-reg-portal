@@ -18,6 +18,10 @@ const nextConfig: NextConfig = {
     "/*": ["./public/brand/*.png"],
     "/flyer": ["./public/brand/partners/**/*"],
   },
+  // Drawing passport PDFs (src/lib/server/passport-file.ts): pdf.js loads its
+  // worker from its own folder and the canvas is a native binary, so both
+  // run from node_modules rather than being bundled.
+  serverExternalPackages: ["pdfjs-dist", "@napi-rs/canvas"],
   async redirects() {
     return [
       {
