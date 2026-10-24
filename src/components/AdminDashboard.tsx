@@ -524,9 +524,10 @@ export default function AdminDashboard() {
               <>
                 {/* Phones: stacked list */}
                 <ul className="divide-y divide-line md:hidden">
-                  {pageRows.map((a) => (
+                  {pageRows.map((a, i) => (
                     <li key={a.id} className="space-y-3 p-4">
                       <div className="flex items-center gap-3">
+                        <span className="min-w-6 text-right text-sm tabular-nums text-ink-3">{currentPage * PAGE_SIZE + i + 1}</span>
                         <Avatar name={a.full_name} />
                         <div className="min-w-0">
                           <p className="truncate font-semibold text-ink">
@@ -556,7 +557,7 @@ export default function AdminDashboard() {
                     <thead className="bg-subtle text-left text-xs font-semibold uppercase tracking-wider text-ink-3">
                       <tr>
                         <th scope="col" className="w-px whitespace-nowrap py-3 pl-4 pr-0 text-right">
-                          <abbr title="Registration number" className="no-underline">No.</abbr>
+                          <span className="sr-only">Count</span>
                         </th>
                         <th scope="col" className="px-4 py-3">Attendee</th>
                         <th scope="col" className="hidden px-4 py-3 @6xl:table-cell">Organisation</th>
@@ -569,20 +570,23 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {pageRows.map((a) => (
+                      {pageRows.map((a, i) => (
                         <tr
                           key={a.id}
                           onClick={() => setSelectedId(a.id)}
                           className="cursor-pointer border-t border-line align-middle transition-colors duration-150 hover:bg-canvas"
                         >
-                          <td className="w-px whitespace-nowrap py-3 pl-4 pr-0 text-right tabular-nums">
-                            <RegistrationNo a={a} />
+                          <td className="w-px whitespace-nowrap py-3 pl-4 pr-0 text-right tabular-nums text-ink-3">
+                            {currentPage * PAGE_SIZE + i + 1}
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex min-w-0 items-center gap-3">
                               <Avatar name={a.full_name} />
                               <div className="min-w-0">
-                                <div className="max-w-56 truncate font-semibold text-ink">{a.full_name}</div>
+                                <div className="max-w-56 truncate font-semibold text-ink">
+                                  {a.registration_number != null && <span className="mr-1.5 font-normal tabular-nums text-ink-3">#{a.registration_number}</span>}
+                                  {a.full_name}
+                                </div>
                                 <div className="max-w-56 truncate text-ink-3">{a.email}</div>
                               </div>
                             </div>
@@ -660,17 +664,6 @@ export default function AdminDashboard() {
         </DeleteDialog>
       )}
     </AdminPage>
-  );
-}
-
-// The registration number, given once a registration is confirmed.
-function RegistrationNo({ a }: { a: Attendee }) {
-  if (a.registration_number != null) return <span className="font-semibold text-ink">#{a.registration_number}</span>;
-  return (
-    <span className="text-ink-3" title={a.payment_status === "pending" ? "Numbered once they pay" : "No number yet"}>
-      <span aria-hidden="true">–</span>
-      <span className="sr-only">{a.payment_status === "pending" ? "Numbered once they pay" : "No number yet"}</span>
-    </span>
   );
 }
 
