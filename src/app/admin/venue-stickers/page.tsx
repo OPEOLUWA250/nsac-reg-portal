@@ -1,35 +1,24 @@
 import type { Metadata } from "next";
-import { Alert, ButtonLink, Eyebrow } from "@/components/ui";
+import { ButtonLink, Eyebrow } from "@/components/ui";
 import PrintButton from "@/components/venue/PrintButton";
 import { generateQrSvgDataUrl } from "@/lib/qrcode";
-import { publicBaseUrl, toHttps } from "@/lib/public-url";
+import { OFFICIAL_SITE_URL } from "@/lib/public-url";
 import { QR_POINTS } from "@/lib/venue/data";
 
 // Printable QR stickers for the venue (Q1 to Q6), two per A4 sheet. Each one
-// opens the venue map with that spot as the starting point. Staff only:
-// src/proxy.ts signs admins in for everything under /admin. It sits outside
-// the admin shell so only the stickers print.
-
-// Built per request, so the links use this deployment's PUBLIC_BASE_URL.
-export const dynamic = "force-dynamic";
+// opens the venue map, on the official site, with that spot as the starting
+// point. Staff only: src/proxy.ts signs admins in for everything under
+// /admin. It sits outside the admin shell so only the stickers print.
 
 export const metadata: Metadata = {
   title: "Venue QR stickers",
   robots: { index: false, follow: false },
 };
 
-const LIVE_SITE = "https://registration.newspace.spaceinafrica.com";
-
-function siteUrl(): string {
-  return publicBaseUrl() ?? (process.env.VERCEL_PROJECT_PRODUCTION_URL ? toHttps(process.env.VERCEL_PROJECT_PRODUCTION_URL) : LIVE_SITE);
-}
-
 export default async function VenueStickersPage() {
-  const base = siteUrl();
-  const local = /^http:\/\/(localhost|127\.0\.0\.1)/.test(base);
   const stickers = await Promise.all(
     QR_POINTS.map(async (q) => {
-      const url = `${base}/venue?from=${q.id}`;
+      const url = `${OFFICIAL_SITE_URL}/venue?from=${q.id}`;
       return { ...q, url, qr: await generateQrSvgDataUrl(url) };
     })
   );
@@ -54,11 +43,6 @@ export default async function VenueStickersPage() {
             starting point. Cut along the dashed line.
           </p>
         </div>
-        {local && (
-          <Alert tone="error" title="These stickers point to this computer">
-            They link to {base}. Print them from the live site so they work at the venue.
-          </Alert>
-        )}
         <div className="flex flex-wrap gap-2">
           <PrintButton>Print stickers</PrintButton>
           <ButtonLink href="/admin/booths" variant="outline">
