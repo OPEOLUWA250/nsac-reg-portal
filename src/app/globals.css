@@ -90,6 +90,58 @@
   }
 }
 
+/* Venue wayfinder (/venue). The only part of the site with a dark mode
+   (DESIGN.md, "Venue wayfinder"): it follows the phone's setting, or the
+   map's light/dark button (data-theme). Inside .venue the site tokens become
+   light-dark() pairs, so shared components (inputClass, buttonClass) follow
+   along. In dark mode brand blue turns light blue and "white" (the text on
+   blue fills) turns the dark page colour, so blue buttons keep their
+   contrast. The --map-* tokens colour the floor plan; booth colours match
+   the printed plan. */
+.venue {
+  color-scheme: light dark;
+  --focus: var(--color-blue);
+  --color-white: light-dark(#ffffff, #0d1822);
+  --color-canvas: light-dark(#f5f5f5, #0d1822);
+  --color-surface: light-dark(#ffffff, #132230);
+  --color-subtle: light-dark(#ebedef, #1c2e3e);
+  --color-line: light-dark(#d8dce0, #273b4d);
+  --color-line-strong: light-dark(#858f99, #6d7f90);
+  --color-ink: light-dark(#232323, #e6ebf0);
+  --color-ink-2: light-dark(#454b52, #c2ccd6);
+  --color-ink-3: light-dark(#5e6670, #9eabb8);
+  --color-blue: light-dark(#03416a, #8fc3ec);
+  --color-blue-hover: light-dark(#0a5283, #a9d1f1);
+  --color-blue-deep: light-dark(#02314f, #c3dff6);
+  --color-gold-ink: light-dark(#8a5300, #f0b54a);
+  --map-bg: light-dark(#e4e8ec, #08121b);
+  --map-floor: light-dark(#fbf8f1, #15263a);
+  --map-hall: light-dark(#eef2f5, #102031);
+  --map-wall: light-dark(#03416a, #8fc3ec);
+  --map-seat: light-dark(#d3dae1, #26394c);
+  --map-booth-s: light-dark(#2f7d3a, #2c6e36);
+  --map-booth-l: light-dark(#2f6fb8, #2d5f9e);
+  --map-booth-x: light-dark(#03416a, #1f5a8a);
+  --map-booth-ink: #ffffff;
+  --map-table: light-dark(#ffffff, #15263a);
+  --map-table-line: light-dark(#b98e5f, #8a6d4c);
+  --map-ac: light-dark(#e3e7eb, #1c2e42);
+  --map-ac-line: light-dark(#9aa5b1, #4d6178);
+  --map-desk: light-dark(#ffffff, #1b2d40);
+  --map-label: light-dark(#03416a, #c6d9ea);
+  --map-sublabel: light-dark(#5e6670, #93a5b6);
+  --map-route: light-dark(#f09f07, #f5a623);
+  --map-casing: light-dark(#ffffff, #08121b);
+  --map-you: light-dark(#03416a, #8fc3ec);
+}
+.venue[data-theme="light"] { color-scheme: light; }
+.venue[data-theme="dark"] { color-scheme: dark; }
+
+.venue-pulse { transform-box: fill-box; transform-origin: center; animation: venue-pulse 1.8s ease-out infinite; }
+@keyframes venue-pulse { 0% { transform: scale(.6); opacity: .55; } 100% { transform: scale(2.2); opacity: 0; } }
+.venue-flow { stroke-dasharray: 1 1.8; animation: venue-flow 1s linear infinite; }
+@keyframes venue-flow { to { stroke-dashoffset: -2.8; } }
+
 /* Physical badge dimensions are independent of the screen UI scale. */
 .badge-print { display: none; }
 .badge-preview { width: min(100%, 3.5in); margin: 32px auto 0; }
