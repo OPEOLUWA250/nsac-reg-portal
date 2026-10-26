@@ -36,11 +36,20 @@ In the admin: **Venue booths** (`/admin/booths`). Any admin can do it.
 
 1. Click the booth on the plan, or find it in the list (search by booth,
    company or room; filter Assigned or Free).
-2. Fill in the company (required), and optionally the sector, website and
+2. Choose the status:
+   - **Sold**: confirmed. The company's name shows on the public map.
+   - **Reserved**: on hold for a company. The public map shows the booth
+     hatched and labelled "Reserved", without the name (the name never leaves
+     the server), so unconfirmed deals aren't announced.
+3. Fill in the company (required), and optionally the sector, website and
    logo address. Save.
-3. The public map shows it on its next page load: on the booth (when the name
-   fits), in search, and in the directions ("Arrive at Sahel Orbital (W-S4) on
-   your left"). The admin page records who changed it and when.
+4. The public map shows it on its next page load: on the booth (when the name
+   fits), in search, in the Exhibitors A–Z list and in the directions
+   ("Arrive at Sahel Orbital (W-S4) on your left"). The admin page records who
+   changed it and when.
+
+Visitors find confirmed companies under **Exhibitors A–Z** on the venue map:
+every sold booth, by company name, with a heading per letter.
 
 "Free this booth" takes the company off the map. The QR sticker sheet is
 linked from the same page.
