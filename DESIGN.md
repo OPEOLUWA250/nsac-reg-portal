@@ -189,13 +189,40 @@ field, a submitting state on its button, and a success or failure message.
 Gradients, glows, radial "orbs", star or dot fields, glass or blur, drop
 shadows, coloured left stripes, pastel fills, neon colours, emoji, sparkle
 icons, animated arrows, icon libraries (icons are small inline SVGs with
-`currentColor`).
+`currentColor`; the venue wayfinder's Font Awesome icons are the exception,
+see "Venue wayfinder").
 
 **Exception: the flyer artwork** (`src/lib/flyer-draw.ts`, the image people
 post on social media) keeps its own deep-space look: starfield, planet
 horizon with glow, shadows and the gold card edge. It is a poster, not the
 interface, and was kept by choice. It still uses the site fonts (Raleway and
 DM Sans), passed in from the flyer maker page.
+
+## Venue wayfinder
+
+The venue map (`/venue`) is a full-height tool page: the panel on the left
+and the map on the right on desktop; on phones the map on top (58% of the
+screen), its legend under it, the panel below. It uses the same tokens,
+components and type as the rest of the site, with three deliberate
+exceptions:
+
+- **Dark mode**, for this page only. It follows the phone's setting, or the
+  map's light/dark button. Inside `.venue` the tokens become `light-dark()`
+  pairs (`globals.css`): blue turns light blue `#8FC3EC`, and the text on blue
+  fills turns the dark page colour, so blue buttons keep their contrast. Gold
+  stays gold with black text. The header stays blue.
+- **Map colours** (`--map-*`): booths match the printed plan (green 3×3 m,
+  blue 4×3 m, brand blue 6×6 m), the route and the destination are gold, "you"
+  is brand blue. They exist only inside the map and its legend.
+- **Icons from Font Awesome Free** (solid set, CC BY 4.0) through
+  `FaIcon` / `FaGlyph` (`src/components/FaIcon.tsx`), imported one by one so
+  only those icons are shipped. The rest of the site keeps
+  `components/icons.tsx`.
+
+The one gold button on the page is the header's Register; the wayfinder's own
+actions are blue or outline buttons. The QR sticker sheet
+(`/admin/venue-stickers`) is print artwork, two A5 stickers per A4 sheet, with
+borders rather than fills so it prints without background graphics.
 
 ## Printed conference badge
 
