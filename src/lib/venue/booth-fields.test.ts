@@ -13,7 +13,7 @@ describe("booth assignment fields", () => {
   it("cleans up what an admin typed", () => {
     const r = parseBoothAssignment({ boothCode: "ws4", companyName: "  Sahel   Orbital ", sector: "", website: "sahelorbital.com", logoUrl: "" });
     expect(r).toEqual({
-      value: { boothCode: "W-S4", companyName: "Sahel Orbital", sector: null, website: "https://sahelorbital.com/", logoUrl: null },
+      value: { boothCode: "W-S4", status: "sold", companyName: "Sahel Orbital", sector: null, website: "https://sahelorbital.com/", logoUrl: null },
     });
   });
 
@@ -29,6 +29,11 @@ describe("booth assignment fields", () => {
     expect(webAddress("http://example.com/logo.png")).toBe("http://example.com/logo.png");
     const r = parseBoothAssignment({ boothCode: "E-L2", companyName: "Acme", website: "javascript:alert(1)", logoUrl: "nope" });
     expect(r).toEqual({ fields: { website: expect.any(String), logoUrl: expect.any(String) } });
+  });
+
+  it("holds a booth as reserved, and refuses any other status", () => {
+    expect(parseBoothAssignment({ boothCode: "N-L4", status: "reserved", companyName: "Acme" })).toMatchObject({ value: { status: "reserved" } });
+    expect(parseBoothAssignment({ boothCode: "N-L4", status: "maybe", companyName: "Acme" })).toEqual({ fields: { status: expect.any(String) } });
   });
 
   it("limits the length of names", () => {

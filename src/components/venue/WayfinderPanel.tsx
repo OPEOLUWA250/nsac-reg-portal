@@ -19,15 +19,16 @@ import {
 import FaIcon from "@/components/FaIcon";
 import { Card, Chip, Eyebrow, Field, buttonClass, cx, inputClass, linkClass } from "@/components/ui";
 import { ZONES } from "@/lib/venue/data";
-import type { Place, PlaceKind } from "@/lib/venue/places";
+import { boothState, type Place, type PlaceKind } from "@/lib/venue/places";
 import type { Step, StepType } from "@/lib/venue/directions";
 import { BOOTH_FILL } from "@/components/venue/VenueMap";
 
-export type Filter = "all" | "booth" | "room" | "facility";
+export type Filter = "all" | "exhibitors" | "booth" | "room" | "facility";
 export const PIN = "__pin";
 
 const FILTERS: [Filter, string][] = [
   ["all", "All"],
+  ["exhibitors", "Exhibitors A–Z"],
   ["booth", "Booths"],
   ["room", "Rooms & areas"],
   ["facility", "Facilities"],
@@ -81,14 +82,22 @@ const fold = (s: string) =>
 const ZONE_ORDER = ZONES.map((z) => z.id as string);
 const RANK: Partial<Record<PlaceKind, number>> = { room: 0, facility: 1, booth: 2 };
 
+const matches = (p: Place, q: string) => !q || fold([p.code, p.code.replace(/-/g, ""), p.name, p.cat].join(" ")).includes(q);
+
 /** Search: booth code (hyphen optional), company, sector, room and area names. */
 export function searchPlaces(places: Place[], query: string, filter: Filter): Place[] {
   const q = fold(query.trim());
   const qCode = q.replace(/ /g, "");
+  // The exhibitor directory: confirmed companies only, by name.
+  if (filter === "exhibitors") {
+    return places
+      .filter((p) => p.kind === "booth" && p.assigned && matches(p, q))
+      .sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base", numeric: true }) || a.code.localeCompare(b.code, undefined, { numeric: true }));
+  }
   return places
     .filter((p) => p.kind !== "qr" && p.kind !== "entrance")
     .filter((p) => filter === "all" || p.kind === filter)
-    .filter((p) => !q || fold([p.code, p.code.replace(/-/g, ""), p.name, p.cat].join(" ")).includes(q))
+    .filter((p) => matches(p, q))
     .sort((a, b) => {
       // An exact code ("ws1") comes before codes that only start with it (W-S10).
       const exact = Number(fold(b.code).replace(/ /g, "") === qCode) - Number(fold(a.code).replace(/ /g, "") === qCode);
@@ -105,6 +114,7 @@ const fmtMetres = (m: number) => (m < 1 ? "" : `${Math.max(1, Math.round(m))} m`
 export default function WayfinderPanel(p: Props) {
   const results = useMemo(() => searchPlaces(p.places, p.query, p.filter), [p.places, p.query, p.filter]);
   const searching = p.query.trim() !== "";
+  const directory = p.filter === "exhibitors";
 
   const fromGroups: [string, (x: Place) => boolean][] = [
     ["Entrance and QR points", (x) => x.kind === "entrance" || x.kind === "qr"],
@@ -147,7 +157,7 @@ export default function WayfinderPanel(p: Props) {
               <optgroup key={label} label={label}>
                 {p.places.filter(test).map((x) => (
                   <option key={x.id} value={x.id}>
-                    {x.kind === "booth" ? `${x.code}${x.assigned ? ` · ${x.name}` : ""}` : x.name}
+                    {x.kind === "booth" ? `${x.code}${x.assigned ? ` · ${x.name}` : x.status === "reserved" ? " · reserved" : ""}` : x.name}
                   </option>
                 ))}
               </optgroup>
@@ -207,34 +217,40 @@ export default function WayfinderPanel(p: Props) {
 
       <section aria-labelledby="venue-results-label" className="space-y-2">
         <h2 id="venue-results-label" className="text-xs font-semibold uppercase tracking-wider text-ink-3">
-          {searching ? `${results.length} ${results.length === 1 ? "match" : "matches"}` : "Places"}
+          {searching
+            ? `${results.length} ${results.length === 1 ? "match" : "matches"}`
+            : directory
+              ? `${results.length} ${results.length === 1 ? "exhibitor" : "exhibitors"}`
+              : "Places"}
         </h2>
         <Card className="overflow-hidden">
           {results.length ? (
-            <ul id="venue-results" className="max-h-[26rem] divide-y divide-line overflow-y-auto overscroll-contain md:max-h-[22rem]">
-              {results.map((x) => (
-                <li key={x.id}>
-                  <button
-                    type="button"
-                    onClick={() => p.onChooseTo(x.id)}
-                    aria-current={x.id === p.to?.id ? "true" : undefined}
-                    className={cx(
-                      "grid min-h-12 w-full grid-cols-[3.75rem_1fr] items-center gap-3 px-4 py-2.5 text-left transition-colors duration-150 hover:bg-subtle focus-visible:-outline-offset-2",
-                      x.id === p.to?.id && "bg-subtle"
-                    )}
-                  >
-                    <CodeBadge place={x} />
-                    <span className="min-w-0">
-                      <span className="block text-sm font-semibold text-ink">{x.name}</span>
-                      <span className="block text-sm text-ink-3">{x.cat}</span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            directory ? (
+              // A to Z, with a heading for each first letter.
+              <div id="venue-results" className="max-h-[26rem] overflow-y-auto overscroll-contain md:max-h-[22rem]">
+                {groupByLetter(results).map(([letter, list]) => (
+                  <section key={letter} aria-label={letter}>
+                    <h3 className="sticky top-0 z-10 border-b border-line bg-subtle px-4 py-1 font-display text-sm font-bold text-blue">{letter}</h3>
+                    <ul className="divide-y divide-line">
+                      {list.map((x) => (
+                        <ResultRow key={x.id} place={x} current={x.id === p.to?.id} onChoose={p.onChooseTo} />
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+              </div>
+            ) : (
+              <ul id="venue-results" className="max-h-[26rem] divide-y divide-line overflow-y-auto overscroll-contain md:max-h-[22rem]">
+                {results.map((x) => (
+                  <ResultRow key={x.id} place={x} current={x.id === p.to?.id} onChoose={p.onChooseTo} />
+                ))}
+              </ul>
+            )
           ) : (
             <p id="venue-results" className="px-4 py-4 text-sm text-ink-3">
-              No match. Try a booth number like W-S4 or E-L2, or a room name.
+              {directory && !searching
+                ? "Exhibitors appear here once their booths are confirmed."
+                : "No match. Try a booth number like W-S4 or E-L2, or a room name."}
             </p>
           )}
         </Card>
@@ -252,6 +268,38 @@ export default function WayfinderPanel(p: Props) {
   );
 }
 
+function groupByLetter(list: Place[]): [string, Place[]][] {
+  const groups = new Map<string, Place[]>();
+  for (const x of list) {
+    const first = fold(x.name).charAt(0).toUpperCase();
+    const letter = /[A-Z]/.test(first) ? first : "#";
+    groups.set(letter, [...(groups.get(letter) ?? []), x]);
+  }
+  return [...groups];
+}
+
+function ResultRow({ place: x, current, onChoose }: { place: Place; current: boolean; onChoose: (id: string) => void }) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => onChoose(x.id)}
+        aria-current={current ? "true" : undefined}
+        className={cx(
+          "grid min-h-12 w-full grid-cols-[3.75rem_1fr] items-center gap-3 px-4 py-2.5 text-left transition-colors duration-150 hover:bg-subtle focus-visible:-outline-offset-2",
+          current && "bg-subtle"
+        )}
+      >
+        <CodeBadge place={x} />
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold text-ink">{x.name}</span>
+          <span className="block text-sm text-ink-3">{x.cat}</span>
+        </span>
+      </button>
+    </li>
+  );
+}
+
 function CodeBadge({ place: x }: { place: Place }) {
   const booth = x.kind === "booth";
   return (
@@ -266,7 +314,7 @@ function CodeBadge({ place: x }: { place: Place }) {
 
 function RouteCard(p: Props) {
   const { summary, to } = p;
-  const toLabel = to ? (to.kind === "booth" ? `${to.code} · ${to.assigned ? to.name : "booth not yet assigned"}` : to.name) : null;
+  const toLabel = to ? (to.kind === "booth" ? `${to.code} · ${boothState(to)}` : to.name) : null;
 
   return (
     <Card aria-live="polite" aria-label="Your route" className="overflow-hidden">

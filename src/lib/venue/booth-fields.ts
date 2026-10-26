@@ -4,8 +4,12 @@ import { normalizeCode } from "@/lib/venue/places";
 // What an admin can set on a booth (/admin/booths), checked the same way in
 // the browser and on the server.
 
+/** Sold: named on the public map. Reserved: on hold, shown as reserved without the name. */
+export type AssignmentStatus = "sold" | "reserved";
+
 export interface BoothAssignmentInput {
   boothCode: string;
+  status: AssignmentStatus;
   companyName: string;
   sector: string | null;
   website: string | null;
@@ -41,6 +45,7 @@ export type BoothFieldErrors = Partial<Record<keyof BoothAssignmentInput, string
 export function parseBoothAssignment(body: Record<string, unknown>): { value: BoothAssignmentInput } | { fields: BoothFieldErrors } {
   const fields: BoothFieldErrors = {};
   const code = boothCode(body.boothCode);
+  const status = body.status === undefined ? "sold" : body.status;
   const companyName = text(body.companyName);
   const sector = text(body.sector);
   const websiteRaw = text(body.website);
@@ -49,6 +54,7 @@ export function parseBoothAssignment(body: Record<string, unknown>): { value: Bo
   const logoUrl = webAddress(logoRaw);
 
   if (!code) fields.boothCode = "Pick a booth from the plan.";
+  if (status !== "sold" && status !== "reserved") fields.status = "Choose Sold or Reserved.";
   if (!companyName) fields.companyName = "Enter the company's name.";
   else if (companyName.length > LIMITS.companyName) fields.companyName = `Keep it under ${LIMITS.companyName} characters.`;
   if (sector.length > LIMITS.sector) fields.sector = `Keep it under ${LIMITS.sector} characters.`;
@@ -56,5 +62,5 @@ export function parseBoothAssignment(body: Record<string, unknown>): { value: Bo
   if (logoRaw && (!logoUrl || logoUrl.length > LIMITS.url)) fields.logoUrl = "Enter the logo's web address, starting with https://.";
 
   if (Object.keys(fields).length) return { fields };
-  return { value: { boothCode: code!, companyName, sector: sector || null, website, logoUrl } };
+  return { value: { boothCode: code!, status: status as AssignmentStatus, companyName, sector: sector || null, website, logoUrl } };
 }

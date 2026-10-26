@@ -20,6 +20,7 @@ export interface BoothAssignment extends BoothAssignmentInput {
 
 interface Row {
   booth_code: string;
+  status: string | null;
   company_name: string;
   sector: string | null;
   website: string | null;
@@ -28,10 +29,11 @@ interface Row {
   updated_by: string | null;
 }
 
-const COLUMNS = "booth_code, company_name, sector, website, logo_url, updated_at, updated_by";
+const COLUMNS = "booth_code, status, company_name, sector, website, logo_url, updated_at, updated_by";
 
 const fromRow = (r: Row): BoothAssignment => ({
   boothCode: r.booth_code,
+  status: r.status === "reserved" ? "reserved" : "sold",
   companyName: r.company_name,
   sector: r.sector,
   website: r.website,
@@ -40,10 +42,10 @@ const fromRow = (r: Row): BoothAssignment => ({
   updatedBy: r.updated_by,
 });
 
-/** The table hasn't been created yet (the setup SQL wasn't run). */
-export function isMissingTable(err: unknown): boolean {
+/** The table, or one of its columns, isn't there yet (the setup SQL wasn't run). */
+export function isNotSetUp(err: unknown): boolean {
   const code = (err as { code?: string } | null)?.code;
-  return code === "42P01" || code === "PGRST205";
+  return code === "42P01" || code === "PGRST205" || code === "42703" || code === "PGRST204";
 }
 
 const httpUrl = (v: unknown) => (typeof v === "string" && /^https?:\/\/\S+$/i.test(v.trim()) ? v.trim() : null);
@@ -52,7 +54,7 @@ const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : nul
 /** For the public map. Never throws: without the table every booth is "not yet assigned". */
 export async function getBoothAssignments(): Promise<ExhibitorMap> {
   try {
-    const { data, error } = await supabaseAdmin().from(TABLE).select("booth_code, company_name, sector, website");
+    const { data, error } = await supabaseAdmin().from(TABLE).select("booth_code, status, company_name, sector, website");
     if (error) throw error;
     const out: ExhibitorMap = {};
     for (const row of data ?? []) {
@@ -60,7 +62,8 @@ export async function getBoothAssignments(): Promise<ExhibitorMap> {
       const company = text(row.company_name);
       // Rows for booths that aren't on the plan (typos) are skipped, not shown.
       if (!code || !KNOWN.has(code) || !company) continue;
-      out[code] = { company, sector: text(row.sector), website: httpUrl(row.website) };
+      // Reserved booths go out without the company: the deal isn't confirmed.
+      out[code] = row.status === "reserved" ? { status: "reserved" } : { status: "sold", company, sector: text(row.sector), website: httpUrl(row.website) };
     }
     return out;
   } catch (err) {
@@ -82,6 +85,7 @@ export async function saveBoothAssignment(input: BoothAssignmentInput, by: strin
     .upsert(
       {
         booth_code: input.boothCode,
+        status: input.status,
         company_name: input.companyName,
         sector: input.sector,
         website: input.website,

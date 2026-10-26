@@ -213,7 +213,9 @@ exceptions:
   stays gold with black text. The header stays blue.
 - **Map colours** (`--map-*`): booths match the printed plan (green 3×3 m,
   blue 4×3 m, brand blue 6×6 m), the route and the destination are gold, "you"
-  is brand blue. They exist only inside the map and its legend.
+  is brand blue. Reserved booths keep their colour under white diagonal
+  hatching (a pattern, not a gradient; the legend swatch draws it with CSS).
+  They exist only inside the map, its legend and the booth lists.
 - **Icons from Font Awesome Free** (solid set, CC BY 4.0) through
   `FaIcon` / `FaGlyph` (`src/components/FaIcon.tsx`), imported one by one so
   only those icons are shipped. The rest of the site keeps

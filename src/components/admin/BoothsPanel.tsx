@@ -27,7 +27,7 @@ import { BOOTH_FILL, FloorPlan } from "@/components/venue/VenueMap";
 import { relativeTime } from "@/lib/admin-format";
 import { BOOTHS, BOOTH_SIZE_LABEL, MAP_H, MAP_W, ZONES } from "@/lib/venue/data";
 import { buildPlaces, type ExhibitorMap } from "@/lib/venue/places";
-import { LIMITS, parseBoothAssignment, type BoothAssignmentInput, type BoothFieldErrors } from "@/lib/venue/booth-fields";
+import { LIMITS, parseBoothAssignment, type AssignmentStatus, type BoothAssignmentInput, type BoothFieldErrors } from "@/lib/venue/booth-fields";
 
 // /admin/booths: which company has which booth. Pick a booth on the plan or
 // in the list, fill in the company, save: the public venue map (/venue) shows
@@ -38,10 +38,17 @@ interface Assignment extends BoothAssignmentInput {
   updatedBy: string | null;
 }
 
-type Show = "all" | "assigned" | "free";
-type Draft = { companyName: string; sector: string; website: string; logoUrl: string };
+type Show = "all" | "sold" | "reserved" | "free";
+type Draft = { status: AssignmentStatus; companyName: string; sector: string; website: string; logoUrl: string };
 
-const EMPTY: Draft = { companyName: "", sector: "", website: "", logoUrl: "" };
+const EMPTY: Draft = { status: "sold", companyName: "", sector: "", website: "", logoUrl: "" };
+
+const STATUS_DOT: Record<AssignmentStatus | "free", string> = {
+  sold: "var(--color-success)",
+  reserved: "var(--color-gold)",
+  free: "var(--color-line-strong)",
+};
+const STATUS_LABEL: Record<AssignmentStatus | "free", string> = { sold: "Sold", reserved: "Reserved", free: "Free" };
 const ROOM_NAME = Object.fromEntries(ZONES.map((z) => [z.id, z.name])) as Record<string, string>;
 const ROOM_ORDER = ["north", "west", "east", "entr"];
 const SORTED_BOOTHS = [...BOOTHS].sort(
@@ -49,7 +56,7 @@ const SORTED_BOOTHS = [...BOOTHS].sort(
 );
 
 const draftOf = (a: Assignment | undefined): Draft =>
-  a ? { companyName: a.companyName, sector: a.sector ?? "", website: a.website ?? "", logoUrl: a.logoUrl ?? "" } : EMPTY;
+  a ? { status: a.status, companyName: a.companyName, sector: a.sector ?? "", website: a.website ?? "", logoUrl: a.logoUrl ?? "" } : EMPTY;
 
 export default function BoothsPanel() {
   const { apiCall } = useAdmin();
@@ -87,10 +94,11 @@ export default function BoothsPanel() {
   const current = selected ? assignments?.get(selected) : undefined;
   const dirty = JSON.stringify(draft) !== JSON.stringify(draftOf(current));
 
-  // The same names the public map will show.
+  // The plan as the public map shows it: reserved booths hatched, without their name.
   const places = useMemo(() => {
     const ex: ExhibitorMap = {};
-    for (const a of assignments?.values() ?? []) ex[a.boothCode] = { company: a.companyName, sector: a.sector, website: a.website };
+    for (const a of assignments?.values() ?? [])
+      ex[a.boothCode] = a.status === "reserved" ? { status: "reserved" } : { status: "sold", company: a.companyName, sector: a.sector, website: a.website };
     return buildPlaces(ex);
   }, [assignments]);
 
@@ -105,7 +113,7 @@ export default function BoothsPanel() {
     if (scroll && window.matchMedia("(max-width: 1023px)").matches) editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  const set = (key: keyof Draft, value: string) => {
+  const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
     setDraft((d) => ({ ...d, [key]: value }));
     setFieldErrors((e) => ({ ...e, [key]: undefined }));
   };
@@ -123,7 +131,11 @@ export default function BoothsPanel() {
       const saved = json.assignment as Assignment;
       setAssignments((m) => new Map(m).set(saved.boothCode, saved));
       setDraft(draftOf(saved));
-      setNotice(`${saved.boothCode} is now ${saved.companyName}. The venue map shows it on its next load.`);
+      setNotice(
+        saved.status === "reserved"
+          ? `${saved.boothCode} is reserved for ${saved.companyName}. The venue map shows it as reserved, without the name.`
+          : `${saved.boothCode} is now ${saved.companyName}. The venue map shows it on its next load.`
+      );
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Couldn't save the booth.");
       const fields = (err as { body?: { fields?: BoothFieldErrors } }).body?.fields;
@@ -159,14 +171,17 @@ export default function BoothsPanel() {
     const q = query.trim().toLowerCase().replace(/-/g, "");
     return SORTED_BOOTHS.filter((b) => {
       const a = assignments?.get(b.code);
-      if (show === "assigned" && !a) return false;
-      if (show === "free" && a) return false;
+      if (show !== "all" && (a?.status ?? "free") !== show) return false;
       if (!q) return true;
       return [b.code.replace(/-/g, ""), a?.companyName, a?.sector, ROOM_NAME[b.room]].some((v) => v?.toLowerCase().replace(/-/g, "").includes(q));
     });
   }, [assignments, show, query]);
 
-  const assignedCount = assignments?.size ?? 0;
+  const counts = { sold: 0, reserved: 0, free: BOOTHS.length };
+  for (const a of assignments?.values() ?? []) {
+    counts[a.status]++;
+    counts.free--;
+  }
   const err = (k: keyof BoothFieldErrors) => fieldErrors[k] || undefined;
   const aria = (id: string, e?: string, hint?: boolean) => ({ "aria-invalid": !!e, "aria-describedby": describedBy(id, { hint, error: e }) });
   const booth = selected ? BOOTHS.find((b) => b.code === selected) : null;
@@ -178,7 +193,7 @@ export default function BoothsPanel() {
       <PageHeader
         eyebrow="Venue map"
         title="Booths"
-        description="Assign each sold booth to its exhibitor. The company's name then appears on the venue map: on the booth, in search and in the directions."
+        description="Assign each booth to its exhibitor. Sold booths show the company's name on the venue map: on the booth, in search, in the exhibitor list and in the directions. Reserved booths show as reserved, without the name."
         actions={
           <>
             <ButtonLink href="/venue" target="_blank" variant="outline">
@@ -211,15 +226,15 @@ export default function BoothsPanel() {
             <Card className="overflow-hidden">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
                 <p className="text-sm text-ink-2">
-                  {BOOTHS.length} booths · {assignedCount} assigned · {BOOTHS.length - assignedCount} free
+                  {BOOTHS.length} booths · {counts.sold} sold · {counts.reserved} reserved · {counts.free} free
                 </p>
-                <p className="text-sm text-ink-3">Click a booth to edit it. Faded booths are free.</p>
+                <p className="text-sm text-ink-3">Click a booth to edit it. Hatched booths are reserved; faded ones are free.</p>
               </div>
               <div>
                 <svg
                   viewBox={`-2 -1 ${MAP_W + 4} ${MAP_H + 2}`}
                   role="img"
-                  aria-label="Venue floor plan. Assigned booths are in full colour, free booths are faded."
+                  aria-label="Venue floor plan. Sold booths are in full colour, reserved booths are hatched, free booths are faded."
                   className="block w-full select-none"
                   style={{ background: "var(--map-bg)" }}
                   onClick={(e) => {
@@ -251,7 +266,7 @@ export default function BoothsPanel() {
                     <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h2 className="font-display text-xl font-bold text-blue">Booth {booth.code}</h2>
-                        <Chip dot={current ? "var(--color-success)" : "var(--color-line-strong)"}>{current ? "Assigned" : "Free"}</Chip>
+                        <Chip dot={STATUS_DOT[current?.status ?? "free"]}>{STATUS_LABEL[current?.status ?? "free"]}</Chip>
                       </div>
                       <p className="text-sm text-ink-3">
                         {BOOTH_SIZE_LABEL[booth.size]} · {ROOM_NAME[booth.room]}
@@ -265,7 +280,33 @@ export default function BoothsPanel() {
                       )}
                     </div>
 
-                    <Field id="booth-company" label="Company" required error={err("companyName")}>
+                    <Field
+                      id="booth-status"
+                      as="div"
+                      label="Status"
+                      hint={draft.status === "reserved" ? "On hold: the public map shows it as reserved, without the company's name." : "Confirmed: the company's name shows on the public map."}
+                      error={err("status")}
+                    >
+                      <div className="flex gap-2" role="group" aria-label="Status" aria-describedby="booth-status-hint">
+                        {(["sold", "reserved"] as const).map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => set("status", s)}
+                            aria-pressed={draft.status === s}
+                            className={cx(
+                              "inline-flex min-h-11 items-center gap-2 rounded-md border px-4 text-sm transition-colors duration-150",
+                              draft.status === s ? "border-blue font-semibold text-blue ring-1 ring-blue" : "border-line-strong text-ink-2 hover:bg-subtle"
+                            )}
+                          >
+                            <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: STATUS_DOT[s] }} />
+                            {STATUS_LABEL[s]}
+                          </button>
+                        ))}
+                      </div>
+                    </Field>
+
+                    <Field id="booth-company" label={draft.status === "reserved" ? "Reserved for" : "Company"} required error={err("companyName")}>
                       <input
                         id="booth-company"
                         className={inputClass(!!err("companyName"))}
@@ -351,8 +392,9 @@ export default function BoothsPanel() {
                 {(
                   [
                     ["all", `All (${BOOTHS.length})`],
-                    ["assigned", `Assigned (${assignedCount})`],
-                    ["free", `Free (${BOOTHS.length - assignedCount})`],
+                    ["sold", `Sold (${counts.sold})`],
+                    ["reserved", `Reserved (${counts.reserved})`],
+                    ["free", `Free (${counts.free})`],
                   ] as [Show, string][]
                 ).map(([value, label]) => (
                   <button
@@ -396,7 +438,10 @@ export default function BoothsPanel() {
                           {b.code}
                         </span>
                         <span className="min-w-0">
-                          <span className={cx("block text-sm font-semibold", a ? "text-ink" : "text-ink-3")}>{a ? a.companyName : "Free"}</span>
+                          <span className={cx("flex flex-wrap items-center gap-x-2 text-sm font-semibold", a ? "text-ink" : "text-ink-3")}>
+                            {a ? a.companyName : "Free"}
+                            {a?.status === "reserved" && <Chip dot={STATUS_DOT.reserved}>Reserved</Chip>}
+                          </span>
                           <span className="block text-sm text-ink-3">
                             {[a?.sector, BOOTH_SIZE_LABEL[b.size], ROOM_NAME[b.room]].filter(Boolean).join(" · ")}
                           </span>

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import VenueMap from "@/components/venue/VenueMap";
 import WayfinderPanel, { PIN, type Filter, type RouteSummary } from "@/components/venue/WayfinderPanel";
 import { BOOTHS, ENTRANCE, METRES_PER_UNIT, WALK_SPEED_MPS, type Point } from "@/lib/venue/data";
-import { buildPlaces, type ExhibitorMap, type Place } from "@/lib/venue/places";
+import { boothState, buildPlaces, type ExhibitorMap, type Place } from "@/lib/venue/places";
 import { cellCenter, dist, hasGrid, pathLength, route, setGrid, snap, type Grid } from "@/lib/venue/pathfinding";
 import { buildSteps, type RouteEnd } from "@/lib/venue/directions";
 import { venueQuery } from "@/lib/venue/params";
@@ -129,7 +129,7 @@ export default function VenueWayfinder({
   };
 
   const fromLabel =
-    fromId === PIN ? "Spot you picked on the map" : from.kind === "booth" ? `${from.code} · ${fromPlace?.assigned ? from.name : "booth not yet assigned"}` : from.name;
+    fromId === PIN ? "Spot you picked on the map" : from.kind === "booth" && fromPlace ? `${from.code} · ${boothState(fromPlace)}` : from.name;
 
   return (
     <main id="main" className="venue flex-1 bg-canvas text-ink" data-theme={theme ?? undefined}>

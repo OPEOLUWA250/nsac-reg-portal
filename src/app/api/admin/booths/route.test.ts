@@ -13,7 +13,7 @@ vi.mock("@/lib/server/booth-assignments", () => ({
   listBoothAssignments: mocks.list,
   saveBoothAssignment: mocks.save,
   clearBoothAssignment: mocks.clear,
-  isMissingTable: (err: { code?: string }) => err?.code === "PGRST205",
+  isNotSetUp: (err: { code?: string }) => err?.code === "PGRST205",
 }));
 
 const admin = { user: { id: "a" }, email: "admin@example.com", role: "admin", mustChangePassword: false } as AdminSession;
@@ -37,7 +37,7 @@ it("lets any admin assign a booth, saved under their email", async () => {
   const res = await call(PUT, "PUT", { boothCode: "ws4", companyName: "Sahel Orbital", website: "sahelorbital.com" });
   expect(res.status).toBe(200);
   expect(mocks.save).toHaveBeenCalledWith(
-    { boothCode: "W-S4", companyName: "Sahel Orbital", sector: null, website: "https://sahelorbital.com/", logoUrl: null },
+    { boothCode: "W-S4", status: "sold", companyName: "Sahel Orbital", sector: null, website: "https://sahelorbital.com/", logoUrl: null },
     "admin@example.com"
   );
   expect(await res.json()).toMatchObject({ assignment: { boothCode: "W-S4", updatedBy: "admin@example.com" } });

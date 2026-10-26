@@ -52,6 +52,9 @@ export const FACILITY_ICON: Record<FacilityCategory, IconDefinition> = {
 };
 
 export const BOOTH_FILL = { s: "var(--map-booth-s)", l: "var(--map-booth-l)", x: "var(--map-booth-x)" } as const;
+/** Reserved booths: their size colour with white hatching (the same in lists and legends). */
+export const RESERVED_SWATCH = "repeating-linear-gradient(135deg, var(--map-booth-l) 0 2px, #ffffff 2px 4px)";
+const RESERVED_PATTERN = "venue-reserved";
 
 type View = { x: number; y: number; w: number; h: number };
 const FULL: View = { x: -2, y: -1, w: MAP_W + 4, h: MAP_H + 2 };
@@ -384,6 +387,7 @@ function Legend() {
     [BOOTH_FILL.s, BOOTH_SIZE_LABEL.s],
     [BOOTH_FILL.l, BOOTH_SIZE_LABEL.l],
     [BOOTH_FILL.x, BOOTH_SIZE_LABEL.x],
+    [RESERVED_SWATCH, "Reserved"],
     ["var(--map-you)", "You", true],
     ["var(--map-route)", "Destination"],
   ];
@@ -411,6 +415,11 @@ export const FloorPlan = memo(function FloorPlan({ places, selectedId, fadeFree 
 
   return (
     <g>
+      <defs>
+        <pattern id={RESERVED_PATTERN} width={0.9} height={0.9} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <rect width={0.35} height={0.9} fill="#ffffff" opacity={0.55} />
+        </pattern>
+      </defs>
       {/* Rooms */}
       {ZONES.map((z) => (
         <rect
@@ -492,7 +501,7 @@ export const FloorPlan = memo(function FloorPlan({ places, selectedId, fadeFree 
 
       {/* Booths */}
       {booths.map((p) => (
-        <BoothShape key={p.id} place={p} selected={p.id === selectedId} faded={fadeFree && !p.assigned} />
+        <BoothShape key={p.id} place={p} selected={p.id === selectedId} faded={fadeFree && p.status === "free"} />
       ))}
 
       {/* Room names */}
@@ -525,10 +534,12 @@ function BoothShape({ place: p, selected, faded = false }: { place: Place; selec
   const big = p.size === "x";
   const fs = big ? 1.5 : Math.min(1.3, w / 3.4);
   const ink = selected ? "#000000" : "var(--map-booth-ink)";
-  // The company name goes under the code when it fits on one line.
+  // The company name (or "Reserved") goes under the code when it fits on one line.
   const nameSize = big ? 0.95 : 0.62;
-  const name = p.assigned && p.name.length * nameSize * 0.56 <= w - 0.6 ? p.name : null;
+  const label = p.assigned ? p.name : p.status === "reserved" ? "Reserved" : null;
+  const name = label && label.length * nameSize * 0.56 <= w - 0.6 ? label : null;
   const sub = big ? (name ?? "6 × 6 m") : name;
+  const reserved = p.status === "reserved" && !selected;
   const codeY = y + h / 2 + fs * 0.35 - (sub ? (big ? 0.7 : 0.45) : 0);
   return (
     <g data-id={p.id} className="cursor-pointer [&:hover>rect]:brightness-110" opacity={faded && !selected ? 0.4 : undefined}>
@@ -542,6 +553,7 @@ function BoothShape({ place: p, selected, faded = false }: { place: Place; selec
         stroke={selected ? "var(--map-route)" : "var(--map-casing)"}
         strokeWidth={0.15}
       />
+      {reserved && <rect x={x + 0.1} y={y + 0.1} width={w - 0.2} height={h - 0.2} rx={0.45} fill={`url(#${RESERVED_PATTERN})`} className="pointer-events-none" />}
       <text x={x + w / 2} y={codeY} textAnchor="middle" fontSize={fs} fontWeight={700} fill={ink} className="pointer-events-none font-sans tabular-nums">
         {p.code}
       </text>

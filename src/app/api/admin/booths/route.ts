@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminRoute } from "@/lib/server/admin-auth";
-import { clearBoothAssignment, isMissingTable, listBoothAssignments, saveBoothAssignment } from "@/lib/server/booth-assignments";
+import { clearBoothAssignment, isNotSetUp, listBoothAssignments, saveBoothAssignment } from "@/lib/server/booth-assignments";
 import { boothCode, parseBoothAssignment } from "@/lib/venue/booth-fields";
 import { describeError } from "@/lib/describe-error";
 
@@ -10,11 +10,11 @@ export const runtime = "nodejs";
 // assign or edit (PUT), free a booth (DELETE). Any admin: selling booths is
 // day-to-day work.
 
-const NOT_SET_UP = "Booths aren't set up yet: run the booth assignments setup SQL in the Supabase SQL Editor.";
+const NOT_SET_UP = "Booths aren't fully set up yet: run the booth assignments setup SQL in the Supabase SQL Editor.";
 
 function failed(action: string, err: unknown) {
   console.error(`${action} failed: ${describeError(err)}`);
-  if (isMissingTable(err)) return NextResponse.json({ error: NOT_SET_UP }, { status: 503 });
+  if (isNotSetUp(err)) return NextResponse.json({ error: NOT_SET_UP }, { status: 503 });
   return NextResponse.json({ error: `Couldn't ${action.toLowerCase()}. Try again.` }, { status: 500 });
 }
 
@@ -26,14 +26,14 @@ export const GET = adminRoute(async () => {
   }
 });
 
-// Body: { boothCode, companyName, sector?, website?, logoUrl? }
+// Body: { boothCode, status: "sold" | "reserved", companyName, sector?, website?, logoUrl? }
 export const PUT = adminRoute(async (req: NextRequest, _context, session) => {
   const body = await req.json().catch(() => ({}));
   const parsed = parseBoothAssignment(body && typeof body === "object" ? body : {});
   if ("fields" in parsed) return NextResponse.json({ error: "Check the highlighted fields.", fields: parsed.fields }, { status: 400 });
   try {
     const assignment = await saveBoothAssignment(parsed.value, session.email);
-    console.info(`Booth ${assignment.boothCode} set to "${assignment.companyName}" by ${session.email}`);
+    console.info(`Booth ${assignment.boothCode} ${assignment.status} to "${assignment.companyName}" by ${session.email}`);
     return NextResponse.json({ assignment });
   } catch (err) {
     return failed("Save the booth", err);

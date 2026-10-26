@@ -17,13 +17,20 @@ describe("venue directions", () => {
   });
 
   it("names an assigned booth by its exhibitor", () => {
-    const places = buildPlaces({ "W-S4": { company: "Sahel Orbital", sector: "Earth observation", website: null } });
+    const places = buildPlaces({ "W-S4": { status: "sold", company: "Sahel Orbital", sector: "Earth observation", website: null } });
     const from = places.find((p) => p.id === "Q2")!;
     const to = places.find((p) => p.id === "W-S4")!;
     const steps = buildSteps(route(from.anchor, to.anchor)!, from, to, places);
 
     expect(to.name).toBe("Sahel Orbital");
     expect(steps.at(-1)!.text).toMatch(/^Arrive at Sahel Orbital \(W-S4\)/);
+  });
+
+  it("keeps a reserved booth's company off the map", () => {
+    const places = buildPlaces({ "N-L4": { status: "reserved" } });
+    const booth = places.find((p) => p.id === "N-L4")!;
+    expect(booth).toMatchObject({ name: "Booth N-L4", assigned: false, status: "reserved" });
+    expect(booth.cat).toMatch(/reserved$/);
   });
 
   it("gives every step but the last a walking distance", () => {
