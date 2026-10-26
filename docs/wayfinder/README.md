@@ -14,7 +14,7 @@ in Dakar, with walking directions. Built from the approved prototype
 | Walking grid, A* route, smoothing | `src/lib/venue/pathfinding.ts` (grid built off the main thread by `grid.worker.ts`) |
 | Turn-by-turn steps | `src/lib/venue/directions.ts` |
 | `?from=` / `?to=` in the address | `src/lib/venue/params.ts` |
-| Booth assignments from Supabase | `src/lib/server/booth-assignments.ts` |
+| Booth assignments (Supabase) and the admin editor | `src/lib/server/booth-assignments.ts`, `src/app/api/admin/booths/route.ts`, `src/components/admin/BoothsPanel.tsx` |
 | The page | `src/app/venue/page.tsx`, `src/components/venue/*` |
 | Printable QR stickers (staff) | `src/app/admin/venue-stickers/page.tsx`, at `/admin/venue-stickers` |
 
@@ -32,22 +32,23 @@ destination.
 
 ## Assign a booth to an exhibitor
 
-Booths are edited in Supabase, with no code change and no redeploy. The map
-picks a change up on the next page load.
+In the admin: **Venue booths** (`/admin/booths`). Any admin can do it.
 
-1. Supabase, Table Editor, `booth_assignments`, Insert row.
-2. `booth_code`: the code on the plan, exactly as printed, e.g. `W-S4` or `M-1`.
-3. `company_name`: shown on the booth (when it fits), in search and in the
-   directions ("Arrive at Sahel Orbital (W-S4) on your left").
-4. `sector` (optional): shown under the name in search.
-5. `website` (optional, `https://…`): a link on the route card.
-6. `logo_url` (optional): stored for later; the map doesn't show logos yet.
+1. Click the booth on the plan, or find it in the list (search by booth,
+   company or room; filter Assigned or Free).
+2. Fill in the company (required), and optionally the sector, website and
+   logo address. Save.
+3. The public map shows it on its next page load: on the booth (when the name
+   fits), in search, and in the directions ("Arrive at Sahel Orbital (W-S4) on
+   your left"). The admin page records who changed it and when.
 
-To unassign a booth, delete its row. Rows with a code that isn't on the plan
-are ignored.
+"Free this booth" takes the company off the map. The QR sticker sheet is
+linked from the same page.
 
-The table is created once with the SQL from the build notes. Without it, every
-booth shows as "not yet assigned" and the server log says so.
+Behind it is the `booth_assignments` table in Supabase (one row per assigned
+booth, keyed by the code on the plan). It is created once with the setup SQL
+from the build notes; until then the admin page says so, and the public map
+shows every booth as "not yet assigned".
 
 ## Move a door
 

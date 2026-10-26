@@ -61,8 +61,8 @@ export default async function VenueStickersPage() {
         )}
         <div className="flex flex-wrap gap-2">
           <PrintButton>Print stickers</PrintButton>
-          <ButtonLink href="/admin" variant="outline">
-            Back to the admin
+          <ButtonLink href="/admin/booths" variant="outline">
+            Back to booths
           </ButtonLink>
         </div>
       </div>

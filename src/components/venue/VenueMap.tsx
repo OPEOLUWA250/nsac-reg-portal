@@ -404,7 +404,8 @@ function Legend() {
 
 // ---------- the plan itself (redrawn only when names or the destination change) ----------
 
-const FloorPlan = memo(function FloorPlan({ places, selectedId }: { places: Place[]; selectedId: string | null }) {
+/** Rooms, furniture, walls, booths and labels. Also used by /admin/booths, with free booths faded. */
+export const FloorPlan = memo(function FloorPlan({ places, selectedId, fadeFree = false }: { places: Place[]; selectedId: string | null; fadeFree?: boolean }) {
   const booths = places.filter((p) => p.kind === "booth");
   const selectedStroke = (id: string) => (id === selectedId ? { stroke: "var(--map-route)", strokeWidth: 0.5 } : {});
 
@@ -491,7 +492,7 @@ const FloorPlan = memo(function FloorPlan({ places, selectedId }: { places: Plac
 
       {/* Booths */}
       {booths.map((p) => (
-        <BoothShape key={p.id} place={p} selected={p.id === selectedId} />
+        <BoothShape key={p.id} place={p} selected={p.id === selectedId} faded={fadeFree && !p.assigned} />
       ))}
 
       {/* Room names */}
@@ -519,7 +520,7 @@ const FloorPlan = memo(function FloorPlan({ places, selectedId }: { places: Plac
   );
 });
 
-function BoothShape({ place: p, selected }: { place: Place; selected: boolean }) {
+function BoothShape({ place: p, selected, faded = false }: { place: Place; selected: boolean; faded?: boolean }) {
   const [x, y, w, h] = p.rect!;
   const big = p.size === "x";
   const fs = big ? 1.5 : Math.min(1.3, w / 3.4);
@@ -530,7 +531,7 @@ function BoothShape({ place: p, selected }: { place: Place; selected: boolean })
   const sub = big ? (name ?? "6 × 6 m") : name;
   const codeY = y + h / 2 + fs * 0.35 - (sub ? (big ? 0.7 : 0.45) : 0);
   return (
-    <g data-id={p.id} className="cursor-pointer [&:hover>rect]:brightness-110">
+    <g data-id={p.id} className="cursor-pointer [&:hover>rect]:brightness-110" opacity={faded && !selected ? 0.4 : undefined}>
       <rect
         x={x + 0.1}
         y={y + 0.1}
