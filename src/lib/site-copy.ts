@@ -13,6 +13,7 @@ export const SITE_COPY: Record<
     register: string;
     form: string;
     flyer: string;
+    venue: string;
     privacy: string;
     terms: string;
     organisedBy: string;
@@ -28,6 +29,7 @@ export const SITE_COPY: Record<
     register: "Register",
     form: "Registration form",
     flyer: "Create your flyer",
+    venue: "Venue map",
     privacy: "Privacy",
     terms: "Terms",
     organisedBy: "Organised by",
@@ -42,6 +44,7 @@ export const SITE_COPY: Record<
     register: "S'inscrire",
     form: "Formulaire d'inscription",
     flyer: "Créer votre visuel",
+    venue: "Plan du lieu",
     privacy: "Confidentialité",
     terms: "Conditions",
     organisedBy: "Organisé par",
