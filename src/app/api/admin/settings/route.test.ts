@@ -11,6 +11,7 @@ vi.mock("@/lib/server/admin-auth", async (importOriginal) => {
 });
 vi.mock("@/lib/settings-store", () => ({ getSettings: vi.fn(), updateSettings: mocks.update }));
 vi.mock("@/lib/ticket-store", () => ({ availableTickets: vi.fn() }));
+vi.mock("@/lib/server/activity-log", () => ({ logActivity: vi.fn() }));
 
 const superAdmin = { user: { id: "s" }, email: "owner@example.com", role: "super_admin", mustChangePassword: false } as AdminSession;
 const admin = { ...superAdmin, email: "admin@example.com", role: "admin" } as AdminSession;

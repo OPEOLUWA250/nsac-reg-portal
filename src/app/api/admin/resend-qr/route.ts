@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { adminRoute } from "@/lib/server/admin-auth";
+import { logActivity } from "@/lib/server/activity-log";
 import { sendAttendeeQr } from "@/lib/attendee-service";
 import type { Attendee } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-export const POST = adminRoute(async (req: NextRequest) => {
+export const POST = adminRoute(async (req: NextRequest, _context, session) => {
   const { id } = await req.json();
   if (!id || typeof id !== "string") {
     return NextResponse.json({ error: "missing id" }, { status: 400 });
@@ -29,5 +30,10 @@ export const POST = adminRoute(async (req: NextRequest) => {
     return NextResponse.json({ error: "failed to send email" }, { status: 502 });
   }
 
+  await logActivity(
+    session,
+    { area: "registrations", action: "attendee.qr_resent", summary: `resent ${attendee.full_name}'s QR email`, target: { type: "attendee", id } },
+    req
+  );
   return NextResponse.json({ ok: true });
 });

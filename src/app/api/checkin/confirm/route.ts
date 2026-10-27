@@ -3,10 +3,11 @@ import { codeFromQr } from "@/lib/qrcode";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { adminRoute } from "@/lib/server/admin-auth";
 import { scannerAttendee } from "@/lib/scanner-attendee";
+import { logActivity } from "@/lib/server/activity-log";
 
 export const runtime = "nodejs";
 
-export const POST = adminRoute(async (req: NextRequest) => {
+export const POST = adminRoute(async (req: NextRequest, _context, session) => {
 
   const { token, station } = await req.json();
   if (!token || typeof token !== "string") {
@@ -59,5 +60,15 @@ export const POST = adminRoute(async (req: NextRequest) => {
     return NextResponse.json({ error: "database error" }, { status: 500 });
   }
 
+  await logActivity(
+    session,
+    {
+      area: "check_in",
+      action: "checkin.scanned",
+      summary: `checked in ${attendee.full_name}${typeof station === "string" && station ? ` at ${station.slice(0, 60)}` : ""}`,
+      target: { type: "attendee", id: attendee.id },
+    },
+    req
+  );
   return NextResponse.json({ ok: true, attendee: scannerAttendee(attendee), alreadyCheckedIn: false }, { headers: { "Cache-Control": "private, no-store" } });
 });

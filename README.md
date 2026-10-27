@@ -199,6 +199,46 @@ for Jotform rows), `stripe_session_id`, `paid_at`.
 RLS is enabled with no public policies — everything goes through the
 service-role-backed API routes.
 
+## Admin activity log
+
+`/admin/activity` (super admins only) lists what admins have done, newest
+first, grouped by day, with filters by area and admin, a search, and an
+"Open" link on entries about a registration. It updates every 30 seconds.
+
+What's recorded:
+
+- **Sign-in:** signed in, signed out, wrong passwords on admin accounts, and
+  password changes.
+- **Registrations:** walk-ins, category changes, QR emails resent, deletions,
+  passports viewed or opened, and CSV downloads.
+- **Check-in:** scanner check-ins, manual check-ins and undos, and badges
+  printed.
+- **Tickets, promo codes and student codes:** created, edited, switched on or
+  off, cancelled, and emailed.
+- **Admins:** added, role changed, temporary password, and removed.
+- **Settings:** registration opened or closed, and the alert list.
+
+Routes call `logActivity` (`src/lib/server/activity-log.ts`) after an action
+succeeds. It never throws, so recording can't break an action. Areas and
+labels are in `src/lib/activity.ts`.
+
+It lives in the `admin_activity` table:
+
+| Column | Notes |
+| --- | --- |
+| `id` | bigint identity, primary key |
+| `at` | timestamptz, default `now()` |
+| `actor_email`, `actor_role` | who did it |
+| `area`, `action` | e.g. `registrations`, `attendee.category_changed` |
+| `summary` | the sentence shown, without the actor |
+| `target_type`, `target_id` | e.g. `attendee` and its id |
+| `details` | jsonb, extra facts |
+| `ip` | where the request came from |
+
+It has an index on `(at desc)` and on `actor_email`. RLS is on with no
+policies (server only). Until the table exists, actions still work and the
+server log says once that nothing is being recorded.
+
 ## Jotform field mapping
 
 `src/lib/jotform-mapping.ts` matches your Jotform fields by *keyword* in the

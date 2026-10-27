@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuthClient, getAdminSession } from "@/lib/server/admin-auth";
 import { passwordProblem } from "@/lib/admin-password";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { logActivity } from "@/lib/server/activity-log";
 
 export const runtime = "nodejs";
 
@@ -40,5 +41,10 @@ export async function POST(req: NextRequest) {
     // The session token still carries the old flag until it refreshes.
     await client.auth.refreshSession().catch(() => undefined);
   }
+  await logActivity(
+    session,
+    { area: "sign_in", action: "password.changed", summary: session.mustChangePassword ? "replaced their temporary password" : "changed their password" },
+    req
+  );
   return NextResponse.json({ ok: true });
 }

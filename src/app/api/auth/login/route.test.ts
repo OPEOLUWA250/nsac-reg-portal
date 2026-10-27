@@ -2,7 +2,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { POST } from "./route";
 
-const mocks = vi.hoisted(() => ({ client: vi.fn(), allowed: vi.fn(), role: vi.fn(), signIn: vi.fn(), signOut: vi.fn(), limit: vi.fn() }));
+const mocks = vi.hoisted(() => ({ client: vi.fn(), allowed: vi.fn(), role: vi.fn(), signIn: vi.fn(), signOut: vi.fn(), limit: vi.fn(), log: vi.fn() }));
+vi.mock("@/lib/server/activity-log", () => ({ logActivity: mocks.log }));
 vi.mock("@/lib/server/admin-auth", () => ({ adminAuthClient: mocks.client }));
 vi.mock("@/lib/server/rate-limit", () => ({ clientIp: () => "203.0.113.1", withinLimit: mocks.limit }));
 vi.mock("@/lib/server/admin-emails", () => ({ isAllowedAdminEmail: mocks.allowed }));
@@ -15,6 +16,7 @@ beforeEach(() => {
   mocks.signIn.mockResolvedValue({ data: { user: { app_metadata: { must_change_password: true } } }, error: null });
   mocks.signOut.mockResolvedValue({ error: null });
   mocks.limit.mockResolvedValue(true);
+  mocks.log.mockReset().mockResolvedValue(undefined);
   vi.spyOn(console, "warn").mockImplementation(() => undefined);
 });
 afterEach(() => vi.restoreAllMocks());
@@ -55,4 +57,15 @@ it("returns the temporary password requirement after successful sign-in", async 
   expect(mocks.signIn).toHaveBeenCalledWith({ email: "admin@example.com", password: "temporary password" });
   // Starts the inactivity clock.
   expect(response.headers.get("set-cookie")).toMatch(/^nsac_admin_activity=\d+\.\d+;.*HttpOnly/i);
+  expect(mocks.log).toHaveBeenCalledWith({ email: "admin@example.com", role: "admin" }, expect.objectContaining({ action: "sign_in" }), expect.anything());
+});
+
+it("records wrong passwords on admin accounts, and nothing for strangers", async () => {
+  mocks.signIn.mockResolvedValue({ data: { user: null }, error: { message: "bad credentials" } });
+  await POST(request({ email: "admin@example.com", password: "a wrong guess" }));
+  expect(mocks.log).toHaveBeenCalledWith({ email: "admin@example.com" }, expect.objectContaining({ action: "sign_in.failed" }), expect.anything());
+  mocks.log.mockClear();
+  mocks.allowed.mockResolvedValue(false);
+  await POST(request({ email: "stranger@example.com", password: "a wrong guess" }));
+  expect(mocks.log).not.toHaveBeenCalled();
 });

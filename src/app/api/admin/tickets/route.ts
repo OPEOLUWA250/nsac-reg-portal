@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminRoute } from "@/lib/server/admin-auth";
 import { deleteTicket, listTickets, saveTicket, ticketRegistrationCounts, validateTicketInput } from "@/lib/ticket-store";
+import { logActivity } from "@/lib/server/activity-log";
+import { money } from "@/lib/admin-format";
 
 export const runtime = "nodejs";
 
@@ -21,7 +23,7 @@ export const GET = adminRoute(async (req: NextRequest) => {
 
 // Body: { isNew: boolean, ticket: { id, nameEn, nameFr, descriptionEn,
 // descriptionFr, amountCents, availableUntil, active, sortOrder } }
-export const POST = adminRoute(async (req: NextRequest) => {
+export const POST = adminRoute(async (req: NextRequest, _context, session) => {
   let body: { isNew?: unknown; ticket?: unknown };
   try {
     body = await req.json();
@@ -53,6 +55,18 @@ export const POST = adminRoute(async (req: NextRequest) => {
     console.info(
       `Ticket ${saved.ticket.id} saved: ${saved.ticket.amountCents} ${saved.ticket.currency}, active=${saved.ticket.active}`
     );
+    const t = saved.ticket;
+    await logActivity(
+      session,
+      {
+        area: "tickets",
+        action: body.isNew === true ? "ticket.created" : "ticket.updated",
+        summary: `${body.isNew === true ? "created" : "updated"} the ${t.name.en} ticket (${money(t.amountCents, t.currency) || "free"}, ${t.active ? "on sale" : "hidden"})`,
+        target: { type: "ticket", id: t.id },
+        details: { amountCents: t.amountCents, currency: t.currency, active: t.active, availableUntil: t.availableUntil },
+      },
+      req
+    );
     return NextResponse.json({ ticket: saved.ticket });
   } catch (err) {
     console.error("Save ticket error", err);
@@ -62,7 +76,7 @@ export const POST = adminRoute(async (req: NextRequest) => {
 
 // DELETE /api/admin/tickets?id=standard — only for tickets nobody has
 // registered with (otherwise hide it: past registrations keep their ticket).
-export const DELETE = adminRoute(async (req: NextRequest) => {
+export const DELETE = adminRoute(async (req: NextRequest, _context, session) => {
   const id = req.nextUrl.searchParams.get("id") ?? "";
   try {
     const result = await deleteTicket(id);
@@ -76,6 +90,7 @@ export const DELETE = adminRoute(async (req: NextRequest) => {
       return NextResponse.json({ error: "Ticket not found." }, { status: 404 });
     }
     console.info(`Ticket ${id} deleted`);
+    await logActivity(session, { area: "tickets", action: "ticket.deleted", summary: `deleted the ticket "${id}"`, target: { type: "ticket", id } }, req);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("Delete ticket error", err);
