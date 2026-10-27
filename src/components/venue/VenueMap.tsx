@@ -61,6 +61,7 @@ type View = { x: number; y: number; w: number; h: number };
 const FULL: View = { x: -2, y: -1, w: MAP_W + 4, h: MAP_H + 2 };
 const viewBox = (v: View) => `${v.x} ${v.y} ${v.w} ${v.h}`;
 const WALK_SPEED = 16; // map units per second in the preview
+const CONTROLS_WIDTH = 60; // px: the map buttons (44) and their margin
 
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -91,6 +92,7 @@ export default function VenueMap(props: Props) {
   const view = useRef<View>({ ...FULL });
   const anim = useRef(0);
   const walkAnim = useRef(0);
+  const fittedSize = useRef({ w: 0, h: 0 });
   const [dragging, setDragging] = useState(false);
 
   // Event handlers read the latest props without re-binding.
@@ -106,8 +108,12 @@ export default function VenueMap(props: Props) {
     if (!svg) return;
     cancelAnimationFrame(anim.current);
     const r = svg.getBoundingClientRect();
+    fittedSize.current = { w: r.width, h: r.height };
     const inset = Math.min(latest.current.insetTop ?? 0, r.height / 2);
-    const ar = r.width / (r.height - inset) || 1;
+    // The map buttons down the right-hand side; only kept clear on narrow maps,
+    // where the route would otherwise run under them.
+    const right = r.width < 640 ? CONTROLS_WIDTH : 0;
+    const ar = (r.width - right) / (r.height - inset) || 1;
     let { x, y, w, h } = target;
     if (w / h < ar) {
       const nw = h * ar;
@@ -118,10 +124,11 @@ export default function VenueMap(props: Props) {
       y -= (nh - h) / 2;
       h = nh;
     }
-    // Room above for the card, so it doesn't hide the route.
+    // Room above for the card and beside for the buttons, so neither hides the route.
     const extra = (h / (r.height - inset)) * inset;
     y -= extra;
     h += extra;
+    w += (w / (r.width - right)) * right;
     const goal = { x, y, w, h };
     const from = { ...view.current };
     if (reducedMotion()) {
@@ -201,10 +208,12 @@ export default function VenueMap(props: Props) {
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
-    let first = true;
+    // Refit when the map's size changes from the one last fitted: a phone
+    // turning, or a page first laid out at another size (browser dev tools,
+    // a slow font) whose first fit was for the wrong shape.
     const ro = new ResizeObserver(() => {
-      if (first) return void (first = false);
-      fitCurrent();
+      const r = svg.getBoundingClientRect();
+      if (Math.abs(r.width - fittedSize.current.w) > 2 || Math.abs(r.height - fittedSize.current.h) > 2) fitCurrent();
     });
     ro.observe(svg);
     // The wheel needs a non-passive listener to stop the page scrolling.

@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { faWifi } from "@fortawesome/free-solid-svg-icons";
+import FaIcon from "@/components/FaIcon";
 import VenueMap from "@/components/venue/VenueMap";
 import { ExhibitorPeek } from "@/components/venue/ExhibitorCard";
 import WayfinderPanel, { PIN, type Filter, type RouteSummary } from "@/components/venue/WayfinderPanel";
@@ -8,7 +10,8 @@ import { BOOTHS, ENTRANCE, METRES_PER_UNIT, WALK_SPEED_MPS, type Point } from "@
 import { boothState, buildPlaces, type ExhibitorMap, type Place } from "@/lib/venue/places";
 import { cellCenter, dist, hasGrid, pathLength, route, setGrid, snap, type Grid } from "@/lib/venue/pathfinding";
 import { buildSteps, type RouteEnd } from "@/lib/venue/directions";
-import { venueQuery } from "@/lib/venue/params";
+import { parseVenueQuery, venueQuery } from "@/lib/venue/params";
+import { useOfflineVenue, useOnline } from "@/components/venue/useOfflineVenue";
 
 // The venue wayfinder: where you are, where you're going, the route on the
 // map and the steps. The URL follows along (?from=…&to=…) so a route can be
@@ -30,11 +33,16 @@ export default function VenueWayfinder({
   exhibitors,
   initialFrom,
   initialTo,
+  renderedAt,
 }: {
   exhibitors: ExhibitorMap;
   initialFrom: string;
   initialTo: string | null;
+  /** When the server drew this page: offline, how old the saved map is. */
+  renderedAt: string;
 }) {
+  useOfflineVenue();
+  const online = useOnline();
   const places = useMemo(() => buildPlaces(exhibitors), [exhibitors]);
   const byId = useMemo(() => new Map(places.map((p) => [p.id, p])), [places]);
 
@@ -82,6 +90,22 @@ export default function VenueWayfinder({
     setWalkKey(0);
     setActiveStep(null);
     setFitKey((k) => k + 1);
+  }, []);
+
+  // Offline, the saved page may have been drawn for another address (a
+  // sticker's ?from=Q3, say): follow the one in the address bar.
+  // (Read now, before the address-bar effect below rewrites it.)
+  useEffect(() => {
+    const { from, to } = parseVenueQuery(Object.fromEntries(new URLSearchParams(window.location.search)), places);
+    if (from === initialFrom && to === initialTo) return;
+    const t = setTimeout(() => {
+      setFromId(from);
+      setToId(to);
+      changed();
+    }, 0);
+    return () => clearTimeout(t);
+    // Once, on load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Keep the address bar in step, without adding history entries.
@@ -143,7 +167,9 @@ export default function VenueWayfinder({
     fromId === PIN ? "Spot you picked on the map" : from.kind === "booth" && fromPlace ? `${from.code} · ${boothState(fromPlace)}` : from.name;
 
   return (
-    <main id="main" className="venue flex-1 bg-canvas text-ink" data-theme={theme ?? undefined}>
+    // Nothing may widen the page sideways on a phone (the map pans inside its own box).
+    <main id="main" className="venue min-w-0 flex-1 overflow-x-clip bg-canvas text-ink" data-theme={theme ?? undefined}>
+      {!online && <OfflineNotice renderedAt={renderedAt} />}
       <div className="flex flex-col md:grid md:h-[calc(100dvh-4rem)] md:grid-cols-[minmax(20rem,25rem)_1fr]">
         <aside aria-label="Venue guide" className="order-2 min-w-0 px-4 py-6 sm:px-6 md:order-none md:overflow-y-auto md:border-r md:border-line md:px-5">
           <WayfinderPanel
@@ -178,7 +204,7 @@ export default function VenueWayfinder({
             onShowRoute={() => setFitKey((k) => k + 1)}
           />
         </aside>
-        <section ref={mapRef} aria-label="Venue map" className="relative order-1 h-[58svh] min-h-[21rem] scroll-mt-16 md:order-none md:h-auto md:min-h-0">
+        <section ref={mapRef} aria-label="Venue map" className="relative order-1 h-[58svh] min-h-[21rem] min-w-0 overflow-hidden scroll-mt-16 md:order-none md:h-auto md:min-h-0">
           {peek && <ExhibitorPeek key={peek.id} place={peek} onClose={() => setPeekHidden(peek.id)} />}
           <VenueMap
             places={places}
@@ -205,5 +231,16 @@ export default function VenueWayfinder({
         </section>
       </div>
     </main>
+  );
+}
+
+// A thin strip over the page: directions still work, names may be out of date.
+function OfflineNotice({ renderedAt }: { renderedAt: string }) {
+  const saved = new Date(renderedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return (
+    <p role="status" className="flex items-center justify-center gap-2 bg-gold px-4 py-2 text-center text-sm font-semibold text-black md:fixed md:bottom-3 md:left-1/2 md:z-30 md:-translate-x-1/2 md:rounded-md">
+      <FaIcon icon={faWifi} className="h-3.5 w-3.5 shrink-0" />
+      You&apos;re offline. Showing the map saved {saved}; directions still work.
+    </p>
   );
 }

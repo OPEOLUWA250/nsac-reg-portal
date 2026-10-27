@@ -145,7 +145,8 @@ export default function WayfinderPanel(p: Props) {
           </>
         }
       >
-        <div className="flex gap-2">
+        {/* Side by side when there's room; on narrow phones the list gets the full width. */}
+        <div className="flex flex-col gap-2 min-[25rem]:flex-row">
           <select
             id="venue-from"
             value={p.fromValue}
@@ -257,15 +258,6 @@ export default function WayfinderPanel(p: Props) {
           )}
         </Card>
       </section>
-
-      <details className="group border-t border-line pt-4 text-sm text-ink-3">
-        <summary className="cursor-pointer rounded-sm font-semibold text-ink">About this map</summary>
-        <ul className="mt-2 list-disc space-y-1 pl-5">
-          <li>Built from the draft NSAC 2027 event floor plan (October 2026): 3 exhibition rooms, the main foyer, the registration foyer, the main entrance and the conference amphitheatre.</li>
-          <li>Exhibitor names appear on booths once they are assigned. Toilets, catering, exits and other facilities will be added when they are confirmed.</li>
-          <li>Walking distances are estimates based on the 247 sqm room size.</li>
-        </ul>
-      </details>
     </div>
   );
 }
@@ -348,8 +340,9 @@ function RouteCard(p: Props) {
                 <span className="text-sm text-ink-3">min walk</span>
               </span>
             </div>
-            <div className="flex flex-wrap gap-2 pt-1">
-              <button type="button" onClick={p.onWalk} className={buttonClass("secondary", "sm")}>
+            {/* Phones: the walk preview on its own row, the other two sharing the next. */}
+            <div className="grid grid-cols-2 gap-2 pt-1 sm:flex sm:flex-wrap">
+              <button type="button" onClick={p.onWalk} className={buttonClass("secondary", "sm", "col-span-2")}>
                 <FaIcon icon={faPersonWalking} />
                 Preview the walk
               </button>
