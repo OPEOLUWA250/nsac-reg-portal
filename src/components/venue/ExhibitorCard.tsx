@@ -2,13 +2,13 @@
 
 import { faArrowUpRightFromSquare, faChevronDown, faXmark } from "@fortawesome/free-solid-svg-icons";
 import FaIcon from "@/components/FaIcon";
-import { Card, buttonClass } from "@/components/ui";
+import { Card, buttonClass, cx } from "@/components/ui";
 import { BOOTH_FILL } from "@/components/venue/VenueMap";
 import { BOOTH_SIZE_LABEL, ZONES } from "@/lib/venue/data";
 import type { Place } from "@/lib/venue/places";
 
-// Who is at a sold booth: shown in the panel when it's the destination, and,
-// on phones, as a short card over the map (the panel is below the fold there).
+// Who is at a sold booth: shown in the panel when it's the destination. Any
+// booth you're going to also gets a short card over the map (BoothPeek).
 
 export const EXHIBITOR_CARD_ID = "venue-exhibitor";
 
@@ -62,29 +62,38 @@ export default function ExhibitorCard({ place: x }: { place: Place }) {
   );
 }
 
-/** The phone version, over the map: name, booth and a way to the full card. */
-export function ExhibitorPeek({ place: x, onClose }: { place: Place; onClose: () => void }) {
-  const more = !!(x.description || x.website);
+/**
+ * The card over the map for the booth you're going to, at every screen size:
+ * the company and a way to its full card for a sold booth, otherwise the
+ * booth's size, room and whether it's reserved or free.
+ */
+export function BoothPeek({ place: x, onClose }: { place: Place; onClose: () => void }) {
+  const more = !!(x.assigned && (x.description || x.website));
+  const where = `${BOOTH_SIZE_LABEL[x.size!]} booth · ${ROOM_NAME[x.room!]}`;
+  const line = x.assigned ? (x.sector ?? where) : `${where} · ${x.status === "reserved" ? "Reserved" : "Not yet assigned"}`;
   return (
     <div
       role="region"
-      aria-label={`Exhibitor at ${x.code}`}
-      className="absolute left-3 top-3 z-10 w-[calc(100%-5.5rem)] max-w-sm rounded-lg border border-line border-t-4 border-t-gold bg-surface p-3 pr-11 transition-[opacity,translate] duration-200 starting:-translate-y-1 starting:opacity-0 md:hidden"
+      aria-label={`Booth ${x.code}`}
+      className={cx(
+        "absolute left-3 top-3 z-10 w-[calc(100%-5.5rem)] max-w-sm rounded-lg border border-line border-t-4 bg-surface p-3 pr-11 transition-[opacity,translate] duration-200 starting:-translate-y-1 starting:opacity-0",
+        x.assigned ? "border-t-gold" : "border-t-line-strong"
+      )}
     >
       <button
         type="button"
         onClick={onClose}
-        aria-label="Hide exhibitor"
+        aria-label="Hide booth card"
         className="absolute right-1 top-1 inline-flex h-11 w-11 items-center justify-center rounded-md text-ink-3 transition-colors duration-150 hover:bg-subtle hover:text-ink"
       >
         <FaIcon icon={faXmark} />
       </button>
       <div className="flex items-center gap-2">
         <BoothBadge place={x} />
-        <p className="min-w-0 truncate font-display text-base font-bold text-blue">{x.name}</p>
+        <p className="min-w-0 truncate font-display text-base font-bold text-blue">{x.assigned ? x.name : `Booth ${x.code}`}</p>
       </div>
       <div className="mt-0.5 flex min-h-9 items-center gap-3 text-sm">
-        {x.sector && <span className="min-w-0 truncate text-ink-3">{x.sector}</span>}
+        <span className="min-w-0 truncate text-ink-3">{line}</span>
         {more && (
           <button
             type="button"

@@ -4,6 +4,7 @@ import { describeError } from "@/lib/describe-error";
 import { BOOTHS } from "@/lib/venue/data";
 import type { ExhibitorMap } from "@/lib/venue/places";
 import type { BoothAssignmentInput } from "@/lib/venue/booth-fields";
+import { BOOTHS_CHANGED, BOOTHS_CHANNEL } from "@/lib/venue/live";
 
 // Which company has which booth, for the venue map. Admins edit them at
 // /admin/booths (one row per sold booth in `booth_assignments`, keyed by the
@@ -103,6 +104,22 @@ export async function saveBoothAssignment(input: BoothAssignmentInput, by: strin
     .single();
   if (error) throw error;
   return fromRow(data as Row);
+}
+
+/**
+ * Tells open venue maps the booths changed, so they fetch them again
+ * (src/lib/venue/live.ts). Never throws: maps also check every minute.
+ */
+export async function announceBoothChange(): Promise<void> {
+  try {
+    const client = supabaseAdmin();
+    const channel = client.channel(BOOTHS_CHANNEL);
+    const result = await channel.httpSend(BOOTHS_CHANGED, {}, { timeout: 3000 });
+    if (!result.success) console.warn(`Booth change not announced (${result.status}): ${result.error}`);
+    await client.removeChannel(channel);
+  } catch (err) {
+    console.warn(`Booth change not announced: ${describeError(err)}`);
+  }
 }
 
 /** Frees a booth. False when it wasn't assigned. */

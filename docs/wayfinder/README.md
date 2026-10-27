@@ -49,8 +49,20 @@ In the admin: **Venue booths** (`/admin/booths`). Any admin can do it.
 
 When a visitor picks a sold booth (on the map or in a list), the company's
 card shows above the route: name, sector, booth and room, the "About" text and
-a button to their website. On phones a short version sits over the top of the
-map (the route is fitted below it), with "More" scrolling to the full card.
+a button to their website. Any booth they pick also gets a short card over
+the top of the map (the route is fitted below it): the company with "More" for
+a sold booth, otherwise its size, room and "Reserved" or "Not yet assigned".
+
+Changes show up live: maps already open update within a second or two of
+pressing Save or "Free this booth" (a "Booths updated" note shows briefly), no
+reload needed. The server sends an empty "changed" message on the Supabase
+Realtime channel `venue-booths`; open maps then fetch `/api/venue/booths`,
+the same public list the page uses, so reserved companies' names never reach
+a visitor. If Realtime is unavailable, maps also check every minute and when
+someone returns to the tab. See `src/lib/venue/live.ts`.
+
+The table is read by the server only (service role). Don't add a public
+read policy to `booth_assignments`: it would expose reserved companies.
 
 Visitors find confirmed companies under **Exhibitors A–Z** on the venue map:
 every sold booth, by company name, with a heading per letter.

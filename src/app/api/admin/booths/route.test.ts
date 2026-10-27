@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import type { AdminSession } from "@/lib/server/admin-auth";
 import { DELETE, GET, PUT } from "./route";
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), list: vi.fn(), save: vi.fn(), clear: vi.fn() }));
+const mocks = vi.hoisted(() => ({ session: vi.fn(), list: vi.fn(), save: vi.fn(), clear: vi.fn(), announce: vi.fn() }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/server/admin-auth", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/server/admin-auth")>();
@@ -13,6 +13,7 @@ vi.mock("@/lib/server/booth-assignments", () => ({
   listBoothAssignments: mocks.list,
   saveBoothAssignment: mocks.save,
   clearBoothAssignment: mocks.clear,
+  announceBoothChange: mocks.announce,
   isNotSetUp: (err: { code?: string }) => err?.code === "PGRST205",
 }));
 
@@ -22,6 +23,7 @@ const call = (handler: typeof PUT, method: string, body?: unknown) =>
   handler(new NextRequest("https://example.com/api/admin/booths", { method, body: body === undefined ? undefined : JSON.stringify(body) }), {});
 
 beforeEach(() => {
+  mocks.announce.mockReset().mockResolvedValue(undefined);
   mocks.session.mockResolvedValue(admin);
   mocks.save.mockImplementation(async (input: object, by: string) => ({ ...input, updatedAt: "2026-10-26T12:00:00Z", updatedBy: by }));
 });
@@ -41,6 +43,8 @@ it("lets any admin assign a booth, saved under their email", async () => {
     "admin@example.com"
   );
   expect(await res.json()).toMatchObject({ assignment: { boothCode: "W-S4", updatedBy: "admin@example.com" } });
+  // Open venue maps are told, so they update without a reload.
+  expect(mocks.announce).toHaveBeenCalledOnce();
 });
 
 it("explains what's wrong instead of saving", async () => {
@@ -48,6 +52,7 @@ it("explains what's wrong instead of saving", async () => {
   expect(res.status).toBe(400);
   expect(await res.json()).toMatchObject({ fields: { boothCode: expect.any(String), companyName: expect.any(String) } });
   expect(mocks.save).not.toHaveBeenCalled();
+  expect(mocks.announce).not.toHaveBeenCalled();
 });
 
 it("frees a booth", async () => {
@@ -55,6 +60,7 @@ it("frees a booth", async () => {
   const res = await call(DELETE, "DELETE", { boothCode: "e-l2" });
   expect(res.status).toBe(200);
   expect(mocks.clear).toHaveBeenCalledWith("E-L2");
+  expect(mocks.announce).toHaveBeenCalledOnce();
 });
 
 it("says when the table hasn't been set up", async () => {

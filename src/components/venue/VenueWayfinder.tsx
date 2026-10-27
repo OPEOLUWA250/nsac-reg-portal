@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { faWifi } from "@fortawesome/free-solid-svg-icons";
 import FaIcon from "@/components/FaIcon";
+import { cx } from "@/components/ui";
 import VenueMap from "@/components/venue/VenueMap";
-import { ExhibitorPeek } from "@/components/venue/ExhibitorCard";
+import { BoothPeek } from "@/components/venue/ExhibitorCard";
 import WayfinderPanel, { PIN, type Filter, type RouteSummary } from "@/components/venue/WayfinderPanel";
 import { BOOTHS, ENTRANCE, METRES_PER_UNIT, WALK_SPEED_MPS, type Point } from "@/lib/venue/data";
 import { boothState, buildPlaces, type ExhibitorMap, type Place } from "@/lib/venue/places";
@@ -12,21 +13,19 @@ import { cellCenter, dist, hasGrid, pathLength, route, setGrid, snap, type Grid 
 import { buildSteps, type RouteEnd } from "@/lib/venue/directions";
 import { parseVenueQuery, venueQuery } from "@/lib/venue/params";
 import { useOfflineVenue, useOnline } from "@/components/venue/useOfflineVenue";
+import { useLiveExhibitors } from "@/components/venue/useLiveExhibitors";
 
 // The venue wayfinder: where you are, where you're going, the route on the
 // map and the steps. The URL follows along (?from=…&to=…) so a route can be
 // shared; QR stickers open it with ?from= already set.
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
-const PHONE_QUERY = "(max-width: 767px)";
-const subscribeTo = (query: string) => (cb: () => void) => {
-  const mq = window.matchMedia(query);
+const subscribeDark = (cb: () => void) => {
+  const mq = window.matchMedia(DARK_QUERY);
   mq.addEventListener("change", cb);
   return () => mq.removeEventListener("change", cb);
 };
-const subscribeDark = subscribeTo(DARK_QUERY);
-const subscribePhone = subscribeTo(PHONE_QUERY);
-// Height of the exhibitor card over the map on phones, plus its margin.
+// Height of the booth card over the map, plus its margin.
 const PEEK_INSET = 104;
 
 export default function VenueWayfinder({
@@ -43,7 +42,8 @@ export default function VenueWayfinder({
 }) {
   useOfflineVenue();
   const online = useOnline();
-  const places = useMemo(() => buildPlaces(exhibitors), [exhibitors]);
+  const { exhibitors: live, changedAt } = useLiveExhibitors(exhibitors);
+  const places = useMemo(() => buildPlaces(live), [live]);
   const byId = useMemo(() => new Map(places.map((p) => [p.id, p])), [places]);
 
   const [fromId, setFromId] = useState(initialFrom);
@@ -62,7 +62,6 @@ export default function VenueWayfinder({
   const [theme, setTheme] = useState<"light" | "dark" | null>(null);
   const systemDark = useSyncExternalStore(subscribeDark, () => window.matchMedia(DARK_QUERY).matches, () => false);
   const dark = theme ? theme === "dark" : systemDark;
-  const phone = useSyncExternalStore(subscribePhone, () => window.matchMedia(PHONE_QUERY).matches, () => false);
 
   const fromPlace: Place | null = fromId === PIN ? null : (byId.get(fromId) ?? null);
   const from: RouteEnd & { anchor: Point } =
@@ -161,7 +160,7 @@ export default function VenueWayfinder({
     }
   };
 
-  const peek = to?.assigned && !picking && peekHidden !== to.id ? to : null;
+  const peek = to?.kind === "booth" && !picking && peekHidden !== to.id ? to : null;
 
   const fromLabel =
     fromId === PIN ? "Spot you picked on the map" : from.kind === "booth" && fromPlace ? `${from.code} · ${boothState(fromPlace)}` : from.name;
@@ -205,7 +204,8 @@ export default function VenueWayfinder({
           />
         </aside>
         <section ref={mapRef} aria-label="Venue map" className="relative order-1 h-[58svh] min-h-[21rem] min-w-0 overflow-hidden scroll-mt-16 md:order-none md:h-auto md:min-h-0">
-          {peek && <ExhibitorPeek key={peek.id} place={peek} onClose={() => setPeekHidden(peek.id)} />}
+          {peek && <BoothPeek key={peek.id} place={peek} onClose={() => setPeekHidden(peek.id)} />}
+          {changedAt && <UpdatedNotice key={changedAt} />}
           <VenueMap
             places={places}
             fromPt={from.anchor}
@@ -218,7 +218,7 @@ export default function VenueWayfinder({
             dark={dark}
             onToggleTheme={() => setTheme(dark ? "light" : "dark")}
             onActiveStep={setActiveStep}
-            insetTop={peek && phone ? PEEK_INSET : 0}
+            insetTop={peek ? PEEK_INSET : 0}
             onTapPlace={chooseTo}
             onPick={(pt) => {
               // Stand on the nearest walkable spot, not inside a booth or a wall.
@@ -231,6 +231,26 @@ export default function VenueWayfinder({
         </section>
       </div>
     </main>
+  );
+}
+
+// "Booths updated" for a few seconds after an admin's change reaches the map.
+function UpdatedNotice() {
+  const [shown, setShown] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setShown(false), 4000);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <p
+      role="status"
+      className={cx(
+        "pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-md bg-blue px-4 py-2 text-sm font-semibold text-white transition-opacity duration-300 starting:opacity-0 md:bottom-16",
+        !shown && "opacity-0"
+      )}
+    >
+      Booths updated
+    </p>
   );
 }
 

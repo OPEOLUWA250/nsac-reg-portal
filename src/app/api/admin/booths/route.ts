@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminRoute } from "@/lib/server/admin-auth";
-import { clearBoothAssignment, isNotSetUp, listBoothAssignments, saveBoothAssignment } from "@/lib/server/booth-assignments";
+import { announceBoothChange, clearBoothAssignment, isNotSetUp, listBoothAssignments, saveBoothAssignment } from "@/lib/server/booth-assignments";
 import { boothCode, parseBoothAssignment } from "@/lib/venue/booth-fields";
 import { describeError } from "@/lib/describe-error";
 
@@ -34,6 +34,7 @@ export const PUT = adminRoute(async (req: NextRequest, _context, session) => {
   try {
     const assignment = await saveBoothAssignment(parsed.value, session.email);
     console.info(`Booth ${assignment.boothCode} ${assignment.status} to "${assignment.companyName}" by ${session.email}`);
+    await announceBoothChange();
     return NextResponse.json({ assignment });
   } catch (err) {
     return failed("Save the booth", err);
@@ -47,7 +48,10 @@ export const DELETE = adminRoute(async (req: NextRequest, _context, session) => 
   if (!code) return NextResponse.json({ error: "No such booth." }, { status: 400 });
   try {
     const cleared = await clearBoothAssignment(code);
-    if (cleared) console.info(`Booth ${code} freed by ${session.email}`);
+    if (cleared) {
+      console.info(`Booth ${code} freed by ${session.email}`);
+      await announceBoothChange();
+    }
     return NextResponse.json({ boothCode: code, cleared });
   } catch (err) {
     return failed("Free the booth", err);
