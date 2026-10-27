@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useAdmin } from "@/components/admin/AdminContext";
 import AttendeeDrawer, { Avatar } from "@/components/AttendeeDrawer";
 import DeleteDialog from "@/components/admin/DeleteDialog";
+import InvitationLetterDialog from "@/components/admin/InvitationLetterDialog";
 import {
   AdminPage,
   Alert,
@@ -27,7 +28,7 @@ import { IconDownload, IconRefresh, IconSearch } from "@/components/icons";
 import { buildAttendeeCsv, categoryLabel, money, relativeTime } from "@/lib/admin-format";
 import { EVENT_INFO } from "@/lib/event-info";
 import { roleLabel } from "@/lib/role-style";
-import { ATTENDEE_ROLES, type Attendee } from "@/lib/types";
+import { ATTENDEE_ROLES, hasValidTicket, type Attendee } from "@/lib/types";
 import type { Ticket } from "@/lib/tickets";
 
 const POLL_INTERVAL_MS = 20_000;
@@ -73,6 +74,7 @@ export default function AdminDashboard() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Attendee | null>(null);
+  const [letterFor, setLetterFor] = useState<Attendee | null>(null);
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({});
   const [rowMessage, setRowMessage] = useState<Record<string, string>>({});
 
@@ -542,6 +544,7 @@ export default function AdminDashboard() {
                         <StatusPill checkedIn={a.checked_in} />
                         {a.role !== "delegate" && <RolePill role={a.role} />}
                         <PassportTag a={a} onOpen={isSuper ? () => handleViewPassport(a.id) : undefined} />
+                        <LetterTag a={a} onOpen={() => setLetterFor(a)} />
                       </div>
                       <p className="text-sm text-ink-3">
                         {[ticketName(a.ticket_type), money(a.amount_cents, a.currency), relativeTime(a.created_at)].filter(Boolean).join(" · ")}
@@ -599,8 +602,8 @@ export default function AdminDashboard() {
                             <div className="flex flex-wrap items-center gap-2">
                               <PaymentBadge status={a.payment_status} source={a.source} />
                               {a.role !== "delegate" && <RolePill role={a.role} />}
-                              {a.needs_invitation_letter && <span className="rounded-sm border border-line px-1.5 py-0.5 text-xs font-semibold text-ink-2">Letter</span>}
                               <PassportTag a={a} onOpen={isSuper ? () => handleViewPassport(a.id) : undefined} />
+                              <LetterTag a={a} onOpen={() => setLetterFor(a)} />
                             </div>
                             <div className="mt-1 text-ink-3">
                               {[ticketName(a.ticket_type), money(a.amount_cents, a.currency)].filter(Boolean).join(" · ") || "No ticket"}
@@ -655,6 +658,18 @@ export default function AdminDashboard() {
           canManageVip={isSuper}
           onPassport={isSuper ? () => handleViewPassport(selected.id) : undefined}
           onDelete={isSuper ? () => setDeleteTarget(selected) : undefined}
+          onLetter={() => setLetterFor(selected)}
+        />
+      )}
+      {letterFor && (
+        <InvitationLetterDialog
+          attendee={letterFor}
+          onPassport={isSuper && letterFor.passport_path ? () => handleViewPassport(letterFor.id) : undefined}
+          onClose={() => setLetterFor(null)}
+          onSent={(updated, message) => {
+            if (updated) setAttendees((prev) => (prev ? prev.map((x) => (x.id === updated.id ? updated : x)) : prev));
+            setRowMessage((s) => ({ ...s, [letterFor.id]: message }));
+          }}
         />
       )}
       {deleteTarget && (
@@ -691,6 +706,45 @@ function PassportTag({ a, onOpen }: { a: Attendee; onOpen?: () => void }) {
       <Chip dot="var(--color-success)" className="underline decoration-line-strong underline-offset-2 hover:decoration-blue">
         Passport
       </Chip>
+    </button>
+  );
+}
+
+// For people who asked for an invitation letter: "Send email" opens the
+// letter's preview (nothing is sent until the admin sends it there). Once
+// sent, "Letter sent" reopens it to send again.
+function LetterTag({ a, onOpen }: { a: Attendee; onOpen: () => void }) {
+  if (!a.needs_invitation_letter) return null;
+  if (!hasValidTicket(a)) {
+    return (
+      <Chip dot="var(--color-line-strong)" className="text-ink-3">
+        Letter after payment
+      </Chip>
+    );
+  }
+  const sent = !!a.invitation_letter_sent_at;
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen();
+      }}
+      title={sent ? `Invitation letter sent ${new Date(a.invitation_letter_sent_at!).toLocaleString()}` : undefined}
+      aria-label={sent ? `Invitation letter sent to ${a.full_name}. Open it to send again` : `Send ${a.full_name} their invitation letter`}
+      className={cx(
+        "inline-flex min-h-7 items-center gap-1.5 whitespace-nowrap rounded-sm border px-2 py-0.5 text-xs font-semibold transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue pointer-coarse:min-h-9",
+        sent ? "border-line bg-surface text-ink hover:bg-canvas" : "border-gold bg-gold text-black hover:bg-gold-hover"
+      )}
+    >
+      {sent ? (
+        <>
+          <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-success" />
+          Letter sent
+        </>
+      ) : (
+        "Letter: Send email"
+      )}
     </button>
   );
 }

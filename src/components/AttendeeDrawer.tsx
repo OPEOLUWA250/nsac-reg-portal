@@ -31,6 +31,7 @@ export default function AttendeeDrawer({
   canManageVip,
   onPassport,
   onDelete,
+  onLetter,
 }: {
   attendee: Attendee;
   ticketName: string;
@@ -47,6 +48,8 @@ export default function AttendeeDrawer({
   onPassport?: () => void;
   /** Deletes this registration (asks for confirmation first). Super admins only. */
   onDelete?: () => void;
+  /** Opens the invitation letter preview (it's sent from there). */
+  onLetter: () => void;
 }) {
   const [closing, setClosing] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -200,7 +203,20 @@ export default function AttendeeDrawer({
               label="Invitation letter"
               value={
                 a.needs_invitation_letter == null ? null : a.needs_invitation_letter ? (
-                  <span className="font-semibold">Needed{a.passport_path ? ", passport uploaded" : ", no passport yet"}</span>
+                  <span className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <span className="font-semibold">
+                      {a.invitation_letter_sent_at
+                        ? `Sent ${formatDateTime(a.invitation_letter_sent_at)}${a.invitation_letter_sent_by ? ` by ${a.invitation_letter_sent_by}` : ""}`
+                        : `Needed${a.passport_path ? ", passport uploaded" : ", no passport yet"}`}
+                    </span>
+                    {hasValidTicket(a) ? (
+                      <Button variant={a.invitation_letter_sent_at ? "outline" : "primary"} size="sm" onClick={onLetter} disabled={busy}>
+                        {a.invitation_letter_sent_at ? "Send again" : "Send email"}
+                      </Button>
+                    ) : (
+                      <span className="text-ink-3">Can be sent once they pay.</span>
+                    )}
+                  </span>
                 ) : (
                   "Not needed"
                 )

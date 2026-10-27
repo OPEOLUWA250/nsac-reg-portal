@@ -82,6 +82,9 @@ export interface Attendee {
    * until the registration_number SQL has been run.
    */
   registration_number?: number | null;
+  /** When an admin emailed their invitation letter, and who. Missing until the invitation letters SQL has been run. */
+  invitation_letter_sent_at?: string | null;
+  invitation_letter_sent_by?: string | null;
 }
 
 /** Can this attendee enter / receive their QR ticket? */

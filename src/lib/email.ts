@@ -535,6 +535,100 @@ export async function sendCategoryChangeEmail({
   });
 }
 
+// ---------- invitation letter (sent by an admin from the dashboard) ----------
+
+const LETTER_COPY = {
+  en: {
+    subject: (event: string) => `Your invitation letter for the ${event}`,
+    preheader: "Your invitation letter is attached, to support your visa application.",
+    eyebrow: "Invitation letter",
+    heading: "Your invitation letter",
+    greeting: (first: string) => `Dear ${first},`,
+    attached: (event: string) =>
+      `As requested, your invitation letter for the <strong style="color:${NAVY};">${event}</strong> is attached as a PDF, to support your visa application.`,
+    use: "Print it, or attach it to your application. If any detail in it needs correcting, simply reply to this email.",
+    regards: "Kind regards,",
+    footerNote: "You are receiving this email because you asked for an invitation letter when you registered.",
+  },
+  fr: {
+    subject: (event: string) => `Votre lettre d'invitation pour la ${event}`,
+    preheader: "Votre lettre d'invitation est jointe, à l'appui de votre demande de visa.",
+    eyebrow: "Lettre d'invitation",
+    heading: "Votre lettre d'invitation",
+    greeting: (first: string) => `Bonjour ${first},`,
+    attached: (event: string) =>
+      `Comme demandé, vous trouverez ci-joint, au format PDF, votre lettre d'invitation pour la <strong style="color:${NAVY};">${event}</strong>, à l'appui de votre demande de visa.`,
+    use: "Imprimez-la ou joignez-la à votre dossier. Si une information doit être corrigée, répondez simplement à cet e-mail.",
+    regards: "Bien cordialement,",
+    footerNote: "Vous recevez cet e-mail car vous avez demandé une lettre d'invitation lors de votre inscription.",
+  },
+} as const;
+
+/**
+ * The invitation letter email, without sending it: the dashboard shows it
+ * before an admin sends it. The letter itself is the attached PDF.
+ */
+export function buildInvitationLetterEmail({
+  fullName,
+  signatoryName,
+  signatoryTitle,
+  hasLogo,
+  language = "en",
+}: {
+  fullName: string;
+  signatoryName: string;
+  signatoryTitle?: string | null;
+  hasLogo: boolean;
+  language?: EmailLanguage;
+}): { subject: string; html: string } {
+  const t = LETTER_COPY[language] ?? LETTER_COPY.en;
+  const event = EVENT_INFO.name[language === "fr" ? "fr" : "en"];
+  const firstName = escapeHtml(fullName.trim().split(/\s+/)[0] || fullName);
+  const lines = [signatoryTitle ? escapeHtml(signatoryTitle) : null, LAYOUT_COPY[language].team].filter(Boolean);
+  const content = `
+        ${eyebrow(t.eyebrow)}
+        ${heading(t.heading)}
+        ${para(t.greeting(firstName), ` color:${INK};`)}
+        ${para(t.attached(escapeHtml(event)))}
+        ${para(t.use)}
+        <p style="margin:32px 0 0; font-family:${FONT}; color:${INK_2}; font-size:15px; line-height:1.7;">${t.regards}<br /><strong style="color:${INK};">${escapeHtml(signatoryName)}</strong>${lines.map((s) => `<br />${s}`).join("")}</p>`;
+  return {
+    subject: t.subject(event),
+    html: layout({ language, preheader: t.preheader, hasLogo, content, footerNote: t.footerNote }),
+  };
+}
+
+/** Sends the invitation letter (PDF attached). Replies go to the sender, who gets a hidden copy if asked. */
+export async function sendInvitationLetterEmail({
+  toEmail,
+  replyTo,
+  bcc,
+  pdf,
+  filename,
+  logoPngBuffer,
+  ...details
+}: {
+  toEmail: string;
+  replyTo: string;
+  bcc?: string | null;
+  pdf: Buffer;
+  filename: string;
+  logoPngBuffer?: Buffer | null;
+} & Omit<Parameters<typeof buildInvitationLetterEmail>[0], "hasLogo">) {
+  const fromAddress = process.env.EMAIL_FROM;
+  if (!fromAddress) throw new Error("Missing EMAIL_FROM environment variable");
+  const { subject, html } = buildInvitationLetterEmail({ ...details, hasLogo: Boolean(logoPngBuffer) });
+  await deliver({
+    from: fromAddress,
+    to: toEmail,
+    subject,
+    html,
+    replyTo,
+    ...(bcc ? { bcc } : {}),
+    attachments: [...(logoPngBuffer ? [logoAttachment(logoPngBuffer)] : []), { filename, content: pdf, contentType: "application/pdf" }],
+  });
+}
+
 // ---------- new registration (to the organisers) ----------
 
 /**
@@ -615,6 +709,10 @@ interface OutgoingEmail {
   html: string;
   attachments: { filename: string; content: Buffer; contentType: string; contentId?: string }[];
   headers?: Record<string, string>;
+  /** Where replies go, when not the sending address. */
+  replyTo?: string;
+  /** Hidden copy, e.g. to the admin who sent it. */
+  bcc?: string;
 }
 
 // Two ways to send, chosen by environment:
@@ -643,6 +741,8 @@ async function deliver(message: OutgoingEmail) {
         ...(a.contentId ? { cid: a.contentId } : {}),
       })),
       ...(message.headers ? { headers: message.headers } : {}),
+      ...(message.replyTo ? { replyTo: message.replyTo } : {}),
+      ...(message.bcc ? { bcc: message.bcc } : {}),
     });
     return;
   }
