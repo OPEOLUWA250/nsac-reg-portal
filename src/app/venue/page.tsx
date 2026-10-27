@@ -23,5 +23,5 @@ export const metadata: Metadata = {
 export default async function VenuePage(props: PageProps<"/venue">) {
   const [query, exhibitors] = await Promise.all([props.searchParams, getBoothAssignments()]);
   const { from, to } = parseVenueQuery(query, buildPlaces());
-  return <VenueWayfinder exhibitors={exhibitors} initialFrom={from} initialTo={to} />;
+  return <VenueWayfinder exhibitors={exhibitors} initialFrom={from} initialTo={to} renderedAt={new Date().toISOString()} />;
 }

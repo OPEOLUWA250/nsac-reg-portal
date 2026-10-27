@@ -63,6 +63,24 @@ booth, keyed by the code on the plan). It is created once with the setup SQL
 from the build notes; until then the admin page says so, and the public map
 shows every booth as "not yet assigned".
 
+## Offline
+
+Once a phone has opened `/venue` with signal, the map keeps working without
+it, including a QR sticker scanned with no signal (`?from=Q3` is read from the
+address bar). A gold strip says it's offline and when the saved map is from.
+Routes and directions need no connection. Booth names are as of that save.
+
+It's a small service worker, `public/venue-sw.js`, registered by the venue
+page only (scope `/venue`), in production builds only:
+
+- the page: network first (4 s timeout), the saved copy otherwise;
+- its files (scripts, fonts, logos): saved after each visit, served from the
+  save; each save replaces the last, so old builds don't pile up.
+
+To throw every saved copy away (e.g. after a bad deploy), bump `VERSION` at
+the top of `venue-sw.js`. Test it with `next build && next start`, then
+DevTools → Network → Offline; development mode doesn't register it.
+
 ## Move a door
 
 Each room in `ZONES` (`data.ts`) has `doors: [{ side, a, b }]`:
