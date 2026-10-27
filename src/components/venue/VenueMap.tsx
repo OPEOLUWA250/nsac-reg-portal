@@ -32,6 +32,7 @@ import {
   type FacilityCategory,
   type Point,
 } from "@/lib/venue/data";
+import { fitLabel, LINE_HEIGHT } from "@/lib/venue/label-fit";
 import { wallsOf } from "@/lib/venue/pathfinding";
 import type { Place } from "@/lib/venue/places";
 import type { Step } from "@/lib/venue/directions";
@@ -534,15 +535,24 @@ function BoothShape({ place: p, selected, faded = false }: { place: Place; selec
   const big = p.size === "x";
   const fs = big ? 1.5 : Math.min(1.3, w / 3.4);
   const ink = selected ? "#000000" : "var(--map-booth-ink)";
-  // The company name (or "Reserved") goes under the code when it fits on one line.
-  const nameSize = big ? 0.95 : 0.62;
-  const label = p.assigned ? p.name : p.status === "reserved" ? "Reserved" : null;
-  const name = label && label.length * nameSize * 0.56 <= w - 0.6 ? label : null;
-  const sub = big ? (name ?? "6 × 6 m") : name;
   const reserved = p.status === "reserved" && !selected;
-  const codeY = y + h / 2 + fs * 0.35 - (sub ? (big ? 0.7 : 0.45) : 0);
+  // An assigned booth leads with the company's name (or "Reserved"), as big as
+  // the booth allows over up to three lines, with the code small above it.
+  const label = p.assigned ? p.name : p.status === "reserved" ? "Reserved" : null;
+  const codeSize = big ? 1 : 0.62;
+  const fitIn = (bw: number, bh: number) => (label ? fitLabel(label, bw - 0.7, bh - 0.6 - codeSize * LINE_HEIGHT, big ? 2.2 : 1.6) : null);
+  // Tall, narrow booths turn the name sideways when that makes it clearly bigger.
+  const flat = fitIn(w, h);
+  const upright = h > w ? fitIn(h, w) : null;
+  const turned = !!upright && (!flat || upright.size > flat.size * 1.2);
+  const fit = turned ? upright : flat;
+  const [cxB, cyB] = [x + w / 2, y + h / 2];
+  const top = fit ? cyB - ((codeSize + fit.lines.length * fit.size) * LINE_HEIGHT) / 2 : 0;
+  // Otherwise the code alone, centred (with the size under it on the big booths).
+  const sub = big && !fit ? "6 × 6 m" : null;
   return (
     <g data-id={p.id} className="cursor-pointer [&:hover>rect]:brightness-110" opacity={faded && !selected ? 0.4 : undefined}>
+      {fit && <title>{`${p.code} · ${label}`}</title>}
       <rect
         x={x + 0.1}
         y={y + 0.1}
@@ -554,11 +564,26 @@ function BoothShape({ place: p, selected, faded = false }: { place: Place; selec
         strokeWidth={0.15}
       />
       {reserved && <rect x={x + 0.1} y={y + 0.1} width={w - 0.2} height={h - 0.2} rx={0.45} fill={`url(#${RESERVED_PATTERN})`} className="pointer-events-none" />}
-      <text x={x + w / 2} y={codeY} textAnchor="middle" fontSize={fs} fontWeight={700} fill={ink} className="pointer-events-none font-sans tabular-nums">
-        {p.code}
-      </text>
+      {fit ? (
+        <g transform={turned ? `rotate(-90 ${cxB} ${cyB})` : undefined}>
+          <text x={cxB} y={top + codeSize * 0.92} textAnchor="middle" fontSize={codeSize} fontWeight={600} fill={ink} opacity={0.85} className="pointer-events-none font-sans tabular-nums">
+            {p.code}
+          </text>
+          <text textAnchor="middle" fontSize={fit.size} fontWeight={800} fill={ink} className="pointer-events-none font-sans">
+            {fit.lines.map((line, i) => (
+              <tspan key={i} x={cxB} y={top + codeSize * LINE_HEIGHT + fit.size * (LINE_HEIGHT * i + 0.92)}>
+                {line}
+              </tspan>
+            ))}
+          </text>
+        </g>
+      ) : (
+        <text x={x + w / 2} y={y + h / 2 + fs * 0.35 - (sub ? 0.7 : 0)} textAnchor="middle" fontSize={fs} fontWeight={700} fill={ink} className="pointer-events-none font-sans tabular-nums">
+          {p.code}
+        </text>
+      )}
       {sub && (
-        <text x={x + w / 2} y={y + h / 2 + (big ? 1.5 : 0.95)} textAnchor="middle" fontSize={nameSize} fontWeight={600} fill={ink} className="pointer-events-none font-sans">
+        <text x={x + w / 2} y={y + h / 2 + 1.5} textAnchor="middle" fontSize={0.95} fontWeight={600} fill={ink} className="pointer-events-none font-sans">
           {sub}
         </text>
       )}

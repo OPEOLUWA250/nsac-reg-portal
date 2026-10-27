@@ -216,6 +216,12 @@ exceptions:
   is brand blue. Reserved booths keep their colour under white diagonal
   hatching (a pattern, not a gradient; the legend swatch draws it with CSS).
   They exist only inside the map, its legend and the booth lists.
+- **Booth labels**: a free booth shows its code. An assigned one leads with
+  the company's name in extra bold, as large as the booth allows over up to
+  three lines (`src/lib/venue/label-fit.ts`), with the code small above it;
+  tall, narrow booths turn it sideways when that makes it clearly bigger. A
+  name too long even at the smallest size ends in "…", and the full name
+  shows on hover.
 - **Icons from Font Awesome Free** (solid set, CC BY 4.0) through
   `FaIcon` / `FaGlyph` (`src/components/FaIcon.tsx`), imported one by one so
   only those icons are shipped. The rest of the site keeps
