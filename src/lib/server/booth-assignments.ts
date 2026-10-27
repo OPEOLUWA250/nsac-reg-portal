@@ -24,12 +24,11 @@ interface Row {
   company_name: string;
   sector: string | null;
   website: string | null;
-  logo_url: string | null;
   updated_at: string;
   updated_by: string | null;
 }
 
-const COLUMNS = "booth_code, status, company_name, sector, website, logo_url, updated_at, updated_by";
+const COLUMNS = "booth_code, status, company_name, sector, website, updated_at, updated_by";
 
 const fromRow = (r: Row): BoothAssignment => ({
   boothCode: r.booth_code,
@@ -37,7 +36,6 @@ const fromRow = (r: Row): BoothAssignment => ({
   companyName: r.company_name,
   sector: r.sector,
   website: r.website,
-  logoUrl: r.logo_url,
   updatedAt: r.updated_at,
   updatedBy: r.updated_by,
 });
@@ -89,7 +87,6 @@ export async function saveBoothAssignment(input: BoothAssignmentInput, by: strin
         company_name: input.companyName,
         sector: input.sector,
         website: input.website,
-        logo_url: input.logoUrl,
         updated_at: new Date().toISOString(),
         updated_by: by,
       },

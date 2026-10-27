@@ -13,7 +13,6 @@ export interface BoothAssignmentInput {
   companyName: string;
   sector: string | null;
   website: string | null;
-  logoUrl: string | null;
 }
 
 export const LIMITS = { companyName: 120, sector: 80, url: 300 } as const;
@@ -49,9 +48,7 @@ export function parseBoothAssignment(body: Record<string, unknown>): { value: Bo
   const companyName = text(body.companyName);
   const sector = text(body.sector);
   const websiteRaw = text(body.website);
-  const logoRaw = text(body.logoUrl);
   const website = webAddress(websiteRaw);
-  const logoUrl = webAddress(logoRaw);
 
   if (!code) fields.boothCode = "Pick a booth from the plan.";
   if (status !== "sold" && status !== "reserved") fields.status = "Choose Sold or Reserved.";
@@ -59,8 +56,7 @@ export function parseBoothAssignment(body: Record<string, unknown>): { value: Bo
   else if (companyName.length > LIMITS.companyName) fields.companyName = `Keep it under ${LIMITS.companyName} characters.`;
   if (sector.length > LIMITS.sector) fields.sector = `Keep it under ${LIMITS.sector} characters.`;
   if (websiteRaw && (!website || website.length > LIMITS.url)) fields.website = "Enter a web address, such as example.com.";
-  if (logoRaw && (!logoUrl || logoUrl.length > LIMITS.url)) fields.logoUrl = "Enter the logo's web address, starting with https://.";
 
   if (Object.keys(fields).length) return { fields };
-  return { value: { boothCode: code!, status: status as AssignmentStatus, companyName, sector: sector || null, website, logoUrl } };
+  return { value: { boothCode: code!, status: status as AssignmentStatus, companyName, sector: sector || null, website } };
 }

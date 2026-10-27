@@ -11,9 +11,9 @@ describe("booth assignment fields", () => {
   });
 
   it("cleans up what an admin typed", () => {
-    const r = parseBoothAssignment({ boothCode: "ws4", companyName: "  Sahel   Orbital ", sector: "", website: "sahelorbital.com", logoUrl: "" });
+    const r = parseBoothAssignment({ boothCode: "ws4", companyName: "  Sahel   Orbital ", sector: "", website: "sahelorbital.com" });
     expect(r).toEqual({
-      value: { boothCode: "W-S4", status: "sold", companyName: "Sahel Orbital", sector: null, website: "https://sahelorbital.com/", logoUrl: null },
+      value: { boothCode: "W-S4", status: "sold", companyName: "Sahel Orbital", sector: null, website: "https://sahelorbital.com/" },
     });
   });
 
@@ -27,8 +27,8 @@ describe("booth assignment fields", () => {
     expect(webAddress("ftp://example.com")).toBeNull();
     expect(webAddress("not a site")).toBeNull();
     expect(webAddress("http://example.com/logo.png")).toBe("http://example.com/logo.png");
-    const r = parseBoothAssignment({ boothCode: "E-L2", companyName: "Acme", website: "javascript:alert(1)", logoUrl: "nope" });
-    expect(r).toEqual({ fields: { website: expect.any(String), logoUrl: expect.any(String) } });
+    const r = parseBoothAssignment({ boothCode: "E-L2", companyName: "Acme", website: "javascript:alert(1)" });
+    expect(r).toEqual({ fields: { website: expect.any(String) } });
   });
 
   it("holds a booth as reserved, and refuses any other status", () => {

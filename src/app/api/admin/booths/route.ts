@@ -26,7 +26,7 @@ export const GET = adminRoute(async () => {
   }
 });
 
-// Body: { boothCode, status: "sold" | "reserved", companyName, sector?, website?, logoUrl? }
+// Body: { boothCode, status: "sold" | "reserved", companyName, sector?, website? }
 export const PUT = adminRoute(async (req: NextRequest, _context, session) => {
   const body = await req.json().catch(() => ({}));
   const parsed = parseBoothAssignment(body && typeof body === "object" ? body : {});

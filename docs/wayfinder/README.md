@@ -41,8 +41,8 @@ In the admin: **Venue booths** (`/admin/booths`). Any admin can do it.
    - **Reserved**: on hold for a company. The public map shows the booth
      hatched and labelled "Reserved", without the name (the name never leaves
      the server), so unconfirmed deals aren't announced.
-3. Fill in the company (required), and optionally the sector, website and
-   logo address. Save.
+3. Fill in the company (required), and optionally the sector and website.
+   Save.
 4. The public map shows it on its next page load: on the booth (when the name
    fits), in search, in the Exhibitors A–Z list and in the directions
    ("Arrive at Sahel Orbital (W-S4) on your left"). The admin page records who

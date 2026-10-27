@@ -39,9 +39,9 @@ interface Assignment extends BoothAssignmentInput {
 }
 
 type Show = "all" | "sold" | "reserved" | "free";
-type Draft = { status: AssignmentStatus; companyName: string; sector: string; website: string; logoUrl: string };
+type Draft = { status: AssignmentStatus; companyName: string; sector: string; website: string };
 
-const EMPTY: Draft = { status: "sold", companyName: "", sector: "", website: "", logoUrl: "" };
+const EMPTY: Draft = { status: "sold", companyName: "", sector: "", website: "" };
 
 const STATUS_DOT: Record<AssignmentStatus | "free", string> = {
   sold: "var(--color-success)",
@@ -56,7 +56,7 @@ const SORTED_BOOTHS = [...BOOTHS].sort(
 );
 
 const draftOf = (a: Assignment | undefined): Draft =>
-  a ? { status: a.status, companyName: a.companyName, sector: a.sector ?? "", website: a.website ?? "", logoUrl: a.logoUrl ?? "" } : EMPTY;
+  a ? { status: a.status, companyName: a.companyName, sector: a.sector ?? "", website: a.website ?? "" } : EMPTY;
 
 export default function BoothsPanel() {
   const { apiCall } = useAdmin();
@@ -338,20 +338,6 @@ export default function BoothsPanel() {
                         onChange={(e) => set("website", e.target.value)}
                         maxLength={LIMITS.url}
                         {...aria("booth-website", err("website"), true)}
-                      />
-                    </Field>
-                    <Field id="booth-logo" label="Logo address" optionalLabel="optional" hint="Kept for later: the map doesn't show logos yet." error={err("logoUrl")}>
-                      <input
-                        id="booth-logo"
-                        type="url"
-                        inputMode="url"
-                        autoCapitalize="none"
-                        spellCheck={false}
-                        className={inputClass(!!err("logoUrl"))}
-                        value={draft.logoUrl}
-                        onChange={(e) => set("logoUrl", e.target.value)}
-                        maxLength={LIMITS.url}
-                        {...aria("booth-logo", err("logoUrl"), true)}
                       />
                     </Field>
 
