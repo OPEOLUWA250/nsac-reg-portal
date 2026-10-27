@@ -92,7 +92,10 @@ export default function BoothsPanel() {
   }, [load]);
 
   const current = selected ? assignments?.get(selected) : undefined;
-  const dirty = JSON.stringify(draft) !== JSON.stringify(draftOf(current));
+  // Only an open booth can have unsaved changes; compared field by field, so a
+  // form missing a field (an older copy of the page) doesn't count as edited.
+  const saved = draftOf(current);
+  const dirty = !!selected && (Object.keys(saved) as (keyof Draft)[]).some((k) => (draft[k] ?? saved[k]) !== saved[k]);
 
   // The plan as the public map shows it: reserved booths hatched, without their name.
   const places = useMemo(() => {
