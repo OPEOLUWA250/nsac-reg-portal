@@ -41,12 +41,16 @@ In the admin: **Venue booths** (`/admin/booths`). Any admin can do it.
    - **Reserved**: on hold for a company. The public map shows the booth
      hatched and labelled "Reserved", without the name (the name never leaves
      the server), so unconfirmed deals aren't announced.
-3. Fill in the company (required), and optionally the sector and website.
-   Save.
-4. The public map shows it on its next page load: on the booth (when the name
-   fits), in search, in the Exhibitors A–Z list and in the directions
-   ("Arrive at Sahel Orbital (W-S4) on your left"). The admin page records who
-   changed it and when.
+3. Fill in the company (required), and optionally the sector, website and
+   "About the company" (up to 280 characters). Save.
+4. The public map shows it on its next page load: on the booth, in search, in
+   the Exhibitors A–Z list and in the directions ("Arrive at Sahel Orbital
+   (W-S4) on your left"). The admin page records who changed it and when.
+
+When a visitor picks a sold booth (on the map or in a list), the company's
+card shows above the route: name, sector, booth and room, the "About" text and
+a button to their website. On phones a short version sits over the top of the
+map (the route is fitted below it), with "More" scrolling to the full card.
 
 Visitors find confirmed companies under **Exhibitors A–Z** on the venue map:
 every sold booth, by company name, with a heading per letter.

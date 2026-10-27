@@ -35,13 +35,18 @@ export interface Place {
   assigned?: boolean;
   status?: BoothStatus;
   website?: string | null;
+  /** Sold booths: the company's sector, and a line or two about it. */
+  sector?: string | null;
+  description?: string | null;
   category?: FacilityCategory;
 }
 
 export type BoothStatus = "free" | "reserved" | "sold";
 
 /** A reserved booth is on hold for a company not yet confirmed: its name stays off the public map. */
-export type Exhibitor = { status: "sold"; company: string; sector: string | null; website: string | null } | { status: "reserved" };
+export type Exhibitor =
+  | { status: "sold"; company: string; sector: string | null; website: string | null; description?: string | null }
+  | { status: "reserved" };
 
 /** Booth code to exhibitor. Free booths are absent. */
 export type ExhibitorMap = Record<string, Exhibitor>;
@@ -71,6 +76,8 @@ export function buildPlaces(exhibitors: ExhibitorMap = {}): Place[] {
       assigned: !!sold,
       status,
       website: sold?.website ?? null,
+      sector: sold?.sector ?? null,
+      description: sold?.description ?? null,
     });
   }
   for (const q of QR_POINTS) places.push({ id: q.id, code: q.id, kind: "qr", name: `QR point, ${q.area}`, cat: "QR point", anchor: q.anchor });

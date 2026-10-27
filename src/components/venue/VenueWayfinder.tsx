@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import VenueMap from "@/components/venue/VenueMap";
+import { ExhibitorPeek } from "@/components/venue/ExhibitorCard";
 import WayfinderPanel, { PIN, type Filter, type RouteSummary } from "@/components/venue/WayfinderPanel";
 import { BOOTHS, ENTRANCE, METRES_PER_UNIT, WALK_SPEED_MPS, type Point } from "@/lib/venue/data";
 import { boothState, buildPlaces, type ExhibitorMap, type Place } from "@/lib/venue/places";
@@ -14,11 +15,16 @@ import { venueQuery } from "@/lib/venue/params";
 // shared; QR stickers open it with ?from= already set.
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
-const subscribeDark = (cb: () => void) => {
-  const mq = window.matchMedia(DARK_QUERY);
+const PHONE_QUERY = "(max-width: 767px)";
+const subscribeTo = (query: string) => (cb: () => void) => {
+  const mq = window.matchMedia(query);
   mq.addEventListener("change", cb);
   return () => mq.removeEventListener("change", cb);
 };
+const subscribeDark = subscribeTo(DARK_QUERY);
+const subscribePhone = subscribeTo(PHONE_QUERY);
+// Height of the exhibitor card over the map on phones, plus its margin.
+const PEEK_INSET = 104;
 
 export default function VenueWayfinder({
   exhibitors,
@@ -41,11 +47,14 @@ export default function VenueWayfinder({
   const [fitKey, setFitKey] = useState(0);
   const [walkKey, setWalkKey] = useState(0);
   const [activeStep, setActiveStep] = useState<number | null>(null);
+  // The exhibitor card over the map (phones) that was closed, until the destination changes.
+  const [peekHidden, setPeekHidden] = useState<string | null>(null);
 
   // Light or dark: the phone's setting until someone presses the map's button.
   const [theme, setTheme] = useState<"light" | "dark" | null>(null);
   const systemDark = useSyncExternalStore(subscribeDark, () => window.matchMedia(DARK_QUERY).matches, () => false);
   const dark = theme ? theme === "dark" : systemDark;
+  const phone = useSyncExternalStore(subscribePhone, () => window.matchMedia(PHONE_QUERY).matches, () => false);
 
   const fromPlace: Place | null = fromId === PIN ? null : (byId.get(fromId) ?? null);
   const from: RouteEnd & { anchor: Point } =
@@ -128,6 +137,8 @@ export default function VenueWayfinder({
     }
   };
 
+  const peek = to?.assigned && !picking && peekHidden !== to.id ? to : null;
+
   const fromLabel =
     fromId === PIN ? "Spot you picked on the map" : from.kind === "booth" && fromPlace ? `${from.code} · ${boothState(fromPlace)}` : from.name;
 
@@ -167,7 +178,8 @@ export default function VenueWayfinder({
             onShowRoute={() => setFitKey((k) => k + 1)}
           />
         </aside>
-        <section ref={mapRef} aria-label="Venue map" className="order-1 h-[58svh] min-h-[21rem] scroll-mt-16 md:order-none md:h-auto md:min-h-0">
+        <section ref={mapRef} aria-label="Venue map" className="relative order-1 h-[58svh] min-h-[21rem] scroll-mt-16 md:order-none md:h-auto md:min-h-0">
+          {peek && <ExhibitorPeek key={peek.id} place={peek} onClose={() => setPeekHidden(peek.id)} />}
           <VenueMap
             places={places}
             fromPt={from.anchor}
@@ -180,6 +192,7 @@ export default function VenueWayfinder({
             dark={dark}
             onToggleTheme={() => setTheme(dark ? "light" : "dark")}
             onActiveStep={setActiveStep}
+            insetTop={peek && phone ? PEEK_INSET : 0}
             onTapPlace={chooseTo}
             onPick={(pt) => {
               // Stand on the nearest walkable spot, not inside a booth or a wall.

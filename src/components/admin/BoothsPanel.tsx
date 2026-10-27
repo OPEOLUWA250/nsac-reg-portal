@@ -39,9 +39,9 @@ interface Assignment extends BoothAssignmentInput {
 }
 
 type Show = "all" | "sold" | "reserved" | "free";
-type Draft = { status: AssignmentStatus; companyName: string; sector: string; website: string };
+type Draft = { status: AssignmentStatus; companyName: string; sector: string; website: string; description: string };
 
-const EMPTY: Draft = { status: "sold", companyName: "", sector: "", website: "" };
+const EMPTY: Draft = { status: "sold", companyName: "", sector: "", website: "", description: "" };
 
 const STATUS_DOT: Record<AssignmentStatus | "free", string> = {
   sold: "var(--color-success)",
@@ -56,7 +56,7 @@ const SORTED_BOOTHS = [...BOOTHS].sort(
 );
 
 const draftOf = (a: Assignment | undefined): Draft =>
-  a ? { status: a.status, companyName: a.companyName, sector: a.sector ?? "", website: a.website ?? "" } : EMPTY;
+  a ? { status: a.status, companyName: a.companyName, sector: a.sector ?? "", website: a.website ?? "", description: a.description ?? "" } : EMPTY;
 
 export default function BoothsPanel() {
   const { apiCall } = useAdmin();
@@ -98,7 +98,7 @@ export default function BoothsPanel() {
   const places = useMemo(() => {
     const ex: ExhibitorMap = {};
     for (const a of assignments?.values() ?? [])
-      ex[a.boothCode] = a.status === "reserved" ? { status: "reserved" } : { status: "sold", company: a.companyName, sector: a.sector, website: a.website };
+      ex[a.boothCode] = a.status === "reserved" ? { status: "reserved" } : { status: "sold", company: a.companyName, sector: a.sector, website: a.website, description: a.description };
     return buildPlaces(ex);
   }, [assignments]);
 
@@ -338,6 +338,23 @@ export default function BoothsPanel() {
                         onChange={(e) => set("website", e.target.value)}
                         maxLength={LIMITS.url}
                         {...aria("booth-website", err("website"), true)}
+                      />
+                    </Field>
+                    <Field
+                      id="booth-description"
+                      label="About the company"
+                      optionalLabel="optional"
+                      hint={`A line or two, shown on the company's card when someone taps their booth. ${draft.description.length}/${LIMITS.description}`}
+                      error={err("description")}
+                    >
+                      <textarea
+                        id="booth-description"
+                        rows={3}
+                        className={inputClass(!!err("description"))}
+                        value={draft.description}
+                        onChange={(e) => set("description", e.target.value)}
+                        maxLength={LIMITS.description}
+                        {...aria("booth-description", err("description"), true)}
                       />
                     </Field>
 

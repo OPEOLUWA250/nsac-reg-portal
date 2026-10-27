@@ -13,7 +13,7 @@ describe("booth assignment fields", () => {
   it("cleans up what an admin typed", () => {
     const r = parseBoothAssignment({ boothCode: "ws4", companyName: "  Sahel   Orbital ", sector: "", website: "sahelorbital.com" });
     expect(r).toEqual({
-      value: { boothCode: "W-S4", status: "sold", companyName: "Sahel Orbital", sector: null, website: "https://sahelorbital.com/" },
+      value: { boothCode: "W-S4", status: "sold", companyName: "Sahel Orbital", sector: null, website: "https://sahelorbital.com/", description: null },
     });
   });
 
@@ -36,8 +36,13 @@ describe("booth assignment fields", () => {
     expect(parseBoothAssignment({ boothCode: "N-L4", status: "maybe", companyName: "Acme" })).toEqual({ fields: { status: expect.any(String) } });
   });
 
-  it("limits the length of names", () => {
-    const r = parseBoothAssignment({ boothCode: "E-L2", companyName: "A".repeat(121), sector: "B".repeat(81) });
-    expect(r).toEqual({ fields: { companyName: expect.any(String), sector: expect.any(String) } });
+  it("limits the length of names and the description", () => {
+    const r = parseBoothAssignment({ boothCode: "E-L2", companyName: "A".repeat(121), sector: "B".repeat(81), description: "C".repeat(281) });
+    expect(r).toEqual({ fields: { companyName: expect.any(String), sector: expect.any(String), description: expect.any(String) } });
+  });
+
+  it("keeps a short description of the company", () => {
+    const r = parseBoothAssignment({ boothCode: "E-L2", companyName: "Acme", description: "  Earth observation\n for  farmers. " });
+    expect(r).toMatchObject({ value: { description: "Earth observation for farmers." } });
   });
 });

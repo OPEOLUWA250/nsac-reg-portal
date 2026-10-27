@@ -17,7 +17,8 @@ import {
   type IconDefinition,
 } from "@fortawesome/free-solid-svg-icons";
 import FaIcon from "@/components/FaIcon";
-import { Card, Chip, Eyebrow, Field, buttonClass, cx, inputClass, linkClass } from "@/components/ui";
+import { Card, Chip, Eyebrow, Field, buttonClass, cx, inputClass } from "@/components/ui";
+import ExhibitorCard from "@/components/venue/ExhibitorCard";
 import { ZONES } from "@/lib/venue/data";
 import { boothState, type Place, type PlaceKind } from "@/lib/venue/places";
 import type { Step, StepType } from "@/lib/venue/directions";
@@ -213,6 +214,7 @@ export default function WayfinderPanel(p: Props) {
         </div>
       </div>
 
+      {p.to?.assigned && <ExhibitorCard key={p.to.id} place={p.to} />}
       <RouteCard {...p} />
 
       <section aria-labelledby="venue-results-label" className="space-y-2">
@@ -331,14 +333,6 @@ function RouteCard(p: Props) {
           <span>
             <span className="text-ink-3">To </span>
             {toLabel ? <strong className="font-semibold">{toLabel}</strong> : <span className="text-ink-3">choose a destination</span>}
-            {to?.website && (
-              <>
-                {" · "}
-                <a href={to.website} target="_blank" rel="noopener noreferrer" className={linkClass}>
-                  Website
-                </a>
-              </>
-            )}
           </span>
         </p>
 

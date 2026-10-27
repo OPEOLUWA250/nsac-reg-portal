@@ -13,9 +13,11 @@ export interface BoothAssignmentInput {
   companyName: string;
   sector: string | null;
   website: string | null;
+  /** A line or two about the company, on its card on the venue map. */
+  description: string | null;
 }
 
-export const LIMITS = { companyName: 120, sector: 80, url: 300 } as const;
+export const LIMITS = { companyName: 120, sector: 80, url: 300, description: 280 } as const;
 
 const BY_CODE = new Map(BOOTHS.map((b) => [normalizeCode(b.code), b.code]));
 
@@ -49,6 +51,7 @@ export function parseBoothAssignment(body: Record<string, unknown>): { value: Bo
   const sector = text(body.sector);
   const websiteRaw = text(body.website);
   const website = webAddress(websiteRaw);
+  const description = text(body.description);
 
   if (!code) fields.boothCode = "Pick a booth from the plan.";
   if (status !== "sold" && status !== "reserved") fields.status = "Choose Sold or Reserved.";
@@ -56,7 +59,8 @@ export function parseBoothAssignment(body: Record<string, unknown>): { value: Bo
   else if (companyName.length > LIMITS.companyName) fields.companyName = `Keep it under ${LIMITS.companyName} characters.`;
   if (sector.length > LIMITS.sector) fields.sector = `Keep it under ${LIMITS.sector} characters.`;
   if (websiteRaw && (!website || website.length > LIMITS.url)) fields.website = "Enter a web address, such as example.com.";
+  if (description.length > LIMITS.description) fields.description = `Keep it under ${LIMITS.description} characters.`;
 
   if (Object.keys(fields).length) return { fields };
-  return { value: { boothCode: code!, status: status as AssignmentStatus, companyName, sector: sector || null, website } };
+  return { value: { boothCode: code!, status: status as AssignmentStatus, companyName, sector: sector || null, website, description: description || null } };
 }

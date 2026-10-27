@@ -80,6 +80,8 @@ interface Props {
   onActiveStep: (i: number | null) => void;
   onTapPlace: (id: string) => void;
   onPick: (pt: Point) => void;
+  /** Pixels at the top covered by a card: routes are fitted below them. */
+  insetTop?: number;
 }
 
 export default function VenueMap(props: Props) {
@@ -104,7 +106,8 @@ export default function VenueMap(props: Props) {
     if (!svg) return;
     cancelAnimationFrame(anim.current);
     const r = svg.getBoundingClientRect();
-    const ar = r.width / r.height || 1;
+    const inset = Math.min(latest.current.insetTop ?? 0, r.height / 2);
+    const ar = r.width / (r.height - inset) || 1;
     let { x, y, w, h } = target;
     if (w / h < ar) {
       const nw = h * ar;
@@ -115,6 +118,10 @@ export default function VenueMap(props: Props) {
       y -= (nh - h) / 2;
       h = nh;
     }
+    // Room above for the card, so it doesn't hide the route.
+    const extra = (h / (r.height - inset)) * inset;
+    y -= extra;
+    h += extra;
     const goal = { x, y, w, h };
     const from = { ...view.current };
     if (reducedMotion()) {
@@ -183,6 +190,14 @@ export default function VenueMap(props: Props) {
     fitCurrent();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fitKey is the trigger; fitCurrent reads the latest props
   }, [fitKey]);
+  // A card appearing over the map (not one going away, which would undo a pan).
+  const lastInset = useRef(props.insetTop ?? 0);
+  useEffect(() => {
+    const inset = props.insetTop ?? 0;
+    if (inset > lastInset.current) fitCurrent();
+    lastInset.current = inset;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fitCurrent reads the latest props
+  }, [props.insetTop]);
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
