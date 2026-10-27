@@ -3,7 +3,8 @@ import { NextRequest } from "next/server";
 import type { AdminSession } from "@/lib/server/admin-auth";
 import { DELETE, GET, PUT } from "./route";
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), list: vi.fn(), save: vi.fn(), clear: vi.fn(), announce: vi.fn() }));
+const mocks = vi.hoisted(() => ({ session: vi.fn(), list: vi.fn(), save: vi.fn(), clear: vi.fn(), announce: vi.fn(), log: vi.fn() }));
+vi.mock("@/lib/server/activity-log", () => ({ logActivity: mocks.log }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/server/admin-auth", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/server/admin-auth")>();
@@ -45,6 +46,8 @@ it("lets any admin assign a booth, saved under their email", async () => {
   expect(await res.json()).toMatchObject({ assignment: { boothCode: "W-S4", updatedBy: "admin@example.com" } });
   // Open venue maps are told, so they update without a reload.
   expect(mocks.announce).toHaveBeenCalledOnce();
+  // And it's in the activity log.
+  expect(mocks.log).toHaveBeenCalledWith(admin, expect.objectContaining({ summary: "assigned booth W-S4 to Sahel Orbital" }), expect.anything());
 });
 
 it("explains what's wrong instead of saving", async () => {

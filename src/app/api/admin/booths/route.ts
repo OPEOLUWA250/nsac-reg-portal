@@ -3,6 +3,7 @@ import { adminRoute } from "@/lib/server/admin-auth";
 import { announceBoothChange, clearBoothAssignment, isNotSetUp, listBoothAssignments, saveBoothAssignment } from "@/lib/server/booth-assignments";
 import { boothCode, parseBoothAssignment } from "@/lib/venue/booth-fields";
 import { describeError } from "@/lib/describe-error";
+import { logActivity } from "@/lib/server/activity-log";
 
 export const runtime = "nodejs";
 
@@ -35,6 +36,17 @@ export const PUT = adminRoute(async (req: NextRequest, _context, session) => {
     const assignment = await saveBoothAssignment(parsed.value, session.email);
     console.info(`Booth ${assignment.boothCode} ${assignment.status} to "${assignment.companyName}" by ${session.email}`);
     await announceBoothChange();
+    await logActivity(
+      session,
+      {
+        area: "booths",
+        action: assignment.status === "reserved" ? "booth.reserved" : "booth.sold",
+        summary: `${assignment.status === "reserved" ? "reserved" : "assigned"} booth ${assignment.boothCode} ${assignment.status === "reserved" ? "for" : "to"} ${assignment.companyName}`,
+        target: { type: "booth", id: assignment.boothCode },
+        details: { sector: assignment.sector, website: assignment.website },
+      },
+      req
+    );
     return NextResponse.json({ assignment });
   } catch (err) {
     return failed("Save the booth", err);
@@ -51,6 +63,7 @@ export const DELETE = adminRoute(async (req: NextRequest, _context, session) => 
     if (cleared) {
       console.info(`Booth ${code} freed by ${session.email}`);
       await announceBoothChange();
+      await logActivity(session, { area: "booths", action: "booth.freed", summary: `freed booth ${code}`, target: { type: "booth", id: code } }, req);
     }
     return NextResponse.json({ boothCode: code, cleared });
   } catch (err) {
