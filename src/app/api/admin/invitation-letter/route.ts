@@ -6,6 +6,7 @@ import { buildInvitationLetterEmail, sendInvitationLetterEmail } from "@/lib/ema
 import { buildLetter, letterFilename, parseLetterInput } from "@/lib/invitation-letter";
 import { renderLetterPages, renderLetterPdf } from "@/lib/server/invitation-letter-pdf";
 import { brandLogoPng } from "@/lib/ticket-image";
+import { logActivity } from "@/lib/server/activity-log";
 import { hasValidTicket, type Attendee } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -82,6 +83,18 @@ export const POST = adminRoute(async (req: NextRequest, _context, session) => {
     console.error(`Invitation letter ${action} failed for attendee ${id}: ${describeError(err)}`);
     return NextResponse.json({ error: action === "send" ? "The email didn't send. Nothing was recorded; try again." : "Couldn't draw the letter." }, { status: 502 });
   }
+
+  await logActivity(
+    session,
+    {
+      area: "letters",
+      action: "letter.sent",
+      summary: `sent ${attendee.full_name} their invitation letter (${input.language === "fr" ? "French" : "English"}, signed by ${input.signatoryName}, replies to ${input.senderEmail})`,
+      target: { type: "attendee", id },
+      details: { passportNumberGiven: Boolean(input.passportNumber), copyToSender: input.copyToSender },
+    },
+    req
+  );
 
   // Sent: note it, so the dashboard shows "Letter sent".
   const { data: updated, error: saveError } = await supabase

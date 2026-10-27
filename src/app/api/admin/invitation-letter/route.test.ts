@@ -3,7 +3,8 @@ import { NextRequest } from "next/server";
 import type { AdminSession } from "@/lib/server/admin-auth";
 import { POST } from "./route";
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), read: vi.fn(), update: vi.fn(), send: vi.fn(), updates: [] as unknown[] }));
+const mocks = vi.hoisted(() => ({ session: vi.fn(), read: vi.fn(), update: vi.fn(), send: vi.fn(), log: vi.fn(), updates: [] as unknown[] }));
+vi.mock("@/lib/server/activity-log", () => ({ logActivity: mocks.log }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/server/admin-auth", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/server/admin-auth")>();
@@ -73,6 +74,7 @@ describe("invitation letters", () => {
     expect(json.pages).toEqual([expect.stringMatching(/^data:image\/jpeg;base64,/)]);
     expect(mocks.send).not.toHaveBeenCalled();
     expect(mocks.updates).toEqual([]);
+    expect(mocks.log).not.toHaveBeenCalled();
   });
 
   it("sends only when asked, with replies to the sender, and records who sent it", async () => {
@@ -82,6 +84,7 @@ describe("invitation letters", () => {
       expect.objectContaining({ toEmail: "ada@example.com", replyTo: "events@example.com", bcc: "events@example.com", filename: "invitation-letter-12-ada-obi.pdf" })
     );
     expect(mocks.updates).toEqual([{ invitation_letter_sent_at: expect.any(String), invitation_letter_sent_by: "admin@example.com" }]);
+    expect(mocks.log).toHaveBeenCalledWith(session, expect.objectContaining({ action: "letter.sent", target: { type: "attendee", id } }), expect.anything());
   });
 
   it("leaves out the copy when the sender doesn't want one", async () => {
