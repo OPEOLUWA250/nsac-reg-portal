@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAdmin } from "@/components/admin/AdminContext";
+import { Kpi } from "@/components/admin/Stats";
 import AttendeeDrawer, { Avatar } from "@/components/AttendeeDrawer";
 import DeleteDialog from "@/components/admin/DeleteDialog";
-import { Kpi } from "@/components/admin/Stats";
 import {
   AdminPage,
   Alert,
