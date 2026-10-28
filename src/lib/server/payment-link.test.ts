@@ -41,11 +41,11 @@ it("only accepts links we signed", () => {
   expect(attendeeIdFromToken("nonsense")).toBeNull();
 });
 
-it("points links at the live site, or at this computer while testing locally", () => {
+it("always points links at the live site, even when sent from a local copy", () => {
   process.env.PUBLIC_BASE_URL = "https://registration.example.com";
   expect(linkBaseUrl("https://registration.example.com")).toBe("https://registration.example.com");
   expect(linkBaseUrl("https://nsac-git-staging.vercel.app")).toBe("https://registration.example.com");
-  expect(linkBaseUrl("http://localhost:3000")).toBe("http://localhost:3000");
+  expect(linkBaseUrl("http://localhost:3000")).toBe("https://registration.example.com");
   delete process.env.PUBLIC_BASE_URL;
 });
 
