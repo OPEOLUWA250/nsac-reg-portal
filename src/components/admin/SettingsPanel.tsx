@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { AdminPage, Alert, Button, Card, cx, describedBy, ErrorState, Field, inputClass, linkClass, LoadingLabel, PageHeader, Skeleton, Spinner } from "@/components/ui";
 import DeleteDialog from "@/components/admin/DeleteDialog";
 import { useAdmin } from "@/components/admin/AdminContext";
+import { usePopup } from "@/components/Popup";
 import { EVENT_INFO } from "@/lib/event-info";
 import { MAX_ALERT_EMAILS, mergeAlertRecipients, parseAlertEmailList } from "@/lib/alert-emails";
 
@@ -27,6 +28,7 @@ interface SettingsResponse {
 
 export default function SettingsPanel() {
   const { apiCall, me } = useAdmin();
+  const { confirm, popup } = usePopup();
   const [data, setData] = useState<SettingsResponse | null>(null);
   const [loadError, setLoadError] = useState("");
   const [saveError, setSaveError] = useState("");
@@ -57,10 +59,17 @@ export default function SettingsPanel() {
 
   async function setRegistrationOpen(open: boolean) {
     if (!data) return;
-    const question = open
-      ? "Open registration? The public form will accept new registrations."
-      : "Close registration? The public form will say registration is closed. Walk-ins in the admin keep working.";
-    if (!window.confirm(question)) return;
+    const ok = await confirm(
+      open
+        ? { title: "Open registration?", body: "The public form will accept new registrations.", confirmLabel: "Open registration" }
+        : {
+            title: "Close registration?",
+            body: "The public form will say registration is closed. Walk-ins in the admin keep working.",
+            confirmLabel: "Close registration",
+            tone: "danger",
+          }
+    );
+    if (!ok) return;
     setSaving(true);
     setSaveError("");
     setNotice("");
@@ -115,6 +124,7 @@ export default function SettingsPanel() {
   return (
     <AdminPage width="max-w-4xl">
       {header}
+      {popup}
 
       {notice && <Alert tone="success">{notice}</Alert>}
       {saveError && <Alert tone="error">{saveError}</Alert>}
