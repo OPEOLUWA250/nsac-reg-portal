@@ -29,6 +29,9 @@ import { EVENT_INFO } from "@/lib/event-info";
 import { roleLabel } from "@/lib/role-style";
 import { ATTENDEE_ROLES, type Attendee } from "@/lib/types";
 import type { Ticket } from "@/lib/tickets";
+import PaymentReminderDialog, { type ReminderResult } from "@/components/admin/PaymentReminderDialog";
+import { usePopup } from "@/components/Popup";
+import { AUTOMATIC_SENDER } from "@/lib/payment-reminder";
 
 const POLL_INTERVAL_MS = 20_000;
 const PAGE_SIZE = 25;
@@ -75,6 +78,9 @@ export default function AdminDashboard() {
   const [deleteTarget, setDeleteTarget] = useState<Attendee | null>(null);
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({});
   const [rowMessage, setRowMessage] = useState<Record<string, string>>({});
+  // Payment reminder: one person (from their details) or everyone awaiting payment.
+  const [reminderFor, setReminderFor] = useState<Attendee[] | null>(null);
+  const { notify, popup } = usePopup();
 
   const [walkInOpen, setWalkInOpen] = useState(false);
   const [form, setForm] = useState<RegisterForm>(EMPTY_FORM);
@@ -322,6 +328,41 @@ export default function AdminDashboard() {
     }
   }
 
+  // After payment reminders go out: mark them on the list and say how it went.
+  function handleRemindersSent(results: ReminderResult[], recorded: boolean) {
+    const updated = new Map(results.flatMap((r) => (r.status === "sent" && r.attendee ? [[r.id, r.attendee] as const] : [])));
+    if (updated.size) setAttendees((prev) => (prev ? prev.map((x) => updated.get(x.id) ?? x) : prev));
+    const name = (id: string) => attendees?.find((x) => x.id === id)?.full_name ?? "Someone";
+    const sent = results.filter((r) => r.status === "sent");
+    const notSent = results.filter((r): r is Extract<ReminderResult, { error: string }> => r.status !== "sent");
+    void notify({
+      title: !sent.length
+        ? "No reminder was sent"
+        : results.length === 1
+          ? `Reminder sent to ${name(sent[0].id)}`
+          : `${sent.length} ${sent.length === 1 ? "reminder" : "reminders"} sent`,
+      tone: sent.length ? "default" : "danger",
+      body: (
+        <>
+          {sent.length > 0 && <p>Each email has a button to pay at today&apos;s price. Their place is confirmed as soon as they pay.</p>}
+          {notSent.length > 0 && (
+            <ul className="list-disc space-y-1 pl-5">
+              {notSent.map((r) => (
+                <li key={r.id}>
+                  <strong className="text-ink">{name(r.id)}</strong>: {r.error}
+                </li>
+              ))}
+            </ul>
+          )}
+          {sent.length > 0 && !recorded && (
+            <p>The list can&apos;t show who was reminded until the payment reminders SQL has been run in Supabase.</p>
+          )}
+        </>
+      ),
+    });
+    if (notSent.some((r) => r.status === "paid")) loadAttendees();
+  }
+
   function exportCsv(list: Attendee[], label: string) {
     const blob = buildAttendeeCsv(list, ticketName);
     const url = URL.createObjectURL(blob);
@@ -363,6 +404,11 @@ export default function AdminDashboard() {
                 { label: "Invitation letters", count: stats.letters, run: () => exportCsv((attendees ?? []).filter((a) => a.needs_invitation_letter), "invitation-letters") },
               ]}
             />
+            {stats.pending > 0 && (
+              <Button variant="outline" onClick={() => setReminderFor((attendees ?? []).filter((a) => a.payment_status === "pending"))}>
+                Remind unpaid ({stats.pending})
+              </Button>
+            )}
             <Button
               variant="primary"
               onClick={() => {
@@ -539,6 +585,7 @@ export default function AdminDashboard() {
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <PaymentBadge status={a.payment_status} source={a.source} />
+                        <ReminderTag a={a} />
                         <StatusPill checkedIn={a.checked_in} />
                         {a.role !== "delegate" && <RolePill role={a.role} />}
                         <PassportTag a={a} onOpen={isSuper ? () => handleViewPassport(a.id) : undefined} />
@@ -598,6 +645,7 @@ export default function AdminDashboard() {
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap items-center gap-2">
                               <PaymentBadge status={a.payment_status} source={a.source} />
+                              <ReminderTag a={a} />
                               {a.role !== "delegate" && <RolePill role={a.role} />}
                               {a.needs_invitation_letter && <span className="rounded-sm border border-line px-1.5 py-0.5 text-xs font-semibold text-ink-2">Letter</span>}
                               <PassportTag a={a} onOpen={isSuper ? () => handleViewPassport(a.id) : undefined} />
@@ -650,6 +698,7 @@ export default function AdminDashboard() {
           message={rowMessage[selected.id] ?? ""}
           onClose={() => setSelectedId(null)}
           onResend={() => handleResend(selected.id)}
+          onRemind={() => setReminderFor([selected])}
           onToggleCheckIn={() => handleToggleCheckIn(selected.id, !selected.checked_in)}
           onChangeRole={(role, notify) => handleChangeRole(selected, role, notify)}
           canManageVip={isSuper}
@@ -663,6 +712,8 @@ export default function AdminDashboard() {
           <p>This cannot be undone. Payments are not refunded; refunds must be handled in Stripe.</p>
         </DeleteDialog>
       )}
+      {reminderFor && <PaymentReminderDialog people={reminderFor} onSent={handleRemindersSent} onClose={() => setReminderFor(null)} />}
+      {popup}
     </AdminPage>
   );
 }
@@ -914,5 +965,20 @@ function SkeletonRow(): ReactNode {
       <Skeleton className="hidden h-6 w-24 md:block" />
       <Skeleton className="hidden h-9 w-40 rounded-md md:block" />
     </div>
+  );
+}
+
+// Next to "Awaiting payment": when they were last reminded to pay.
+function ReminderTag({ a }: { a: Attendee }) {
+  if (a.payment_status !== "pending" || !a.payment_reminder_sent_at) return null;
+  const by = a.payment_reminder_sent_by === AUTOMATIC_SENDER ? "automatically" : a.payment_reminder_sent_by ? `by ${a.payment_reminder_sent_by}` : "";
+  const count = a.payment_reminder_count ?? 1;
+  return (
+    <Chip dot="var(--color-gold)" className="text-ink-2">
+      <span title={`Last reminded ${new Date(a.payment_reminder_sent_at).toLocaleString()} ${by}${count > 1 ? ` (${count} reminders)` : ""}`}>
+        Reminded {relativeTime(a.payment_reminder_sent_at)}
+        {count > 1 ? ` (${count})` : ""}
+      </span>
+    </Chip>
   );
 }
