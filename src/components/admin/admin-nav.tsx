@@ -7,10 +7,10 @@ export type NavItem ={ href: string; label: string; icon: ReactNode; superAdminO
 // Admins and Settings at the bottom.
 export const ADMIN_NAV: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: <IconGrid /> },
-  { href: "/admin/analytics", label: "Analytics", icon: <IconChart /> },
   { href: "/admin/tickets", label: "Tickets & prices", icon: <IconTicket /> },
   { href: "/admin/promo-codes", label: "Promo codes", icon: <IconTag />, superAdminOnly: true },
   { href: "/admin/student-codes", label: "Student codes", icon: <IconStudent /> },
+  { href: "/admin/analytics", label: "Analytics", icon: <IconChart /> },
 ];
 
 export const ADMIN_NAV_BOTTOM: NavItem[] = [

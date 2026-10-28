@@ -2,17 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAdmin } from "@/components/admin/AdminContext";
-import { Breakdown, Kpi } from "@/components/admin/Stats";
+import AdminActivitySection from "@/components/admin/AdminActivitySection";
+import { BarChart, Breakdown, Kpi, Segmented } from "@/components/admin/Stats";
 import { AdminPage, Alert, Button, Card, cx, EmptyState, ErrorState, LoadingLabel, PageHeader, Skeleton } from "@/components/ui";
 import { IconRefresh } from "@/components/icons";
 import { categoryLabel, jobFunctionLabel, money, relativeTime } from "@/lib/admin-format";
+import { bucketByDay, countBy } from "@/lib/analytics";
 import { EVENT_INFO } from "@/lib/event-info";
 import { roleLabel } from "@/lib/role-style";
 import type { Attendee } from "@/lib/types";
 import type { Ticket } from "@/lib/tickets";
 
+// /admin/analytics: registrations and revenue over time, tickets, who
+// registered and, for super admins, what admins have been doing.
+
 const POLL_INTERVAL_MS = 60_000;
-const DAY_MS = 24 * 3600_000;
 
 type Range = "30" | "90" | "all";
 type Metric = "registrations" | "revenue";
@@ -24,38 +28,15 @@ const LANGUAGE_LABELS: Record<string, string> = { en: "English", fr: "French" };
 // Registered and not left waiting at the payment step.
 const isConfirmed = (a: Attendee) => a.payment_status !== "pending";
 
-function startOfDay(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
-function shortDate(d: Date) {
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-}
-
-/** Rows of [label, count], biggest first. Empty values are left out. */
-function countBy(list: Attendee[], key: (a: Attendee) => string | null | undefined): [string, number][] {
-  const map = new Map<string, number>();
-  for (const a of list) {
-    const k = key(a)?.trim();
-    if (k) map.set(k, (map.get(k) ?? 0) + 1);
-  }
-  return [...map.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]));
-}
-
-/** A round number at or above `v`, for the top of the chart's scale. */
-function niceCeil(v: number) {
-  if (v <= 0) return 1;
-  const pow = 10 ** Math.floor(Math.log10(v));
-  return ([1, 2, 2.5, 5, 10].find((m) => m * pow >= v) ?? 10) * pow;
-}
-
 export default function AnalyticsPanel() {
-  const { apiCall } = useAdmin();
+  const { apiCall, me } = useAdmin();
   const [attendees, setAttendees] = useState<Attendee[] | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loadError, setLoadError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  // Bumped by the refresh button so the activity section reloads too.
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [range, setRange] = useState<Range>("30");
   const [metric, setMetric] = useState<Metric>("registrations");
@@ -130,33 +111,10 @@ export default function AnalyticsPanel() {
   // ---------- over time ----------
 
   const series = useMemo(() => {
-    const today = startOfDay(new Date());
-    const earliest = all.reduce((min, a) => Math.min(min, new Date(a.created_at).getTime()), today.getTime());
-    const start =
-      range === "all" ? startOfDay(new Date(earliest)) : new Date(today.getFullYear(), today.getMonth(), today.getDate() - Number(range) + 1);
-    const spanDays = Math.round((today.getTime() - start.getTime()) / DAY_MS) + 1;
-    // Long stretches are shown by week (starting Monday) so the bars stay readable.
-    const weekly = spanDays > 120;
-    const step = weekly ? 7 : 1;
-    const first = weekly ? new Date(start.getFullYear(), start.getMonth(), start.getDate() - ((start.getDay() + 6) % 7)) : start;
-    const count = Math.floor(Math.round((today.getTime() - first.getTime()) / DAY_MS) / step) + 1;
-    const buckets = Array.from({ length: count }, (_, i) => {
-      const d = new Date(first.getFullYear(), first.getMonth(), first.getDate() + i * step);
-      return { label: weekly ? `Week of ${shortDate(d)}` : shortDate(d), short: shortDate(d), value: 0 };
-    });
-    const add = (iso: string | null, amount: number) => {
-      if (!iso) return;
-      const day = startOfDay(new Date(iso));
-      if (day < start) return;
-      const i = Math.floor(Math.round((day.getTime() - first.getTime()) / DAY_MS) / step);
-      if (buckets[i]) buckets[i].value += amount;
-    };
-    if (metric === "registrations") {
-      for (const a of audienceList) add(a.created_at, 1);
-    } else {
-      for (const a of all) if (a.payment_status === "paid") add(a.paid_at ?? a.created_at, (a.amount_cents ?? 0) / 100);
-    }
-    return { buckets, weekly, total: buckets.reduce((s, b) => s + b.value, 0) };
+    const days = range === "all" ? "all" : Number(range);
+    if (metric === "registrations") return bucketByDay(audienceList.map((a) => ({ at: a.created_at })), days);
+    const paid = all.filter((a) => a.payment_status === "paid");
+    return bucketByDay(paid.map((a) => ({ at: a.paid_at ?? a.created_at, value: (a.amount_cents ?? 0) / 100 })), days);
   }, [all, audienceList, range, metric]);
 
   // ---------- tickets ----------
@@ -216,6 +174,10 @@ export default function AnalyticsPanel() {
 
   const loading = attendees === null && !loadError;
   const fmtMoney = (cents: number) => money(cents, summary.currency) || "€0";
+  const refreshAll = () => {
+    loadAttendees();
+    setRefreshKey((k) => k + 1);
+  };
 
   return (
     <AdminPage width="max-w-7xl">
@@ -227,7 +189,7 @@ export default function AnalyticsPanel() {
           <Button
             variant="outline"
             size="md"
-            onClick={loadAttendees}
+            onClick={refreshAll}
             disabled={refreshing}
             aria-label="Refresh analytics"
             title="Refresh"
@@ -267,14 +229,25 @@ export default function AnalyticsPanel() {
             <Kpi label="Nationalities" value={summary.countries} sub={`${summary.organisations.toLocaleString()} organisations`} />
           </div>
 
-          <OverTime
-            series={series}
-            metric={metric}
-            onMetric={setMetric}
-            range={range}
-            onRange={setRange}
-            format={(v) => (metric === "revenue" ? fmtMoney(Math.round(v * 100)) : v.toLocaleString())}
-          />
+          <Card className="space-y-4 p-5 sm:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <h2 className="font-display text-xl font-bold text-blue">{metric === "registrations" ? "Registrations" : "Revenue"} over time</h2>
+                <p className="text-sm text-ink-3">
+                  {metric === "registrations" ? "By the day they registered." : "Paid tickets, by the day they paid."}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Segmented label="Measure" value={metric} onChange={setMetric} options={[["registrations", "Registrations"], ["revenue", "Revenue"]]} />
+                <Segmented label="Period" value={range} onChange={setRange} options={[["30", "30 days"], ["90", "90 days"], ["all", "All time"]]} />
+              </div>
+            </div>
+            <BarChart
+              series={series}
+              what={metric === "registrations" ? "Registrations" : "Revenue"}
+              format={(v) => (metric === "revenue" ? fmtMoney(Math.round(v * 100)) : v.toLocaleString())}
+            />
+          </Card>
 
           <TicketTable rows={ticketRows} fmtMoney={fmtMoney} />
 
@@ -310,164 +283,10 @@ export default function AnalyticsPanel() {
           </section>
         </>
       )}
+
+      {/* Everyone's actions: super admins only, like the activity log itself. */}
+      {me?.role === "super_admin" && <AdminActivitySection refreshKey={refreshKey} />}
     </AdminPage>
-  );
-}
-
-function Segmented<T extends string>({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: T;
-  onChange: (v: T) => void;
-  options: [T, string][];
-}) {
-  return (
-    <div role="group" aria-label={label} className="inline-flex overflow-hidden rounded-md border border-line-strong">
-      {options.map(([v, l]) => (
-        <button
-          key={v}
-          type="button"
-          aria-pressed={value === v}
-          onClick={() => onChange(v)}
-          className={cx(
-            "min-h-11 border-l border-line-strong px-3 text-sm font-semibold transition-colors duration-150 first:border-l-0 sm:min-h-9",
-            value === v ? "bg-blue text-white" : "bg-surface text-ink-2 hover:bg-subtle active:bg-line"
-          )}
-        >
-          {l}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function OverTime({
-  series,
-  metric,
-  onMetric,
-  range,
-  onRange,
-  format,
-}: {
-  series: { buckets: { label: string; short: string; value: number }[]; weekly: boolean; total: number };
-  metric: Metric;
-  onMetric: (m: Metric) => void;
-  range: Range;
-  onRange: (r: Range) => void;
-  format: (v: number) => string;
-}) {
-  const [hover, setHover] = useState<number | null>(null);
-  const { buckets, weekly, total } = series;
-  const max = niceCeil(Math.max(0, ...buckets.map((b) => b.value)));
-  const peak = buckets.reduce((best, b) => (b.value > best.value ? b : best), buckets[0]);
-  const hovered = hover !== null ? buckets[hover] : null;
-  const unit = weekly ? "week" : "day";
-  const what = metric === "registrations" ? "Registrations" : "Revenue";
-  const ticks = [max, max / 2, 0];
-  const labelAt = [0, Math.floor((buckets.length - 1) / 2), buckets.length - 1];
-
-  return (
-    <Card className="space-y-4 p-5 sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h2 className="font-display text-xl font-bold text-blue">{what} over time</h2>
-          <p className="text-sm text-ink-3">
-            {metric === "registrations" ? `By the ${unit} they registered.` : `Paid tickets, by the ${unit} they paid.`}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Segmented label="Measure" value={metric} onChange={onMetric} options={[["registrations", "Registrations"], ["revenue", "Revenue"]]} />
-          <Segmented label="Period" value={range} onChange={onRange} options={[["30", "30 days"], ["90", "90 days"], ["all", "All time"]]} />
-        </div>
-      </div>
-
-      {/* Readout: the hovered bar, or the period's total and best day. */}
-      <p aria-live="polite" className="min-h-6 text-sm text-ink">
-        {hovered ? (
-          <>
-            <span className="font-semibold">{hovered.label}</span>: {format(hovered.value)}
-          </>
-        ) : (
-          <>
-            <span className="font-semibold">{format(total)}</span> in this period
-            {peak && peak.value > 0 && (
-              <span className="text-ink-3">
-                {" "}· Best {unit}: {peak.label}, {format(peak.value)}
-              </span>
-            )}
-          </>
-        )}
-      </p>
-
-      <div className="flex gap-2">
-        <div aria-hidden="true" className="flex h-48 shrink-0 flex-col justify-between text-right text-xs text-ink-3 sm:h-56">
-          {ticks.map((t, i) => (
-            <span key={i} className="-my-2 leading-4">{format(t)}</span>
-          ))}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div
-            role="img"
-            aria-label={`${what} per ${unit}: ${format(total)} in this period. The table below lists each ${unit}.`}
-            className="relative h-48 sm:h-56"
-            onMouseLeave={() => setHover(null)}
-          >
-            {ticks.map((_, i) => (
-              <div key={i} aria-hidden="true" className="absolute inset-x-0 border-t border-line" style={{ top: `${(i / (ticks.length - 1)) * 100}%` }} />
-            ))}
-            <div className="absolute inset-0 flex items-end gap-0.5">
-              {buckets.map((b, i) => (
-                <div
-                  key={i}
-                  className="flex h-full min-w-0 flex-1 items-end"
-                  onMouseEnter={() => setHover(i)}
-                  onTouchStart={() => setHover(i)}
-                >
-                  <div
-                    className={cx("w-full rounded-t-sm transition-colors duration-150", hover === i ? "bg-gold" : "bg-blue")}
-                    style={{ height: b.value ? `max(2px, ${(b.value / max) * 100}%)` : 0 }}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-          <div aria-hidden="true" className="mt-1.5 flex justify-between text-xs text-ink-3">
-            {labelAt.map((i, n) => (
-              <span key={n}>{buckets[i]?.short}</span>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <details className="text-sm">
-        <summary className="min-h-11 cursor-pointer content-center font-semibold text-blue">Show as a table</summary>
-        <div className="mt-2 max-h-72 overflow-y-auto rounded-md border border-line">
-          <table className="w-full text-left">
-            <thead className="sticky top-0 bg-subtle text-xs font-semibold uppercase tracking-wider text-ink-3">
-              <tr>
-                <th scope="col" className="px-3 py-2">{weekly ? "Week" : "Day"}</th>
-                <th scope="col" className="px-3 py-2 text-right">{what}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {buckets
-                .map((b, i) => [b, i] as const)
-                .reverse()
-                .map(([b, i]) => (
-                  <tr key={i} className="border-t border-line">
-                    <td className="px-3 py-2 text-ink">{b.label}</td>
-                    <td className="px-3 py-2 text-right text-ink">{format(b.value)}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
-      </details>
-    </Card>
   );
 }
 
