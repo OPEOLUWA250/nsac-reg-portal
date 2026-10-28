@@ -18,6 +18,7 @@ import {
   Skeleton,
 } from "@/components/ui";
 import { useAdmin } from "@/components/admin/AdminContext";
+import { usePopup } from "@/components/Popup";
 import { STUDENT_TICKET_ID, type Ticket } from "@/lib/tickets";
 import { relativeTime } from "@/lib/admin-format";
 import { IconRefresh } from "@/components/icons";
@@ -79,6 +80,7 @@ const discountText = (p: PromoCode) => (p.percentOff === 100 ? "a free pass" : `
 
 export default function PromoCodesPanel() {
   const { apiCall } = useAdmin();
+  const { confirm, notify, popup } = usePopup();
   const [codes, setCodes] = useState<PromoCode[] | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loadError, setLoadError] = useState("");
@@ -176,14 +178,23 @@ export default function PromoCodesPanel() {
   }
 
   async function toggle(p: PromoCode) {
-    if (p.active && !window.confirm(`Switch off ${p.code}? People can no longer use it. Registrations already made keep their discount.`)) return;
+    if (
+      p.active &&
+      !(await confirm({
+        title: `Switch off ${p.code}?`,
+        body: "People can no longer use it. Registrations already made keep their discount.",
+        confirmLabel: "Switch off",
+        tone: "danger",
+      }))
+    )
+      return;
     setBusyId(p.id);
     try {
       const json = await apiCall("/api/admin/promo-codes", { method: "PATCH", body: JSON.stringify({ id: p.id, active: !p.active }) });
       const updated = json.code as PromoCode;
       setCodes((list) => (list ?? []).map((c) => (c.id === updated.id ? updated : c)));
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Couldn't update the code.");
+      void notify({ title: `Couldn't update ${p.code}`, body: err instanceof Error ? err.message : "Try again in a moment.", tone: "danger" });
     } finally {
       setBusyId(null);
     }
@@ -201,6 +212,7 @@ export default function PromoCodesPanel() {
 
   return (
     <AdminPage>
+      {popup}
       <PageHeader
         eyebrow="Registration form"
         title="Promo codes"

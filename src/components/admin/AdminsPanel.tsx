@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { AdminPage, Alert, Button, Card, Chip, EmptyState, ErrorState, Field, inputClass, LoadingLabel, PageHeader, Skeleton } from "@/components/ui";
 import { useAdmin } from "@/components/admin/AdminContext";
+import { usePopup } from "@/components/Popup";
 import PasswordInput from "@/components/admin/PasswordInput";
 import { ADMIN_PASSWORD_MIN } from "@/lib/admin-password";
 import { relativeTime } from "@/lib/admin-format";
@@ -47,6 +48,7 @@ function temporaryPassword(length = 16): string {
 
 export default function AdminsPanel() {
   const { apiCall, me } = useAdmin();
+  const { confirm, popup } = usePopup();
   const [data, setData] = useState<AdminsResponse | null>(null);
   const [loadError, setLoadError] = useState("");
   const [notice, setNotice] = useState<ReactNode>(null);
@@ -85,17 +87,24 @@ export default function AdminsPanel() {
     }
   }
 
-  function changeRole(admin: AdminRow, role: Role) {
+  async function changeRole(admin: AdminRow, role: Role) {
     if (role === admin.role) return;
-    if (!window.confirm(`Make ${admin.email} ${ROLE_NAME[role] === "Admin" ? "an Admin" : "a Super admin"}?`)) return;
+    const label = ROLE_NAME[role] === "Admin" ? "an Admin" : "a Super admin";
+    if (!(await confirm({ title: `Make ${admin.email} ${label}?`, confirmLabel: `Make ${label}` }))) return;
     run(admin.id, async () => {
       await apiCall("/api/admin/admins", { method: "PATCH", body: JSON.stringify({ id: admin.id, role }) });
       setNotice(`${admin.email} is now ${role === "admin" ? "an Admin" : "a Super admin"}.`);
     });
   }
 
-  function resetPassword(admin: AdminRow) {
-    if (!window.confirm(`Give ${admin.email} a new temporary password? Their current password stops working.`)) return;
+  async function resetPassword(admin: AdminRow) {
+    const ok = await confirm({
+      title: `Give ${admin.email} a new temporary password?`,
+      body: "Their current password stops working.",
+      confirmLabel: "Reset password",
+      tone: "danger",
+    });
+    if (!ok) return;
     const password = temporaryPassword();
     run(admin.id, async () => {
       await apiCall("/api/admin/admins", { method: "PATCH", body: JSON.stringify({ id: admin.id, password }) });
@@ -103,8 +112,9 @@ export default function AdminsPanel() {
     });
   }
 
-  function remove(admin: AdminRow) {
-    if (!window.confirm(`Remove ${admin.email}? They won't be able to sign in any more.`)) return;
+  async function remove(admin: AdminRow) {
+    const ok = await confirm({ title: `Remove ${admin.email}?`, body: "They won't be able to sign in any more.", confirmLabel: "Remove", tone: "danger" });
+    if (!ok) return;
     run(admin.id, async () => {
       await apiCall(`/api/admin/admins?id=${admin.id}`, { method: "DELETE" });
       setNotice(`${admin.email} was removed.`);
@@ -143,6 +153,7 @@ export default function AdminsPanel() {
   return (
     <AdminPage width="max-w-4xl">
       {header}
+      {popup}
 
       {notice && <Alert tone="success">{notice}</Alert>}
       {actionError && <Alert tone="error">{actionError}</Alert>}
