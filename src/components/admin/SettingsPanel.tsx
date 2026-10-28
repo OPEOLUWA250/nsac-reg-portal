@@ -9,7 +9,6 @@ import { EVENT_INFO } from "@/lib/event-info";
 import { MAX_ALERT_EMAILS, mergeAlertRecipients, parseAlertEmailList } from "@/lib/alert-emails";
 import { cleanAutoReminders, type AutoReminders as AutoRemindersSetting } from "@/lib/auto-reminders";
 import { AUTO_REMINDER_DAYS } from "@/lib/payment-reminder";
-import { usePopup } from "@/components/Popup";
 
 // /admin/settings: open/close registration, who gets the registration
 // alerts, plus a read-only view of how payments, email and security are set up.
