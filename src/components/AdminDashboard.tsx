@@ -344,7 +344,6 @@ export default function AdminDashboard() {
       tone: sent.length ? "default" : "danger",
       body: (
         <>
-          {sent.length > 0 && <p>Each email has a button to pay at today&apos;s price. Their place is confirmed as soon as they pay.</p>}
           {notSent.length > 0 && (
             <ul className="list-disc space-y-1 pl-5">
               {notSent.map((r) => (
