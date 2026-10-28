@@ -10,7 +10,7 @@ vi.mock("@/lib/promo-codes", () => ({ checkPromoCode: mocks.promo }));
 vi.mock("@/lib/student-codes", () => ({ checkStudentCode: mocks.student }));
 
 process.env.PAYMENT_LINK_SECRET = "test-secret";
-const { attendeeIdFromToken, paymentLinkToken, paymentOffer } = await import("./payment-link");
+const { attendeeIdFromToken, linkBaseUrl, paymentLinkToken, paymentOffer } = await import("./payment-link");
 
 const ID = "12345678-1234-4234-8234-123456789abc";
 const ticket = (id: string, amountCents: number): Ticket => ({
@@ -39,6 +39,14 @@ it("only accepts links we signed", () => {
   expect(attendeeIdFromToken(`${ID}.${"x".repeat(32)}`)).toBeNull();
   expect(attendeeIdFromToken(token.replace(ID, "12345678-1234-4234-8234-123456789abd"))).toBeNull();
   expect(attendeeIdFromToken("nonsense")).toBeNull();
+});
+
+it("points links at the live site, or at this computer while testing locally", () => {
+  process.env.PUBLIC_BASE_URL = "https://registration.example.com";
+  expect(linkBaseUrl("https://registration.example.com")).toBe("https://registration.example.com");
+  expect(linkBaseUrl("https://nsac-git-staging.vercel.app")).toBe("https://registration.example.com");
+  expect(linkBaseUrl("http://localhost:3000")).toBe("http://localhost:3000");
+  delete process.env.PUBLIC_BASE_URL;
 });
 
 it("charges today's price for their ticket", async () => {

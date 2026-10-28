@@ -5,7 +5,7 @@ import { describeError } from "@/lib/describe-error";
 import { buildPaymentReminderEmail } from "@/lib/email";
 import { brandLogoPng } from "@/lib/ticket-image";
 import { listTickets } from "@/lib/ticket-store";
-import { publicBaseUrl, toHttps } from "@/lib/public-url";
+import { linkBaseUrl } from "@/lib/server/payment-link";
 import { logActivity } from "@/lib/server/activity-log";
 import { prepareReminder, recordReminder, sendReminder } from "@/lib/server/payment-reminders";
 import { parseReminderInput, REMINDER_LIMITS, type ReminderLanguage } from "@/lib/payment-reminder";
@@ -60,7 +60,7 @@ export const POST = adminRoute(async (req: NextRequest, _context, session) => {
     return NextResponse.json({ error: "Couldn't load these registrations." }, { status: 500 });
   }
   const byId = new Map(((data ?? []) as Attendee[]).map((a) => [a.id, a]));
-  const baseUrl = publicBaseUrl() ?? toHttps(req.nextUrl.origin);
+  const baseUrl = linkBaseUrl(req.nextUrl.origin);
   const wording = { templates: input.templates, signedBy: input.signedBy, signerTitle: input.signerTitle };
   // One person can be written to in another language than the one they registered in.
   const inLanguage = (a: Attendee) => (language ? { ...a, language } : a);
