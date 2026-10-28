@@ -8,6 +8,7 @@ import { registrationClosedByEnv } from "@/lib/registration-config";
 import { availableTickets } from "@/lib/ticket-store";
 import { describeError } from "@/lib/describe-error";
 import { cleanAlertEmails, MAX_ALERT_EMAILS } from "@/lib/alert-emails";
+import { logActivity } from "@/lib/server/activity-log";
 
 export const runtime = "nodejs";
 
@@ -80,6 +81,25 @@ export const POST = adminRoute(async (req: NextRequest, _context: unknown, sessi
     const settings = await updateSettings({ registrationOpen: body.registrationOpen as boolean | undefined, alertEmails });
     if (alertEmails) console.info(`Registration alert list updated by ${session.email}: ${alertEmails.length} address(es)`);
     if (body.registrationOpen !== undefined) console.info(`Settings updated: registrationOpen=${settings.registrationOpen}`);
+    if (body.registrationOpen !== undefined) {
+      await logActivity(
+        session,
+        { area: "settings", action: settings.registrationOpen ? "registration.opened" : "registration.closed", summary: `${settings.registrationOpen ? "opened" : "closed"} registration` },
+        req
+      );
+    }
+    if (alertEmails) {
+      await logActivity(
+        session,
+        {
+          area: "settings",
+          action: "alerts.changed",
+          summary: `changed who gets registration alerts (${alertEmails.length} ${alertEmails.length === 1 ? "address" : "addresses"})`,
+          details: { alertEmails },
+        },
+        req
+      );
+    }
     return NextResponse.json({ settings });
   } catch (err) {
     console.error(`Could not save settings: ${describeError(err)}`);

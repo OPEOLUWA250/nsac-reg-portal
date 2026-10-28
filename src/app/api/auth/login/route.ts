@@ -5,6 +5,7 @@ import { resolveAdminRole } from "@/lib/server/admin-roles";
 import { adminActivityCookie } from "@/lib/server/admin-idle";
 import { ADMIN_PASSWORD_MAX } from "@/lib/admin-password";
 import { clientIp, withinLimit } from "@/lib/server/rate-limit";
+import { logActivity } from "@/lib/server/activity-log";
 
 export const runtime = "nodejs";
 
@@ -49,6 +50,8 @@ export async function POST(req: NextRequest) {
     const { data, error } = await client.auth.signInWithPassword({ email, password });
     if (error || !data.user) {
       console.warn(`Admin sign-in failed for ${email}: ${error?.message ?? "no user"}`);
+      // Only for real admin emails (checked above), so the log can show someone guessing a password.
+      await logActivity({ email }, { area: "sign_in", action: "sign_in.failed", summary: "failed to sign in (wrong password)" }, req);
       return NextResponse.json(REFUSED, { status: 401 });
     }
 
@@ -59,6 +62,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(REFUSED, { status: 401 });
     }
 
+    await logActivity({ email, role }, { area: "sign_in", action: "sign_in", summary: "signed in" }, req);
     const response = NextResponse.json({ ok: true, mustChangePassword: data.user.app_metadata?.must_change_password === true });
     response.cookies.set(adminActivityCookie(Date.now()));
     return response;

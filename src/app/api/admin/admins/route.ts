@@ -6,6 +6,9 @@ import { ADMIN_ROLES, type AdminRole } from "@/lib/server/admin-roles";
 import { passwordProblem } from "@/lib/admin-password";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { describeError } from "@/lib/describe-error";
+import { logActivity } from "@/lib/server/activity-log";
+
+const ROLE_NAME: Record<AdminRole, string> = { admin: "Admin", super_admin: "Super admin" };
 
 export const runtime = "nodejs";
 
@@ -143,6 +146,7 @@ export const POST = adminRoute(
       console.error(`Add admin ${email} failed: ${describeError(inserted.error)}`);
       return NextResponse.json(missingTable(inserted.error) ? MISSING_TABLE : { error: "Couldn't add the admin. Try again." }, { status: 500 });
     }
+    await logActivity(session, { area: "admins", action: "admin.added", summary: `added ${email} as ${ROLE_NAME[role as AdminRole]}`, target: { type: "admin", id: userId } }, req);
     return NextResponse.json({ ok: true, id: userId });
   },
   { superAdmin: true }
@@ -165,6 +169,13 @@ export const PATCH = adminRoute(
       if (!isRole(body.role)) return NextResponse.json({ error: "Choose Admin or Super admin." }, { status: 400 });
       const updated = await db.from("admin_users").update({ role: body.role }).eq("id", id);
       if (updated.error) return NextResponse.json({ error: "Couldn't change the role. Try again." }, { status: 500 });
+      if (body.role !== row.role) {
+        await logActivity(
+          session,
+          { area: "admins", action: "admin.role_changed", summary: `changed ${row.email}'s role from ${ROLE_NAME[row.role as AdminRole] ?? row.role} to ${ROLE_NAME[body.role as AdminRole]}`, target: { type: "admin", id } },
+          req
+        );
+      }
       return NextResponse.json({ ok: true });
     }
 
@@ -177,6 +188,7 @@ export const PATCH = adminRoute(
         console.warn(`Temporary password for ${row.email} failed: ${updated.error.message}`);
         return NextResponse.json({ error: "Couldn't set the password. Try again." }, { status: 500 });
       }
+      await logActivity(session, { area: "admins", action: "admin.temp_password", summary: `set a new temporary password for ${row.email}`, target: { type: "admin", id } }, req);
       return NextResponse.json({ ok: true });
     }
 
@@ -203,6 +215,7 @@ export const DELETE = adminRoute(
     if (removed.error) return NextResponse.json({ error: "Couldn't remove. Try again." }, { status: 500 });
     const deleted = await db.auth.admin.deleteUser(id);
     if (deleted.error) console.warn(`Admin ${row.email} removed, but deleting their sign-in failed: ${deleted.error.message}`);
+    await logActivity(session, { area: "admins", action: "admin.removed", summary: `removed ${row.email} from the admins`, target: { type: "admin", id } }, req);
     return NextResponse.json({ ok: true });
   },
   { superAdmin: true }

@@ -3,8 +3,9 @@ import { NextRequest } from "next/server";
 import type { AdminSession } from "@/lib/server/admin-auth";
 import { PATCH } from "./route";
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), update: vi.fn(), read: vi.fn(), vip: vi.fn(), updates: [] as unknown[] }));
+const mocks = vi.hoisted(() => ({ session: vi.fn(), update: vi.fn(), read: vi.fn(), vip: vi.fn(), log: vi.fn(), updates: [] as unknown[] }));
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/server/activity-log", () => ({ logActivity: mocks.log }));
 vi.mock("@/lib/attendee-service", () => ({ sendCategoryChangeNotice: mocks.vip }));
 vi.mock("@/lib/server/admin-auth", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/server/admin-auth")>();
@@ -29,7 +30,7 @@ vi.mock("@/lib/supabase-admin", () => ({
 
 const session = { user: { id: "admin-id" }, email: "admin@example.com", role: "super_admin", mustChangePassword: false } as AdminSession;
 const id = "12345678-1234-4234-8234-123456789abc";
-const attendee = { id, role: "vip", payment_status: "paid", email: "ada@example.com" };
+const attendee = { id, role: "vip", payment_status: "paid", email: "ada@example.com", full_name: "Ada Obi" };
 
 function patch(body: unknown) {
   return PATCH(new NextRequest("https://example.com/api/admin/attendees", { method: "PATCH", body: JSON.stringify(body) }), {});
@@ -40,6 +41,7 @@ beforeEach(() => {
   mocks.update.mockResolvedValue({ data: attendee, error: null });
   mocks.read.mockResolvedValue({ data: attendee, error: null });
   mocks.vip.mockReset().mockResolvedValue(true);
+  mocks.log.mockReset().mockResolvedValue(undefined);
   mocks.updates.length = 0;
 });
 
@@ -50,6 +52,12 @@ describe("changing a registration category", () => {
     expect(await res.json()).toMatchObject({ changed: true, emailed: true });
     expect(mocks.updates).toEqual([{ role: "vip" }]);
     expect(mocks.vip).toHaveBeenCalledWith(attendee);
+    // Recorded in the activity log, as this admin.
+    expect(mocks.log).toHaveBeenCalledWith(
+      session,
+      expect.objectContaining({ action: "attendee.category_changed", summary: "changed Ada Obi's category to VIP, and emailed them", target: { type: "attendee", id } }),
+      expect.anything()
+    );
   });
 
   it("makes someone a VIP without an email when asked", async () => {
@@ -71,6 +79,8 @@ describe("changing a registration category", () => {
     mocks.update.mockResolvedValue({ data: null, error: null });
     expect(await (await patch({ id, role: "vip", notify: true })).json()).toMatchObject({ changed: false, emailed: false });
     expect(mocks.vip).not.toHaveBeenCalled();
+    // Nothing happened, so nothing is recorded.
+    expect(mocks.log).not.toHaveBeenCalled();
   });
 
   it("rejects unknown categories and missing registrations", async () => {

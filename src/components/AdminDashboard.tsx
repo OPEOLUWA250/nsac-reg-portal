@@ -320,6 +320,9 @@ export default function AdminDashboard() {
     a.download = `nsac-2027-registrations-${label}-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    // Personal data leaving the site: noted in the activity log (best effort).
+    const what = label === "all" ? "everyone" : label === "filtered" ? "a filtered view" : label.replace(/-/g, " ");
+    apiCall("/api/admin/activity-log", { method: "POST", body: JSON.stringify({ kind: "export", what, count: list.length }) }).catch(() => {});
   }
 
   const selected = attendees?.find((a) => a.id === selectedId) ?? null;
