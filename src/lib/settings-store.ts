@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { describeError } from "@/lib/describe-error";
 import { cleanAlertEmails } from "@/lib/alert-emails";
+import { cleanAutoReminders, DEFAULT_AUTO_REMINDERS, type AutoReminders } from "@/lib/auto-reminders";
 
 // Server-only: settings edited from /admin → Settings, stored in the
 // `settings` table (20260929130000_settings.sql, see the README). One row
@@ -11,13 +12,16 @@ export interface AppSettings {
   registrationOpen: boolean;
   /** Who gets the "new registration" email, besides ADMIN_NOTIFY_EMAILS. */
   alertEmails: string[];
+  /** One automatic payment reminder for people who haven't paid (off unless switched on). */
+  autoReminders: AutoReminders;
 }
 
-const DEFAULTS: AppSettings = { registrationOpen: true, alertEmails: [] };
+const DEFAULTS: AppSettings = { registrationOpen: true, alertEmails: [], autoReminders: DEFAULT_AUTO_REMINDERS };
 
 const KEYS: Record<keyof AppSettings, string> = {
   registrationOpen: "registration_open",
   alertEmails: "alert_emails",
+  autoReminders: "auto_payment_reminders",
 };
 
 export async function getSettings(): Promise<AppSettings> {
@@ -31,6 +35,7 @@ export async function getSettings(): Promise<AppSettings> {
           ? (byKey.get(KEYS.registrationOpen) as boolean)
           : DEFAULTS.registrationOpen,
       alertEmails: cleanAlertEmails(byKey.get(KEYS.alertEmails)) ?? DEFAULTS.alertEmails,
+      autoReminders: cleanAutoReminders(byKey.get(KEYS.autoReminders)) ?? DEFAULTS.autoReminders,
     };
   } catch (err) {
     // Table missing (migration not run) or database hiccup: fall back to

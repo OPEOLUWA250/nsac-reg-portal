@@ -9,8 +9,10 @@ import {
   jobFunctionLabel,
   money,
   paymentLabel,
+  relativeTime,
   stripeSessionUrl,
 } from "@/lib/admin-format";
+import { AUTOMATIC_SENDER } from "@/lib/payment-reminder";
 import { roleLabel } from "@/lib/role-style";
 import { ATTENDEE_ROLES, hasValidTicket, type Attendee } from "@/lib/types";
 
@@ -26,6 +28,7 @@ export default function AttendeeDrawer({
   message,
   onClose,
   onResend,
+  onRemind,
   onToggleCheckIn,
   onChangeRole,
   canManageVip,
@@ -39,6 +42,8 @@ export default function AttendeeDrawer({
   message: string;
   onClose: () => void;
   onResend: () => void;
+  /** Opens the payment reminder (for someone awaiting payment). */
+  onRemind: () => void;
   onToggleCheckIn: () => void;
   /** Changes their category; `notify` emails them the new one. */
   onChangeRole: (role: string, notify: boolean) => void;
@@ -180,6 +185,8 @@ export default function AttendeeDrawer({
         </div>
 
         <div className="space-y-4 p-5 sm:p-6">
+          {a.payment_status === "pending" && <PaymentReminderBox attendee={a} busy={busy} onRemind={onRemind} />}
+
           <RoleEditor key={`${a.id}:${a.role}`} attendee={a} busy={busy} onChangeRole={onChangeRole} canManageVip={canManageVip} />
 
           <Section title="Contact">
@@ -319,6 +326,36 @@ export function Avatar({ name, large = false }: { name: string; large?: boolean 
     >
       {initials || "?"}
     </span>
+  );
+}
+
+// Someone who filled in the form but didn't finish paying: when they were
+// last reminded, and the button that opens the reminder (sent from there).
+function PaymentReminderBox({ attendee: a, busy, onRemind }: { attendee: Attendee; busy: boolean; onRemind: () => void }) {
+  const by = a.payment_reminder_sent_by === AUTOMATIC_SENDER ? "automatically" : a.payment_reminder_sent_by ? `by ${a.payment_reminder_sent_by}` : "";
+  const count = a.payment_reminder_count ?? 0;
+  return (
+    <section className="space-y-3 rounded-lg border border-line bg-surface p-5">
+      <div className="space-y-1">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-3">Payment</h3>
+        <p className="text-sm text-ink">
+          They filled in the form {relativeTime(a.created_at)} but haven&apos;t paid, so their place isn&apos;t confirmed.
+        </p>
+        <p className="text-sm text-ink-3">
+          {a.payment_reminder_sent_at ? (
+            <span title={formatDateTime(a.payment_reminder_sent_at)}>
+              Reminded {relativeTime(a.payment_reminder_sent_at)} {by}
+              {count > 1 ? ` (${count} reminders so far)` : ""}.
+            </span>
+          ) : (
+            "Not reminded yet."
+          )}
+        </p>
+      </div>
+      <Button variant="primary" size="sm" onClick={onRemind} disabled={busy}>
+        {a.payment_reminder_sent_at ? "Send another reminder" : "Send payment reminder"}
+      </Button>
+    </section>
   );
 }
 
