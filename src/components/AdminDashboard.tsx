@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAdmin } from "@/components/admin/AdminContext";
+import { Kpi } from "@/components/admin/Stats";
 import AttendeeDrawer, { Avatar } from "@/components/AttendeeDrawer";
 import DeleteDialog from "@/components/admin/DeleteDialog";
 import {
@@ -24,7 +25,7 @@ import {
   StatusPill,
 } from "@/components/ui";
 import { IconDownload, IconRefresh, IconSearch } from "@/components/icons";
-import { buildAttendeeCsv, categoryLabel, money, relativeTime } from "@/lib/admin-format";
+import { buildAttendeeCsv, money, relativeTime } from "@/lib/admin-format";
 import { EVENT_INFO } from "@/lib/event-info";
 import { roleLabel } from "@/lib/role-style";
 import { ATTENDEE_ROLES, type Attendee } from "@/lib/types";
@@ -137,14 +138,6 @@ export default function AdminDashboard() {
     const list = attendees ?? [];
     const paid = list.filter((a) => a.payment_status === "paid");
     const revenueCents = paid.reduce((sum, a) => sum + (a.amount_cents ?? 0), 0);
-    const count = (key: (a: Attendee) => string | null | undefined, limit = 5) => {
-      const map = new Map<string, number>();
-      for (const a of list) {
-        const k = key(a);
-        if (k) map.set(k, (map.get(k) ?? 0) + 1);
-      }
-      return [...map.entries()].sort((x, y) => y[1] - x[1]).slice(0, limit);
-    };
     const dayAgo = Date.now() - 24 * 3600_000;
     return {
       total: list.length,
@@ -161,11 +154,8 @@ export default function AdminDashboard() {
       checkedIn: list.filter((a) => a.checked_in).length,
       letters: list.filter((a) => a.needs_invitation_letter).length,
       lettersNoPassport: list.filter((a) => a.needs_invitation_letter && !a.passport_path).length,
-      byTicket: count((a) => (a.ticket_type ? ticketName(a.ticket_type) : null)),
-      byCountry: count((a) => a.nationality),
-      byCategory: count((a) => categoryLabel(a.professional_category)),
     };
-  }, [attendees, ticketName]);
+  }, [attendees]);
 
   // ---------- filtering ----------
 
@@ -450,14 +440,6 @@ export default function AdminDashboard() {
               onClick={stats.letters ? () => setFilter("letter", true) : undefined}
             />
           </div>
-
-          {stats.total > 0 && (
-            <div className="grid gap-3 md:grid-cols-3">
-              <Breakdown title="By ticket" rows={stats.byTicket} total={stats.total} />
-              <Breakdown title="Top nationalities" rows={stats.byCountry} total={stats.total} />
-              <Breakdown title="By professional category" rows={stats.byCategory} total={stats.total} />
-            </div>
-          )}
 
           {/* Filters + list. Columns follow the card's own width (container
               queries), since the sidebar takes part of the screen. */}
@@ -783,63 +765,6 @@ function ExportMenu({ disabled, options }: { disabled: boolean; options: { label
         </div>
       )}
     </div>
-  );
-}
-
-function Kpi({
-  label,
-  value,
-  sub,
-  alert,
-  onClick,
-}: {
-  label: string;
-  value: string | number;
-  sub: string;
-  alert?: boolean;
-  onClick?: () => void;
-}) {
-  const Tag = onClick ? "button" : "div";
-  return (
-    <Tag
-      {...(onClick ? { type: "button" as const, onClick } : {})}
-      className={cx(
-        "rounded-lg border border-line bg-surface p-4 text-left",
-        onClick && "cursor-pointer transition-colors duration-150 hover:border-ink-3 hover:bg-canvas active:bg-subtle"
-      )}
-    >
-      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-3">
-        {alert && <span aria-hidden="true" className="h-2 w-2 rounded-full bg-danger" />}
-        {label}
-      </div>
-      <div className="mt-1 font-display text-2xl font-bold text-blue sm:text-3xl">{typeof value === "number" ? value.toLocaleString() : value}</div>
-      <div className={cx("mt-0.5 text-sm text-ink-3", onClick && "underline decoration-line-strong underline-offset-2")}>{sub}</div>
-    </Tag>
-  );
-}
-
-function Breakdown({ title, rows, total }: { title: string; rows: [string, number][]; total: number }) {
-  return (
-    <Card className="p-4">
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-3">{title}</h2>
-      {rows.length === 0 ? (
-        <p className="text-sm text-ink-3">Nobody has answered this yet.</p>
-      ) : (
-        <ul className="space-y-2.5">
-          {rows.map(([label, n]) => (
-            <li key={label}>
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="truncate text-ink">{label}</span>
-                <span className="shrink-0 font-semibold text-ink">{n}</span>
-              </div>
-              <div className="mt-1 h-1.5 rounded-sm bg-subtle">
-                <div className="h-full rounded-sm bg-gold" style={{ width: `${Math.max(4, (n / total) * 100)}%` }} />
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
   );
 }
 

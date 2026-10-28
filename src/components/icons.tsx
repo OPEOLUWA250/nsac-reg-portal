@@ -89,6 +89,11 @@ export const IconGrid = ({ className }: P) => (
     <rect x="14" y="14" width="7" height="7" rx="1" />
   </Svg>
 );
+export const IconChart = ({ className }: P) => (
+  <Svg className={className}>
+    <path d="M4 20h16M7 16v-5M12 16V6M17 16v-8" />
+  </Svg>
+);
 export const IconTicket = ({ className }: P) => (
   <Svg className={className}>
     <path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2a2 2 0 0 0 0-4z" />

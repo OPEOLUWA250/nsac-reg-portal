@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { faMapLocationDot } from "@fortawesome/free-solid-svg-icons";
-import { IconCog, IconGrid, IconStudent, IconTag, IconTicket, IconUser } from "@/components/icons";
+import { IconChart, IconCog, IconGrid, IconStudent, IconTag, IconTicket, IconUser } from "@/components/icons";
 import FaIcon from "@/components/FaIcon";
 
 export type NavItem ={ href: string; label: string; icon: ReactNode; superAdminOnly?: boolean };
@@ -13,6 +13,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/promo-codes", label: "Promo codes", icon: <IconTag />, superAdminOnly: true },
   { href: "/admin/student-codes", label: "Student codes", icon: <IconStudent /> },
   { href: "/admin/booths", label: "Venue booths", icon: <FaIcon icon={faMapLocationDot} className="h-[18px] w-[18px]" /> },
+  { href: "/admin/analytics", label: "Analytics", icon: <IconChart /> },
 ];
 
 export const ADMIN_NAV_BOTTOM: NavItem[] = [
