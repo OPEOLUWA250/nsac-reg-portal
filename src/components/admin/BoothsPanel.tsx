@@ -23,6 +23,7 @@ import {
 import FaIcon from "@/components/FaIcon";
 import { IconRefresh, IconSearch } from "@/components/icons";
 import { useAdmin } from "@/components/admin/AdminContext";
+import { usePopup } from "@/components/Popup";
 import { BOOTH_FILL, FloorPlan } from "@/components/venue/VenueMap";
 import { relativeTime } from "@/lib/admin-format";
 import { BOOTHS, BOOTH_SIZE_LABEL, MAP_H, MAP_W, ZONES } from "@/lib/venue/data";
@@ -60,6 +61,7 @@ const draftOf = (a: Assignment | undefined): Draft =>
 
 export default function BoothsPanel() {
   const { apiCall } = useAdmin();
+  const { confirm, popup } = usePopup();
   const [assignments, setAssignments] = useState<Map<string, Assignment> | null>(null);
   const [loadError, setLoadError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -105,9 +107,13 @@ export default function BoothsPanel() {
     return buildPlaces(ex);
   }, [assignments]);
 
-  function select(code: string, scroll = false) {
+  async function select(code: string, scroll = false) {
     if (code === selected) return;
-    if (dirty && !window.confirm(`Discard your changes to ${selected}?`)) return;
+    if (
+      dirty &&
+      !(await confirm({ title: `Discard your changes to ${selected}?`, body: "What you typed for this booth isn't saved yet.", confirmLabel: "Discard changes", cancelLabel: "Keep editing", tone: "danger" }))
+    )
+      return;
     setSelected(code);
     setDraft(draftOf(assignments?.get(code)));
     setFieldErrors({});
@@ -150,7 +156,8 @@ export default function BoothsPanel() {
 
   async function free() {
     if (!selected || !current) return;
-    if (!window.confirm(`Free ${selected}? ${current.companyName} will no longer show on the venue map.`)) return;
+    const ok = await confirm({ title: `Free ${selected}?`, body: `${current.companyName} will no longer show on the venue map.`, confirmLabel: "Free the booth", tone: "danger" });
+    if (!ok) return;
     setSaving("free");
     setSaveError("");
     setNotice("");
@@ -193,6 +200,7 @@ export default function BoothsPanel() {
     // The map's colours live in .venue; always light here, the admin has no dark mode.
     <div className="venue" data-theme="light">
     <AdminPage>
+      {popup}
       <PageHeader
         eyebrow="Venue map"
         title="Booths"
