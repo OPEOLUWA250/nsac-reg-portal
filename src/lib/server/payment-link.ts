@@ -33,12 +33,11 @@ export function paymentLinkToken(attendeeId: string): string {
 }
 
 /**
- * Where links in reminders point: the public address, except while someone
- * tries this out on their own computer (localhost), where only that copy may
- * have the payment page yet.
+ * Where links in reminders point: always the public address (PUBLIC_BASE_URL),
+ * even when the reminder is sent from a copy running on someone's computer,
+ * because the people who get it can only open the live site.
  */
 export function linkBaseUrl(requestOrigin: string): string {
-  if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(requestOrigin)) return requestOrigin;
   return publicBaseUrl() ?? toHttps(requestOrigin);
 }
 
