@@ -29,7 +29,7 @@ export const SITE_COPY: Record<
     register: "Register",
     form: "Registration form",
     flyer: "Create your flyer",
-    venue: "Venue map",
+    venue: "Floor Plan",
     privacy: "Privacy",
     terms: "Terms",
     organisedBy: "Organised by",
