@@ -4,6 +4,8 @@ import { adminRoute } from "@/lib/server/admin-auth";
 import { describeError } from "@/lib/describe-error";
 import { sendCategoryChangeNotice } from "@/lib/attendee-service";
 import { ATTENDEE_ROLES, isAttendeeRole, type Attendee } from "@/lib/types";
+import { logActivity } from "@/lib/server/activity-log";
+import { roleLabel } from "@/lib/role-style";
 
 export const runtime = "nodejs";
 
@@ -61,6 +63,17 @@ export const PATCH = adminRoute(async (req: NextRequest, _context, session) => {
 
     const attendee = updated as Attendee;
     const emailed = body?.notify === true ? await sendCategoryChangeNotice(attendee) : false;
+    await logActivity(
+      session,
+      {
+        area: "registrations",
+        action: "attendee.category_changed",
+        summary: `changed ${attendee.full_name}'s category to ${roleLabel(role)}${emailed ? ", and emailed them" : ""}`,
+        target: { type: "attendee", id },
+        details: { role, emailed },
+      },
+      req
+    );
     return NextResponse.json({ attendee, changed: true, emailed });
   } catch (err) {
     console.error(`Change category failed for ${id}: ${describeError(err)}`);
@@ -72,7 +85,7 @@ export const PATCH = adminRoute(async (req: NextRequest, _context, session) => {
 // DELETE /api/admin/attendees?all=1&confirm=DELETE every registration
 // Super admins only. Also deletes their passport files. Stripe payments are
 // not refunded (do that in the Stripe dashboard). This can't be undone.
-export const DELETE = adminRoute(async (req: NextRequest) => {
+export const DELETE = adminRoute(async (req: NextRequest, _context, session) => {
   const id = req.nextUrl.searchParams.get("id");
   const all = req.nextUrl.searchParams.get("all") === "1";
   if (all && req.nextUrl.searchParams.get("confirm") !== "DELETE") {
@@ -84,7 +97,7 @@ export const DELETE = adminRoute(async (req: NextRequest) => {
 
   const supabase = supabaseAdmin();
   try {
-    let query = supabase.from("attendees").select("id, passport_path");
+    let query = supabase.from("attendees").select("id, full_name, email, passport_path");
     if (!all) query = query.eq("id", id!);
     const { data: rows, error } = await query;
     if (error) throw error;
@@ -99,6 +112,18 @@ export const DELETE = adminRoute(async (req: NextRequest) => {
     if (ids.length) {
       const { error: deleteError } = await supabase.from("attendees").delete().in("id", ids);
       if (deleteError) throw deleteError;
+      const one = rows?.length === 1 && !all ? rows[0] : null;
+      await logActivity(
+        session,
+        {
+          area: "registrations",
+          action: all ? "attendee.deleted_all" : "attendee.deleted",
+          summary: one ? `deleted ${one.full_name}'s registration (${one.email})` : `deleted every registration (${ids.length})`,
+          target: one ? { type: "attendee", id: one.id } : undefined,
+          details: { count: ids.length },
+        },
+        req
+      );
     }
     return NextResponse.json({ deleted: ids.length });
   } catch (err) {

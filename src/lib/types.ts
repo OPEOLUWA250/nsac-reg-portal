@@ -70,6 +70,14 @@ export interface Attendee {
   badge_printed_at: string | null;
   badge_print_count: number;
   qr_email_sent_at: string | null;
+  /**
+   * The last payment reminder: when, who sent it (an admin's email, or
+   * "automatic") and how many so far. Missing until the payment reminders
+   * SQL has been run.
+   */
+  payment_reminder_sent_at?: string | null;
+  payment_reminder_sent_by?: string | null;
+  payment_reminder_count?: number | null;
   created_at: string;
   updated_at: string;
   /** "Can your details be shared?" on the form. null = not asked (treated as no). */
@@ -82,6 +90,9 @@ export interface Attendee {
    * until the registration_number SQL has been run.
    */
   registration_number?: number | null;
+  /** When an admin emailed their invitation letter, and who. Missing until the invitation letters SQL has been run. */
+  invitation_letter_sent_at?: string | null;
+  invitation_letter_sent_by?: string | null;
 }
 
 /** Can this attendee enter / receive their QR ticket? */

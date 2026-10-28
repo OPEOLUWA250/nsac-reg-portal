@@ -443,6 +443,121 @@ export async function sendStudentCodeEmail({
   });
 }
 
+// ---------- payment reminder (registered, not paid) ----------
+
+const REMINDER_COPY = {
+  en: {
+    eyebrow: "Complete your registration",
+    heading: "Your place is waiting",
+    preheader: "Your details are saved: complete your payment to confirm your place.",
+    ticket: "TICKET",
+    price: "TO PAY",
+    cta: "Complete my payment",
+    link: "If the button doesn't work, copy this link into your browser:",
+    footerNote: "You are receiving this email because you started registering for the conference.",
+  },
+  fr: {
+    eyebrow: "Finalisez votre inscription",
+    heading: "Votre place vous attend",
+    preheader: "Vos informations sont enregistrées : finalisez votre paiement pour confirmer votre place.",
+    ticket: "BILLET",
+    price: "À PAYER",
+    cta: "Finaliser mon paiement",
+    link: "Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :",
+    footerNote: "Vous recevez cet e-mail car vous avez commencé votre inscription à la conférence.",
+  },
+} as const;
+
+/**
+ * A payment reminder, without sending it: the dashboard previews it first.
+ * `message` is the admin's text with each person's details already filled in
+ * (plain text: blank lines start a paragraph). The box under it shows the
+ * ticket and today's price, or `note` when they'll choose a ticket.
+ */
+export function buildPaymentReminderEmail({
+  subject,
+  message,
+  payUrl,
+  ticket,
+  price,
+  note,
+  signedBy,
+  signerTitle,
+  hasLogo,
+  language = "en",
+}: {
+  subject: string;
+  message: string;
+  payUrl: string;
+  ticket: string;
+  price: string | null;
+  note?: string | null;
+  signedBy?: string | null;
+  signerTitle?: string | null;
+  hasLogo: boolean;
+  language?: EmailLanguage;
+}): { subject: string; html: string } {
+  const t = REMINDER_COPY[language] ?? REMINDER_COPY.en;
+  const paragraphs = message
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p, i) => para(escapeHtml(p).replace(/\n/g, "<br />"), i === 0 ? ` color:${INK};` : ""))
+    .join("\n        ");
+  const label = `font-family:${FONT}; color:${INK_3}; font-size:10px; font-weight:700; letter-spacing:1.5px;`;
+  const row = (key: string, value: string, first: boolean) => `
+          <tr>
+            <td width="32%" style="padding:12px 0 12px 24px;${first ? "" : ` border-top:1px solid ${HAIRLINE};`} vertical-align:top; ${label}">${key}</td>
+            <td style="padding:11px 24px 11px 12px;${first ? "" : ` border-top:1px solid ${HAIRLINE};`} vertical-align:top; font-family:${FONT}; color:${INK}; font-size:14px; font-weight:600; line-height:1.5;">${value}</td>
+          </tr>`;
+  const summary = `
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 24px; background:${PANEL}; border:1px solid ${HAIRLINE}; border-top:3px solid ${GOLD}; border-collapse:collapse;">${row(t.ticket, escapeHtml(ticket), true)}${price ? row(t.price, escapeHtml(price), false) : ""}${
+          note ? `<tr><td colspan="2" style="padding:12px 24px; border-top:1px solid ${HAIRLINE}; font-family:${FONT}; color:${INK_2}; font-size:13px; line-height:1.6;">${escapeHtml(note)}</td></tr>` : ""
+        }
+        </table>`;
+  const safeUrl = escapeHtml(payUrl);
+  const signature = signedBy
+    ? `
+        <p style="margin:32px 0 0; font-family:${FONT}; color:${INK_2}; font-size:15px; line-height:1.7;">${LAYOUT_COPY[language].regards}<br /><strong style="color:${INK};">${escapeHtml(signedBy)}</strong>${signerTitle ? `<br />${escapeHtml(signerTitle)}` : ""}<br />${LAYOUT_COPY[language].team}</p>`
+    : signOff(language);
+  const content = `
+        ${eyebrow(t.eyebrow)}
+        ${heading(t.heading)}
+        ${paragraphs}
+        ${summary}
+        <p style="margin:0 0 16px;"><a href="${safeUrl}" style="display:inline-block; background:${GOLD}; border-radius:4px; padding:14px 26px; font-family:${FONT}; color:#000000; font-size:15px; font-weight:700; text-decoration:none;">${t.cta}</a></p>
+        <p style="margin:0; font-family:${FONT}; color:${INK_3}; font-size:12px; line-height:1.6;">${t.link}<br /><a href="${safeUrl}" style="color:${NAVY}; word-break:break-all;">${safeUrl}</a></p>
+        ${signature}`;
+  return { subject, html: layout({ language, preheader: t.preheader, hasLogo, content, footerNote: t.footerNote }) };
+}
+
+/** Sends a payment reminder. Replies go to `replyTo`, who gets a hidden copy if asked. */
+export async function sendPaymentReminderEmail({
+  toEmail,
+  replyTo,
+  bcc,
+  logoPngBuffer,
+  ...details
+}: {
+  toEmail: string;
+  replyTo?: string | null;
+  bcc?: string | null;
+  logoPngBuffer?: Buffer | null;
+} & Omit<Parameters<typeof buildPaymentReminderEmail>[0], "hasLogo">) {
+  const fromAddress = process.env.EMAIL_FROM;
+  if (!fromAddress) throw new Error("Missing EMAIL_FROM environment variable");
+  const { subject, html } = buildPaymentReminderEmail({ ...details, hasLogo: Boolean(logoPngBuffer) });
+  await deliver({
+    from: fromAddress,
+    to: toEmail,
+    subject,
+    html,
+    ...(replyTo ? { replyTo } : {}),
+    ...(bcc ? { bcc } : {}),
+    attachments: logoPngBuffer ? [logoAttachment(logoPngBuffer)] : [],
+  });
+}
+
 // ---------- category changed (from the dashboard) ----------
 
 const CATEGORY_COPY = {
@@ -535,6 +650,100 @@ export async function sendCategoryChangeEmail({
   });
 }
 
+// ---------- invitation letter (sent by an admin from the dashboard) ----------
+
+const LETTER_COPY = {
+  en: {
+    subject: (event: string) => `Your invitation letter for the ${event}`,
+    preheader: "Your invitation letter is attached, to support your visa application.",
+    eyebrow: "Invitation letter",
+    heading: "Your invitation letter",
+    greeting: (first: string) => `Dear ${first},`,
+    attached: (event: string) =>
+      `As requested, your invitation letter for the <strong style="color:${NAVY};">${event}</strong> is attached as a PDF, to support your visa application.`,
+    use: "Print it, or attach it to your application. If any detail in it needs correcting, simply reply to this email.",
+    regards: "Kind regards,",
+    footerNote: "You are receiving this email because you asked for an invitation letter when you registered.",
+  },
+  fr: {
+    subject: (event: string) => `Votre lettre d'invitation pour la ${event}`,
+    preheader: "Votre lettre d'invitation est jointe, à l'appui de votre demande de visa.",
+    eyebrow: "Lettre d'invitation",
+    heading: "Votre lettre d'invitation",
+    greeting: (first: string) => `Bonjour ${first},`,
+    attached: (event: string) =>
+      `Comme demandé, vous trouverez ci-joint, au format PDF, votre lettre d'invitation pour la <strong style="color:${NAVY};">${event}</strong>, à l'appui de votre demande de visa.`,
+    use: "Imprimez-la ou joignez-la à votre dossier. Si une information doit être corrigée, répondez simplement à cet e-mail.",
+    regards: "Bien cordialement,",
+    footerNote: "Vous recevez cet e-mail car vous avez demandé une lettre d'invitation lors de votre inscription.",
+  },
+} as const;
+
+/**
+ * The invitation letter email, without sending it: the dashboard shows it
+ * before an admin sends it. The letter itself is the attached PDF.
+ */
+export function buildInvitationLetterEmail({
+  fullName,
+  signatoryName,
+  signatoryTitle,
+  hasLogo,
+  language = "en",
+}: {
+  fullName: string;
+  signatoryName: string;
+  signatoryTitle?: string | null;
+  hasLogo: boolean;
+  language?: EmailLanguage;
+}): { subject: string; html: string } {
+  const t = LETTER_COPY[language] ?? LETTER_COPY.en;
+  const event = EVENT_INFO.name[language === "fr" ? "fr" : "en"];
+  const firstName = escapeHtml(fullName.trim().split(/\s+/)[0] || fullName);
+  const lines = [signatoryTitle ? escapeHtml(signatoryTitle) : null, LAYOUT_COPY[language].team].filter(Boolean);
+  const content = `
+        ${eyebrow(t.eyebrow)}
+        ${heading(t.heading)}
+        ${para(t.greeting(firstName), ` color:${INK};`)}
+        ${para(t.attached(escapeHtml(event)))}
+        ${para(t.use)}
+        <p style="margin:32px 0 0; font-family:${FONT}; color:${INK_2}; font-size:15px; line-height:1.7;">${t.regards}<br /><strong style="color:${INK};">${escapeHtml(signatoryName)}</strong>${lines.map((s) => `<br />${s}`).join("")}</p>`;
+  return {
+    subject: t.subject(event),
+    html: layout({ language, preheader: t.preheader, hasLogo, content, footerNote: t.footerNote }),
+  };
+}
+
+/** Sends the invitation letter (PDF attached). Replies go to the sender, who gets a hidden copy if asked. */
+export async function sendInvitationLetterEmail({
+  toEmail,
+  replyTo,
+  bcc,
+  pdf,
+  filename,
+  logoPngBuffer,
+  ...details
+}: {
+  toEmail: string;
+  replyTo: string;
+  bcc?: string | null;
+  pdf: Buffer;
+  filename: string;
+  logoPngBuffer?: Buffer | null;
+} & Omit<Parameters<typeof buildInvitationLetterEmail>[0], "hasLogo">) {
+  const fromAddress = process.env.EMAIL_FROM;
+  if (!fromAddress) throw new Error("Missing EMAIL_FROM environment variable");
+  const { subject, html } = buildInvitationLetterEmail({ ...details, hasLogo: Boolean(logoPngBuffer) });
+  await deliver({
+    from: fromAddress,
+    to: toEmail,
+    subject,
+    html,
+    replyTo,
+    ...(bcc ? { bcc } : {}),
+    attachments: [...(logoPngBuffer ? [logoAttachment(logoPngBuffer)] : []), { filename, content: pdf, contentType: "application/pdf" }],
+  });
+}
+
 // ---------- new registration (to the organisers) ----------
 
 /**
@@ -615,6 +824,10 @@ interface OutgoingEmail {
   html: string;
   attachments: { filename: string; content: Buffer; contentType: string; contentId?: string }[];
   headers?: Record<string, string>;
+  /** Where replies go, when not the sending address. */
+  replyTo?: string;
+  /** Hidden copy, e.g. to the admin who sent it. */
+  bcc?: string;
 }
 
 // Two ways to send, chosen by environment:
@@ -643,6 +856,8 @@ async function deliver(message: OutgoingEmail) {
         ...(a.contentId ? { cid: a.contentId } : {}),
       })),
       ...(message.headers ? { headers: message.headers } : {}),
+      ...(message.replyTo ? { replyTo: message.replyTo } : {}),
+      ...(message.bcc ? { bcc: message.bcc } : {}),
     });
     return;
   }

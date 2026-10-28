@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAdmin } from "@/components/admin/AdminContext";
+import { Kpi } from "@/components/admin/Stats";
 import AttendeeDrawer, { Avatar } from "@/components/AttendeeDrawer";
 import DeleteDialog from "@/components/admin/DeleteDialog";
+import InvitationLetterDialog from "@/components/admin/InvitationLetterDialog";
 import {
   AdminPage,
   Alert,
@@ -24,11 +26,14 @@ import {
   StatusPill,
 } from "@/components/ui";
 import { IconDownload, IconRefresh, IconSearch } from "@/components/icons";
-import { buildAttendeeCsv, categoryLabel, money, relativeTime } from "@/lib/admin-format";
+import { buildAttendeeCsv, money, relativeTime } from "@/lib/admin-format";
 import { EVENT_INFO } from "@/lib/event-info";
 import { roleLabel } from "@/lib/role-style";
-import { ATTENDEE_ROLES, type Attendee } from "@/lib/types";
+import { ATTENDEE_ROLES, hasValidTicket, type Attendee } from "@/lib/types";
 import type { Ticket } from "@/lib/tickets";
+import PaymentReminderDialog, { type ReminderResult } from "@/components/admin/PaymentReminderDialog";
+import { usePopup } from "@/components/Popup";
+import { AUTOMATIC_SENDER } from "@/lib/payment-reminder";
 
 const POLL_INTERVAL_MS = 20_000;
 const PAGE_SIZE = 25;
@@ -73,8 +78,12 @@ export default function AdminDashboard() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Attendee | null>(null);
+  const [letterFor, setLetterFor] = useState<Attendee | null>(null);
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({});
   const [rowMessage, setRowMessage] = useState<Record<string, string>>({});
+  // Payment reminder: one person (from their details) or everyone awaiting payment.
+  const [reminderFor, setReminderFor] = useState<Attendee[] | null>(null);
+  const { notify, popup } = usePopup();
 
   const [walkInOpen, setWalkInOpen] = useState(false);
   const [form, setForm] = useState<RegisterForm>(EMPTY_FORM);
@@ -137,14 +146,6 @@ export default function AdminDashboard() {
     const list = attendees ?? [];
     const paid = list.filter((a) => a.payment_status === "paid");
     const revenueCents = paid.reduce((sum, a) => sum + (a.amount_cents ?? 0), 0);
-    const count = (key: (a: Attendee) => string | null | undefined, limit = 5) => {
-      const map = new Map<string, number>();
-      for (const a of list) {
-        const k = key(a);
-        if (k) map.set(k, (map.get(k) ?? 0) + 1);
-      }
-      return [...map.entries()].sort((x, y) => y[1] - x[1]).slice(0, limit);
-    };
     const dayAgo = Date.now() - 24 * 3600_000;
     return {
       total: list.length,
@@ -161,11 +162,8 @@ export default function AdminDashboard() {
       checkedIn: list.filter((a) => a.checked_in).length,
       letters: list.filter((a) => a.needs_invitation_letter).length,
       lettersNoPassport: list.filter((a) => a.needs_invitation_letter && !a.passport_path).length,
-      byTicket: count((a) => (a.ticket_type ? ticketName(a.ticket_type) : null)),
-      byCountry: count((a) => a.nationality),
-      byCategory: count((a) => categoryLabel(a.professional_category)),
     };
-  }, [attendees, ticketName]);
+  }, [attendees]);
 
   // ---------- filtering ----------
 
@@ -322,6 +320,40 @@ export default function AdminDashboard() {
     }
   }
 
+  // After payment reminders go out: mark them on the list and say how it went.
+  function handleRemindersSent(results: ReminderResult[], recorded: boolean) {
+    const updated = new Map(results.flatMap((r) => (r.status === "sent" && r.attendee ? [[r.id, r.attendee] as const] : [])));
+    if (updated.size) setAttendees((prev) => (prev ? prev.map((x) => updated.get(x.id) ?? x) : prev));
+    const name = (id: string) => attendees?.find((x) => x.id === id)?.full_name ?? "Someone";
+    const sent = results.filter((r) => r.status === "sent");
+    const notSent = results.filter((r): r is Extract<ReminderResult, { error: string }> => r.status !== "sent");
+    void notify({
+      title: !sent.length
+        ? "No reminder was sent"
+        : results.length === 1
+          ? `Reminder sent to ${name(sent[0].id)}`
+          : `${sent.length} ${sent.length === 1 ? "reminder" : "reminders"} sent`,
+      tone: sent.length ? "default" : "danger",
+      body: (
+        <>
+          {notSent.length > 0 && (
+            <ul className="list-disc space-y-1 pl-5">
+              {notSent.map((r) => (
+                <li key={r.id}>
+                  <strong className="text-ink">{name(r.id)}</strong>: {r.error}
+                </li>
+              ))}
+            </ul>
+          )}
+          {sent.length > 0 && !recorded && (
+            <p>The list can&apos;t show who was reminded until the payment reminders SQL has been run in Supabase.</p>
+          )}
+        </>
+      ),
+    });
+    if (notSent.some((r) => r.status === "paid")) loadAttendees();
+  }
+
   function exportCsv(list: Attendee[], label: string) {
     const blob = buildAttendeeCsv(list, ticketName);
     const url = URL.createObjectURL(blob);
@@ -330,6 +362,9 @@ export default function AdminDashboard() {
     a.download = `nsac-2027-registrations-${label}-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    // Personal data leaving the site: noted in the activity log (best effort).
+    const what = label === "all" ? "everyone" : label === "filtered" ? "a filtered view" : label.replace(/-/g, " ");
+    apiCall("/api/admin/activity-log", { method: "POST", body: JSON.stringify({ kind: "export", what, count: list.length }) }).catch(() => {});
   }
 
   const selected = attendees?.find((a) => a.id === selectedId) ?? null;
@@ -363,6 +398,11 @@ export default function AdminDashboard() {
                 { label: "Invitation letters", count: stats.letters, run: () => exportCsv((attendees ?? []).filter((a) => a.needs_invitation_letter), "invitation-letters") },
               ]}
             />
+            {stats.pending > 0 && (
+              <Button variant="outline" onClick={() => setReminderFor((attendees ?? []).filter((a) => a.payment_status === "pending"))}>
+                Remind unpaid ({stats.pending})
+              </Button>
+            )}
             <Button
               variant="primary"
               onClick={() => {
@@ -451,14 +491,6 @@ export default function AdminDashboard() {
             />
           </div>
 
-          {stats.total > 0 && (
-            <div className="grid gap-3 md:grid-cols-3">
-              <Breakdown title="By ticket" rows={stats.byTicket} total={stats.total} />
-              <Breakdown title="Top nationalities" rows={stats.byCountry} total={stats.total} />
-              <Breakdown title="By professional category" rows={stats.byCategory} total={stats.total} />
-            </div>
-          )}
-
           {/* Filters + list. Columns follow the card's own width (container
               queries), since the sidebar takes part of the screen. */}
           <Card className="@container overflow-hidden">
@@ -539,9 +571,11 @@ export default function AdminDashboard() {
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <PaymentBadge status={a.payment_status} source={a.source} />
+                        <ReminderTag a={a} />
                         <StatusPill checkedIn={a.checked_in} />
                         {a.role !== "delegate" && <RolePill role={a.role} />}
                         <PassportTag a={a} onOpen={isSuper ? () => handleViewPassport(a.id) : undefined} />
+                        <LetterTag a={a} onOpen={() => setLetterFor(a)} />
                       </div>
                       <p className="text-sm text-ink-3">
                         {[ticketName(a.ticket_type), money(a.amount_cents, a.currency), relativeTime(a.created_at)].filter(Boolean).join(" · ")}
@@ -598,9 +632,10 @@ export default function AdminDashboard() {
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap items-center gap-2">
                               <PaymentBadge status={a.payment_status} source={a.source} />
+                              <ReminderTag a={a} />
                               {a.role !== "delegate" && <RolePill role={a.role} />}
-                              {a.needs_invitation_letter && <span className="rounded-sm border border-line px-1.5 py-0.5 text-xs font-semibold text-ink-2">Letter</span>}
                               <PassportTag a={a} onOpen={isSuper ? () => handleViewPassport(a.id) : undefined} />
+                              <LetterTag a={a} onOpen={() => setLetterFor(a)} />
                             </div>
                             <div className="mt-1 text-ink-3">
                               {[ticketName(a.ticket_type), money(a.amount_cents, a.currency)].filter(Boolean).join(" · ") || "No ticket"}
@@ -650,11 +685,24 @@ export default function AdminDashboard() {
           message={rowMessage[selected.id] ?? ""}
           onClose={() => setSelectedId(null)}
           onResend={() => handleResend(selected.id)}
+          onRemind={() => setReminderFor([selected])}
           onToggleCheckIn={() => handleToggleCheckIn(selected.id, !selected.checked_in)}
           onChangeRole={(role, notify) => handleChangeRole(selected, role, notify)}
           canManageVip={isSuper}
           onPassport={isSuper ? () => handleViewPassport(selected.id) : undefined}
           onDelete={isSuper ? () => setDeleteTarget(selected) : undefined}
+          onLetter={() => setLetterFor(selected)}
+        />
+      )}
+      {letterFor && (
+        <InvitationLetterDialog
+          attendee={letterFor}
+          onPassport={isSuper && letterFor.passport_path ? () => handleViewPassport(letterFor.id) : undefined}
+          onClose={() => setLetterFor(null)}
+          onSent={(updated, message) => {
+            if (updated) setAttendees((prev) => (prev ? prev.map((x) => (x.id === updated.id ? updated : x)) : prev));
+            setRowMessage((s) => ({ ...s, [letterFor.id]: message }));
+          }}
         />
       )}
       {deleteTarget && (
@@ -663,6 +711,8 @@ export default function AdminDashboard() {
           <p>This cannot be undone. Payments are not refunded; refunds must be handled in Stripe.</p>
         </DeleteDialog>
       )}
+      {reminderFor && <PaymentReminderDialog people={reminderFor} onSent={handleRemindersSent} onClose={() => setReminderFor(null)} />}
+      {popup}
     </AdminPage>
   );
 }
@@ -691,6 +741,45 @@ function PassportTag({ a, onOpen }: { a: Attendee; onOpen?: () => void }) {
       <Chip dot="var(--color-success)" className="underline decoration-line-strong underline-offset-2 hover:decoration-blue">
         Passport
       </Chip>
+    </button>
+  );
+}
+
+// For people who asked for an invitation letter: "Send email" opens the
+// letter's preview (nothing is sent until the admin sends it there). Once
+// sent, "Letter sent" reopens it to send again.
+function LetterTag({ a, onOpen }: { a: Attendee; onOpen: () => void }) {
+  if (!a.needs_invitation_letter) return null;
+  if (!hasValidTicket(a)) {
+    return (
+      <Chip dot="var(--color-line-strong)" className="text-ink-3">
+        Letter after payment
+      </Chip>
+    );
+  }
+  const sent = !!a.invitation_letter_sent_at;
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen();
+      }}
+      title={sent ? `Invitation letter sent ${new Date(a.invitation_letter_sent_at!).toLocaleString()}` : undefined}
+      aria-label={sent ? `Invitation letter sent to ${a.full_name}. Open it to send again` : `Send ${a.full_name} their invitation letter`}
+      className={cx(
+        "inline-flex min-h-7 items-center gap-1.5 whitespace-nowrap rounded-sm border px-2 py-0.5 text-xs font-semibold transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue pointer-coarse:min-h-9",
+        sent ? "border-line bg-surface text-ink hover:bg-canvas" : "border-gold bg-gold text-black hover:bg-gold-hover"
+      )}
+    >
+      {sent ? (
+        <>
+          <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-success" />
+          Letter sent
+        </>
+      ) : (
+        "Letter: Send email"
+      )}
     </button>
   );
 }
@@ -786,63 +875,6 @@ function ExportMenu({ disabled, options }: { disabled: boolean; options: { label
   );
 }
 
-function Kpi({
-  label,
-  value,
-  sub,
-  alert,
-  onClick,
-}: {
-  label: string;
-  value: string | number;
-  sub: string;
-  alert?: boolean;
-  onClick?: () => void;
-}) {
-  const Tag = onClick ? "button" : "div";
-  return (
-    <Tag
-      {...(onClick ? { type: "button" as const, onClick } : {})}
-      className={cx(
-        "rounded-lg border border-line bg-surface p-4 text-left",
-        onClick && "cursor-pointer transition-colors duration-150 hover:border-ink-3 hover:bg-canvas active:bg-subtle"
-      )}
-    >
-      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-3">
-        {alert && <span aria-hidden="true" className="h-2 w-2 rounded-full bg-danger" />}
-        {label}
-      </div>
-      <div className="mt-1 font-display text-2xl font-bold text-blue sm:text-3xl">{typeof value === "number" ? value.toLocaleString() : value}</div>
-      <div className={cx("mt-0.5 text-sm text-ink-3", onClick && "underline decoration-line-strong underline-offset-2")}>{sub}</div>
-    </Tag>
-  );
-}
-
-function Breakdown({ title, rows, total }: { title: string; rows: [string, number][]; total: number }) {
-  return (
-    <Card className="p-4">
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-3">{title}</h2>
-      {rows.length === 0 ? (
-        <p className="text-sm text-ink-3">Nobody has answered this yet.</p>
-      ) : (
-        <ul className="space-y-2.5">
-          {rows.map(([label, n]) => (
-            <li key={label}>
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="truncate text-ink">{label}</span>
-                <span className="shrink-0 font-semibold text-ink">{n}</span>
-              </div>
-              <div className="mt-1 h-1.5 rounded-sm bg-subtle">
-                <div className="h-full rounded-sm bg-gold" style={{ width: `${Math.max(4, (n / total) * 100)}%` }} />
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
-  );
-}
-
 function FilterSelect({
   label,
   value,
@@ -914,5 +946,20 @@ function SkeletonRow(): ReactNode {
       <Skeleton className="hidden h-6 w-24 md:block" />
       <Skeleton className="hidden h-9 w-40 rounded-md md:block" />
     </div>
+  );
+}
+
+// Next to "Awaiting payment": when they were last reminded to pay.
+function ReminderTag({ a }: { a: Attendee }) {
+  if (a.payment_status !== "pending" || !a.payment_reminder_sent_at) return null;
+  const by = a.payment_reminder_sent_by === AUTOMATIC_SENDER ? "automatically" : a.payment_reminder_sent_by ? `by ${a.payment_reminder_sent_by}` : "";
+  const count = a.payment_reminder_count ?? 1;
+  return (
+    <Chip dot="var(--color-gold)" className="text-ink-2">
+      <span title={`Last reminded ${new Date(a.payment_reminder_sent_at).toLocaleString()} ${by}${count > 1 ? ` (${count} reminders)` : ""}`}>
+        Reminded {relativeTime(a.payment_reminder_sent_at)}
+        {count > 1 ? ` (${count})` : ""}
+      </span>
+    </Chip>
   );
 }

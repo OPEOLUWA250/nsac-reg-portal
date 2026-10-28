@@ -18,6 +18,7 @@ import {
   Skeleton,
 } from "@/components/ui";
 import { useAdmin } from "@/components/admin/AdminContext";
+import { usePopup } from "@/components/Popup";
 import { formatPrice, isOnSale, MIN_PRICE_CENTS, type Ticket } from "@/lib/tickets";
 
 // /admin/tickets: ticket types and prices. Whatever is saved here is what
@@ -118,6 +119,7 @@ function statusOf(t: Ticket): { label: string; tone: "on" | "off" } {
 
 export default function TicketManager() {
   const { apiCall, me } = useAdmin();
+  const { confirm, popup } = usePopup();
   // Prices are for super admins to change; other admins see them read-only.
   const canEdit = me?.role === "super_admin";
   const [tickets, setTickets] = useState<Ticket[] | null>(null);
@@ -210,9 +212,19 @@ export default function TicketManager() {
       previous &&
       payload.amountCents !== null &&
       payload.amountCents !== previous.amountCents &&
-      !window.confirm(
-        `Change the price of "${previous.name.en}" from ${formatPrice(previous.amountCents, previous.currency)} to ${formatPrice(payload.amountCents, previous.currency)}?\n\nNew registrations pay the new price straight away. People who already paid are not affected.`,
-      )
+      !(await confirm({
+        title: `Change the price of ${previous.name.en}?`,
+        body: (
+          <>
+            <p>
+              From {formatPrice(previous.amountCents, previous.currency)} to{" "}
+              <strong className="text-ink">{formatPrice(payload.amountCents, previous.currency)}</strong>.
+            </p>
+            <p>New registrations pay the new price straight away. People who already paid are not affected.</p>
+          </>
+        ),
+        confirmLabel: "Change price",
+      }))
     ) {
       return;
     }
@@ -234,9 +246,12 @@ export default function TicketManager() {
 
   // Takes a ticket off the form right now by setting its sale end to now.
   async function endSaleNow(t: Ticket) {
-    const ok = window.confirm(
-      `End the sale of "${t.name.en}" now? It disappears from the registration form immediately. People who already registered keep their ticket.`,
-    );
+    const ok = await confirm({
+      title: `End the sale of ${t.name.en} now?`,
+      body: "It disappears from the registration form immediately. People who already registered keep their ticket.",
+      confirmLabel: "End sale now",
+      tone: "danger",
+    });
     if (!ok) return;
     setEditingKey(null);
     setDraft(null);
@@ -264,6 +279,7 @@ export default function TicketManager() {
 
   return (
     <AdminPage>
+      {popup}
       {deleteTarget && (
         <DeleteDialog title="Delete this ticket?" confirmLabel="Delete ticket" onConfirm={() => remove(deleteTarget)} onClose={() => setDeleteTarget(null)}>
           <p><strong className="text-ink">{deleteTarget.name.en}</strong> will be permanently removed. This cannot be undone.</p>

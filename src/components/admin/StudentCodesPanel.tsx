@@ -20,6 +20,7 @@ import {
   Skeleton,
 } from "@/components/ui";
 import { useAdmin } from "@/components/admin/AdminContext";
+import { usePopup } from "@/components/Popup";
 import { relativeTime } from "@/lib/admin-format";
 import { formatPrice } from "@/lib/tickets";
 import { IconRefresh, IconSearch } from "@/components/icons";
@@ -81,6 +82,7 @@ function message(c: StudentCode, lang: Lang): string {
 
 export default function StudentCodesPanel() {
   const { apiCall } = useAdmin();
+  const { confirm, notify, popup } = usePopup();
   const [codes, setCodes] = useState<StudentCode[] | null>(null);
   const [ticket, setTicket] = useState<StudentTicket | null | undefined>(undefined);
   const [loadError, setLoadError] = useState("");
@@ -144,14 +146,24 @@ export default function StudentCodesPanel() {
   }
 
   async function patch(c: StudentCode, action: "cancel" | "email") {
-    if (action === "cancel" && !window.confirm(`Cancel ${c.code} for ${c.email}? It will stop working straight away.`)) return;
+    if (
+      action === "cancel" &&
+      !(await confirm({
+        title: `Cancel ${c.code}?`,
+        body: `The code for ${c.email} stops working straight away.`,
+        confirmLabel: "Cancel the code",
+        cancelLabel: "Keep it",
+        tone: "danger",
+      }))
+    )
+      return;
     setBusyId(c.id);
     try {
       const json = await apiCall("/api/admin/student-codes", { method: "PATCH", body: JSON.stringify({ id: c.id, action }) });
       const updated = json.code as StudentCode;
       setCodes((list) => (list ?? []).map((x) => (x.id === updated.id ? updated : x)));
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Couldn't update the code.");
+      void notify({ title: `Couldn't update ${c.code}`, body: err instanceof Error ? err.message : "Try again in a moment.", tone: "danger" });
     } finally {
       setBusyId(null);
     }
@@ -163,7 +175,8 @@ export default function StudentCodesPanel() {
       setCopied(key);
       setTimeout(() => setCopied((k) => (k === key ? null : k)), 2000);
     } catch {
-      window.prompt("Copy this:", text);
+      // The browser didn't allow copying: show it selected, to copy by hand.
+      void notify({ title: "Copy this", body: "Press Ctrl+C (or ⌘+C), or long-press to copy.", copyText: text, confirmLabel: "Done" });
     }
   }
 
@@ -180,6 +193,7 @@ export default function StudentCodesPanel() {
 
   return (
     <AdminPage>
+      {popup}
       <PageHeader
         eyebrow="Registration form"
         title="Student codes"

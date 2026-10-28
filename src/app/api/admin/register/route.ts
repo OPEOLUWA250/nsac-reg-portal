@@ -3,6 +3,8 @@ import { adminRoute } from "@/lib/server/admin-auth";
 import { createAttendee, sendAttendeeQr } from "@/lib/attendee-service";
 import { ATTENDEE_ROLES, isAttendeeRole } from "@/lib/types";
 import { describeError } from "@/lib/describe-error";
+import { logActivity } from "@/lib/server/activity-log";
+import { roleLabel } from "@/lib/role-style";
 
 export const runtime = "nodejs";
 
@@ -62,6 +64,17 @@ export const POST = adminRoute(async (req: NextRequest, _context, session) => {
   }
 
   const emailSent = await sendAttendeeQr(outcome.attendee);
+  await logActivity(
+    session,
+    {
+      area: "registrations",
+      action: "attendee.walk_in",
+      summary: `registered ${fullName} as a walk-in (${roleLabel(role)})`,
+      target: { type: "attendee", id: outcome.attendee.id },
+      details: { email, emailSent },
+    },
+    req
+  );
   // Attendee is created even if the email failed — admin can hit Resend.
   return NextResponse.json({ ok: true, attendee: outcome.attendee, emailSent });
 });

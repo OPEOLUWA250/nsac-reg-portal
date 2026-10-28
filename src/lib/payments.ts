@@ -91,6 +91,8 @@ interface CheckoutArgs {
    * record. If both pages get paid, the second payment is refunded.
    */
   keepPrevious?: boolean;
+  /** Where "back" on the payment page goes. The registration form by default. */
+  cancelUrl?: string;
 }
 
 export async function createCheckoutSession({
@@ -101,6 +103,7 @@ export async function createCheckoutSession({
   language,
   baseUrl,
   keepPrevious = false,
+  cancelUrl = `${baseUrl}/?payment=cancelled`,
 }: CheckoutArgs): Promise<string> {
   // Up to 4 custom fields appear on the Stripe invoice (40-char names).
   const customFields: { name: string; value: string }[] = [{ name: "Ticket", value: ticket.name.en.slice(0, 140) }];
@@ -161,7 +164,7 @@ export async function createCheckoutSession({
     // it off here rather than in the dashboard.
     adaptive_pricing: { enabled: false },
     success_url: `${baseUrl}/register/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${baseUrl}/?payment=cancelled`,
+    cancel_url: cancelUrl,
   };
 
   // A wide Space in Africa logo, so it shows large at the top of the payment

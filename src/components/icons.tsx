@@ -53,6 +53,12 @@ export const IconDownload = ({ className = "h-4 w-4" }: P) => (
     <path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14" />
   </Svg>
 );
+export const IconHistory = ({ className }: P) => (
+  <Svg className={className}>
+    <path d="M3.5 12a8.5 8.5 0 1 0 2.5-6M3.5 4v4h4" />
+    <path d="M12 7.5V12l3 2" />
+  </Svg>
+);
 export const IconRefresh = ({ className = "h-4 w-4" }: P) => (
   <Svg className={className} strokeWidth={2}>
     <path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" />
@@ -87,6 +93,11 @@ export const IconGrid = ({ className }: P) => (
     <rect x="14" y="3" width="7" height="7" rx="1" />
     <rect x="3" y="14" width="7" height="7" rx="1" />
     <rect x="14" y="14" width="7" height="7" rx="1" />
+  </Svg>
+);
+export const IconChart = ({ className }: P) => (
+  <Svg className={className}>
+    <path d="M4 20h16M7 16v-5M12 16V6M17 16v-8" />
   </Svg>
 );
 export const IconTicket = ({ className }: P) => (

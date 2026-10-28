@@ -196,8 +196,77 @@ Added by the registration-form migration: `first_name`, `last_name`,
 `currency`, `payment_status` (`pending` / `paid` / `not_required`; empty
 for Jotform rows), `stripe_session_id`, `paid_at`.
 
+Added for invitation letters: `invitation_letter_sent_at` (timestamptz) and
+`invitation_letter_sent_by` (text, the admin's email). Until they exist,
+letters still send, but the dashboard can't mark them as sent.
+
+## Invitation letters
+
+People who tick "I need an invitation letter" get a gold **Letter: Send
+email** button on their row in the dashboard (and **Send email** in their
+details). Nothing is sent automatically. The button opens a preview with
+their details already filled in. The admin adds:
+
+- the **sender email**: replies go there, and the letter gives it as the
+  contact;
+- who signs the letter, and optionally their title;
+- optionally the passport number (super admins can open the passport from
+  there);
+- the language.
+
+They check the letter (an A4 PDF on the conference letterhead) and the email,
+then press **Send email**. The email goes from the site's usual address
+(`EMAIL_FROM`), with Reply-To set to the sender and, if ticked, a hidden copy
+to them. The row then shows **Letter sent**, and the details say when and by
+whom; it can be sent again from there.
+
+Letters are only for confirmed registrations: until payment, the row says
+"Letter after payment". The wording is in `src/lib/invitation-letter.ts`
+(English and French) and the layout in
+`src/lib/server/invitation-letter-pdf.ts`.
+
 RLS is enabled with no public policies — everything goes through the
 service-role-backed API routes.
+
+## Admin activity log
+
+`/admin/activity` (super admins only) lists what admins have done, newest
+first, grouped by day, with filters by area and admin, a search, and an
+"Open" link on entries about a registration. It updates every 30 seconds.
+
+What's recorded:
+
+- **Sign-in:** signed in, signed out, wrong passwords on admin accounts, and
+  password changes.
+- **Registrations:** walk-ins, category changes, QR emails resent, deletions,
+  passports viewed or opened, and CSV downloads.
+- **Check-in:** scanner check-ins, manual check-ins and undos, and badges
+  printed.
+- **Tickets, promo codes and student codes:** created, edited, switched on or
+  off, cancelled, and emailed.
+- **Admins:** added, role changed, temporary password, and removed.
+- **Settings:** registration opened or closed, and the alert list.
+
+Routes call `logActivity` (`src/lib/server/activity-log.ts`) after an action
+succeeds. It never throws, so recording can't break an action. Areas and
+labels are in `src/lib/activity.ts`.
+
+It lives in the `admin_activity` table:
+
+| Column | Notes |
+| --- | --- |
+| `id` | bigint identity, primary key |
+| `at` | timestamptz, default `now()` |
+| `actor_email`, `actor_role` | who did it |
+| `area`, `action` | e.g. `registrations`, `attendee.category_changed` |
+| `summary` | the sentence shown, without the actor |
+| `target_type`, `target_id` | e.g. `attendee` and its id |
+| `details` | jsonb, extra facts |
+| `ip` | where the request came from |
+
+It has an index on `(at desc)` and on `actor_email`. RLS is on with no
+policies (server only). Until the table exists, actions still work and the
+server log says once that nothing is being recorded.
 
 ## Jotform field mapping
 

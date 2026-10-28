@@ -3,11 +3,13 @@ import { publicBaseUrl } from "@/lib/public-url";
 import { adminRoute } from "@/lib/server/admin-auth";
 import { ownerEmails, parseAdminEmails } from "@/lib/server/admin-emails";
 import { supabaseAuthConfig } from "@/lib/server/admin-roles";
+import { cleanAutoReminders } from "@/lib/auto-reminders";
 import { getSettings, updateSettings } from "@/lib/settings-store";
 import { registrationClosedByEnv } from "@/lib/registration-config";
 import { availableTickets } from "@/lib/ticket-store";
 import { describeError } from "@/lib/describe-error";
 import { cleanAlertEmails, MAX_ALERT_EMAILS } from "@/lib/alert-emails";
+import { logActivity } from "@/lib/server/activity-log";
 
 export const runtime = "nodejs";
 
@@ -35,6 +37,8 @@ function systemStatus() {
       spamProtection: Boolean(process.env.TURNSTILE_SECRET_KEY),
     },
     keepAlive: Boolean(process.env.CRON_SECRET),
+    // The daily reminder run only sends when Vercel calls it with CRON_SECRET.
+    remindersReady: Boolean(process.env.CRON_SECRET && publicBaseUrl()),
     publicUrl: publicBaseUrl(),
   };
 }
@@ -57,7 +61,7 @@ export const GET = adminRoute(async (req: NextRequest) => {
 // Body: { registrationOpen?: boolean, alertEmails?: string[] }
 // The alert list holds who gets registrants' details by email: super admins only.
 export const POST = adminRoute(async (req: NextRequest, _context: unknown, session) => {
-  let body: { registrationOpen?: unknown; alertEmails?: unknown };
+  let body: { registrationOpen?: unknown; alertEmails?: unknown; autoReminders?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -76,10 +80,56 @@ export const POST = adminRoute(async (req: NextRequest, _context: unknown, sessi
       return NextResponse.json({ error: `Enter up to ${MAX_ALERT_EMAILS} valid email addresses.` }, { status: 400 });
     }
   }
+  // Automatic payment reminders email registrants: super admins only, saved on their own.
+  if (body.autoReminders !== undefined) {
+    if (session.role !== "super_admin") {
+      return NextResponse.json({ error: "Only super admins can change automatic reminders." }, { status: 403 });
+    }
+    const autoReminders = cleanAutoReminders(body.autoReminders);
+    if (!autoReminders) return NextResponse.json({ error: "Check the reminder settings." }, { status: 400 });
+    try {
+      const settings = await updateSettings({ autoReminders });
+      await logActivity(
+        session,
+        {
+          area: "settings",
+          action: "reminders.changed",
+          summary: autoReminders.enabled
+            ? `switched on automatic payment reminders (${autoReminders.afterDays} ${autoReminders.afterDays === 1 ? "day" : "days"} after registering)`
+            : "switched off automatic payment reminders",
+          details: { ...autoReminders },
+        },
+        req
+      );
+      return NextResponse.json({ settings });
+    } catch (err) {
+      console.error(`Could not save reminder settings: ${describeError(err)}`);
+      return NextResponse.json({ error: "Could not save. Try again." }, { status: 500 });
+    }
+  }
   try {
     const settings = await updateSettings({ registrationOpen: body.registrationOpen as boolean | undefined, alertEmails });
     if (alertEmails) console.info(`Registration alert list updated by ${session.email}: ${alertEmails.length} address(es)`);
     if (body.registrationOpen !== undefined) console.info(`Settings updated: registrationOpen=${settings.registrationOpen}`);
+    if (body.registrationOpen !== undefined) {
+      await logActivity(
+        session,
+        { area: "settings", action: settings.registrationOpen ? "registration.opened" : "registration.closed", summary: `${settings.registrationOpen ? "opened" : "closed"} registration` },
+        req
+      );
+    }
+    if (alertEmails) {
+      await logActivity(
+        session,
+        {
+          area: "settings",
+          action: "alerts.changed",
+          summary: `changed who gets registration alerts (${alertEmails.length} ${alertEmails.length === 1 ? "address" : "addresses"})`,
+          details: { alertEmails },
+        },
+        req
+      );
+    }
     return NextResponse.json({ settings });
   } catch (err) {
     console.error(`Could not save settings: ${describeError(err)}`);

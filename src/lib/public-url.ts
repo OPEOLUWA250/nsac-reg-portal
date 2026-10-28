@@ -5,6 +5,13 @@
 
 const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i;
 
+/**
+ * The registration site's official address. Printed things (the venue QR
+ * stickers) always use it, whatever PUBLIC_BASE_URL says, so a sheet printed
+ * from a preview or a laptop still works at the venue.
+ */
+export const OFFICIAL_SITE_URL = "https://registration.newspace.spaceinafrica.com";
+
 export function toHttps(url: string): string {
   // No scheme ("register.example.com"): https, or http for localhost.
   const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(url)

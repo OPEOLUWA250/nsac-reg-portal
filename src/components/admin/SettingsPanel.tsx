@@ -4,14 +4,17 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { AdminPage, Alert, Button, Card, cx, describedBy, ErrorState, Field, inputClass, linkClass, LoadingLabel, PageHeader, Skeleton, Spinner } from "@/components/ui";
 import DeleteDialog from "@/components/admin/DeleteDialog";
 import { useAdmin } from "@/components/admin/AdminContext";
+import { usePopup } from "@/components/Popup";
 import { EVENT_INFO } from "@/lib/event-info";
 import { MAX_ALERT_EMAILS, mergeAlertRecipients, parseAlertEmailList } from "@/lib/alert-emails";
+import { cleanAutoReminders, type AutoReminders as AutoRemindersSetting } from "@/lib/auto-reminders";
+import { AUTO_REMINDER_DAYS } from "@/lib/payment-reminder";
 
 // /admin/settings: open/close registration, who gets the registration
 // alerts, plus a read-only view of how payments, email and security are set up.
 
 interface SettingsResponse {
-  settings: { registrationOpen: boolean; alertEmails: string[] };
+  settings: { registrationOpen: boolean; alertEmails: string[]; autoReminders: AutoRemindersSetting };
   /** From the ADMIN_NOTIFY_EMAILS server setting: always emailed, not editable here. */
   alertEmailsFromEnv: string[];
   closedByEnv: boolean;
@@ -21,12 +24,14 @@ interface SettingsResponse {
     email: { provider: string | null; sender: string | null; testSender: boolean };
     security: { adminSignIn: boolean; owners: number; scannerAdminOnly: boolean; spamProtection: boolean };
     keepAlive: boolean;
+    remindersReady: boolean;
     publicUrl: string | null;
   };
 }
 
 export default function SettingsPanel() {
   const { apiCall, me } = useAdmin();
+  const { confirm, popup } = usePopup();
   const [data, setData] = useState<SettingsResponse | null>(null);
   const [loadError, setLoadError] = useState("");
   const [saveError, setSaveError] = useState("");
@@ -57,10 +62,17 @@ export default function SettingsPanel() {
 
   async function setRegistrationOpen(open: boolean) {
     if (!data) return;
-    const question = open
-      ? "Open registration? The public form will accept new registrations."
-      : "Close registration? The public form will say registration is closed. Walk-ins in the admin keep working.";
-    if (!window.confirm(question)) return;
+    const ok = await confirm(
+      open
+        ? { title: "Open registration?", body: "The public form will accept new registrations.", confirmLabel: "Open registration" }
+        : {
+            title: "Close registration?",
+            body: "The public form will say registration is closed. Walk-ins in the admin keep working.",
+            confirmLabel: "Close registration",
+            tone: "danger",
+          }
+    );
+    if (!ok) return;
     setSaving(true);
     setSaveError("");
     setNotice("");
@@ -115,6 +127,7 @@ export default function SettingsPanel() {
   return (
     <AdminPage width="max-w-4xl">
       {header}
+      {popup}
 
       {notice && <Alert tone="success">{notice}</Alert>}
       {saveError && <Alert tone="error">{saveError}</Alert>}
@@ -151,6 +164,17 @@ export default function SettingsPanel() {
           const json = await apiCall("/api/admin/settings", { method: "POST", body: JSON.stringify({ alertEmails }) });
           setData((d) => (d ? { ...d, settings: json.settings as SettingsResponse["settings"] } : d));
           return (json.settings as SettingsResponse["settings"]).alertEmails;
+        }}
+      />
+
+      <AutoReminders
+        saved={data.settings.autoReminders}
+        ready={data.status.remindersReady}
+        canEdit={me?.role === "super_admin"}
+        onSave={async (autoReminders) => {
+          const json = await apiCall("/api/admin/settings", { method: "POST", body: JSON.stringify({ autoReminders }) });
+          setData((d) => (d ? { ...d, settings: json.settings as SettingsResponse["settings"] } : d));
+          return (json.settings as SettingsResponse["settings"]).autoReminders;
         }}
       />
 
@@ -352,6 +376,139 @@ function AlertRecipients({
         <p className="max-w-xl text-sm text-ink-3">
           Also always emailed, from the server setting ADMIN_NOTIFY_EMAILS: {fromEnv.join(", ")}.
         </p>
+      )}
+    </Card>
+  );
+}
+
+// One automatic payment reminder for people who registered but didn't pay.
+// Super admins switch it on; everyone else sees whether it's on.
+function AutoReminders({
+  saved,
+  ready,
+  canEdit,
+  onSave,
+}: {
+  saved: AutoRemindersSetting;
+  /** CRON_SECRET and PUBLIC_BASE_URL are set, so the daily run can send. */
+  ready: boolean;
+  canEdit: boolean;
+  /** Saves the setting and returns it as stored. Throws with a message on failure. */
+  onSave: (value: AutoRemindersSetting) => Promise<AutoRemindersSetting>;
+}) {
+  const { confirm, popup } = usePopup();
+  const [enabled, setEnabled] = useState(saved.enabled);
+  const [days, setDays] = useState(String(saved.afterDays));
+  const [replyTo, setReplyTo] = useState(saved.replyTo ?? "");
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
+  const [saving, setSaving] = useState(false);
+  const draft = { enabled, afterDays: Number(days), replyTo: replyTo.trim() || null };
+  const changed = JSON.stringify(draft) !== JSON.stringify(saved);
+  const dayWord = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
+
+  async function save() {
+    setStatus("");
+    const value = cleanAutoReminders(draft);
+    if (!value) {
+      setError(
+        !Number.isInteger(draft.afterDays) || draft.afterDays < AUTO_REMINDER_DAYS.min || draft.afterDays > AUTO_REMINDER_DAYS.max
+          ? `Choose between ${AUTO_REMINDER_DAYS.min} and ${AUTO_REMINDER_DAYS.max} days.`
+          : "The reply address doesn't look like an email address."
+      );
+      return;
+    }
+    if (value.enabled && !saved.enabled) {
+      const ok = await confirm({
+        title: "Switch on automatic reminders?",
+        body: `From the next daily run, everyone who registered more than ${dayWord(value.afterDays)} ago without paying, and hasn't been reminded yet, gets one reminder.`,
+        confirmLabel: "Switch on",
+      });
+      if (!ok) return;
+    }
+    setError("");
+    setSaving(true);
+    try {
+      const stored = await onSave(value);
+      setEnabled(stored.enabled);
+      setDays(String(stored.afterDays));
+      setReplyTo(stored.replyTo ?? "");
+      setStatus(stored.enabled ? "Saved. Automatic reminders are on." : "Saved. Automatic reminders are off.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="space-y-4 p-5 sm:p-6">
+      {popup}
+      <div className="max-w-xl space-y-2">
+        <h2 className="font-display text-xl font-bold text-blue">Automatic payment reminders</h2>
+        <p className="text-sm text-ink-2">
+          Once a day, people who filled in the form but haven&apos;t paid get one reminder, in their language, with a button
+          to pay at today&apos;s price. Anyone already reminded, by an admin or automatically, is left alone, and nothing is
+          sent while registration is closed. To remind people yourself, use the dashboard.
+        </p>
+        <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+          <span aria-hidden="true" className={cx("h-2 w-2 shrink-0 rounded-full", saved.enabled ? "bg-success" : "bg-line-strong")} />
+          {saved.enabled ? `On: one reminder ${dayWord(saved.afterDays)} after registering` : "Off"}
+        </p>
+      </div>
+
+      {saved.enabled && !ready && (
+        <Alert tone="error">
+          Nothing is sent yet: the server needs CRON_SECRET and PUBLIC_BASE_URL set (ask your developer).
+        </Alert>
+      )}
+
+      {canEdit ? (
+        <div className="max-w-xl space-y-4">
+          <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-ink">
+            <input type="checkbox" className="h-5 w-5 shrink-0" checked={enabled} disabled={saving} onChange={(e) => setEnabled(e.target.checked)} />
+            Send automatic reminders
+          </label>
+          <div className="grid gap-4 sm:grid-cols-[10rem_1fr]">
+            <Field id="reminder-days" label="Days after registering" hint={`${AUTO_REMINDER_DAYS.min} to ${AUTO_REMINDER_DAYS.max}.`}>
+              <input
+                id="reminder-days"
+                type="number"
+                inputMode="numeric"
+                min={AUTO_REMINDER_DAYS.min}
+                max={AUTO_REMINDER_DAYS.max}
+                className={inputClass()}
+                value={days}
+                disabled={saving}
+                onChange={(e) => setDays(e.target.value)}
+                aria-describedby={describedBy("reminder-days", { hint: true })}
+              />
+            </Field>
+            <Field id="reminder-reply" label="Replies go to" optionalLabel="optional" hint="Without it, replies go to the sending address.">
+              <input
+                id="reminder-reply"
+                type="email"
+                inputMode="email"
+                className={inputClass()}
+                value={replyTo}
+                disabled={saving}
+                onChange={(e) => setReplyTo(e.target.value)}
+                aria-describedby={describedBy("reminder-reply", { hint: true })}
+              />
+            </Field>
+          </div>
+          {error && <Alert tone="error">{error}</Alert>}
+          <div className="flex flex-wrap items-center gap-3">
+            <Button onClick={save} disabled={!changed} loading={saving}>
+              Save
+            </Button>
+            <p role="status" className="text-sm font-semibold text-success">
+              {status}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-ink-3">Only super admins can change this.</p>
       )}
     </Card>
   );

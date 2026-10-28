@@ -13,6 +13,11 @@ import { describeError } from "@/lib/describe-error";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { listTickets } from "@/lib/ticket-store";
 import { STUDENT_TICKET_ID } from "@/lib/tickets";
+import { logActivity } from "@/lib/server/activity-log";
+import type { AdminSession } from "@/lib/server/admin-auth";
+
+const describe = (p: { code: string; label: string; percentOff: number; maxUses: number | null }) =>
+  `${p.code} (${p.percentOff === 100 ? "free pass" : `${p.percentOff}% off`}, ${p.maxUses ?? "unlimited"} uses, "${p.label}")`;
 
 export const runtime = "nodejs";
 
@@ -66,7 +71,7 @@ const ticketsUnavailable = (err: unknown) => {
   return NextResponse.json({ error: "Couldn't load the tickets. Try again." }, { status: 500 });
 };
 
-export const POST = adminRoute(async (req: NextRequest) => {
+export const POST = adminRoute(async (req: NextRequest, _context, session) => {
   const body = await req.json().catch(() => ({}));
   const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
   let read: Awaited<ReturnType<typeof readChanges>>;
@@ -82,6 +87,11 @@ export const POST = adminRoute(async (req: NextRequest) => {
 
   try {
     const promo = await createPromoCode({ code: code || undefined, ...changes });
+    await logActivity(
+      session,
+      { area: "promo_codes", action: "promo.created", summary: `created promo code ${describe(promo)}`, target: { type: "promo_code", id: promo.id }, details: { ticketIds: promo.ticketIds, expiresAt: promo.expiresAt } },
+      req
+    );
     return NextResponse.json({ code: promo });
   } catch (err) {
     const message = describeError(err);
@@ -95,13 +105,18 @@ export const POST = adminRoute(async (req: NextRequest) => {
 
 // { id, active } switches a code on or off; { id, label, percentOff, maxUses,
 // expiresAt, ticketIds } edits it (the code itself stays the same).
-export const PATCH = adminRoute(async (req: NextRequest) => {
+export const PATCH = adminRoute(async (req: NextRequest, _context, session) => {
   const body = await req.json().catch(() => ({}));
   if (typeof body.id !== "string") return NextResponse.json({ error: "Missing id." }, { status: 400 });
-  if (typeof body.active !== "boolean") return edit(body.id, body);
+  if (typeof body.active !== "boolean") return edit(req, session, body.id, body);
   try {
     const promo = await setPromoCodeActive(body.id, body.active);
     if (!promo) return NextResponse.json({ error: "No such promo code." }, { status: 404 });
+    await logActivity(
+      session,
+      { area: "promo_codes", action: body.active ? "promo.on" : "promo.off", summary: `switched promo code ${promo.code} ${body.active ? "on" : "off"}`, target: { type: "promo_code", id: promo.id } },
+      req
+    );
     return NextResponse.json({ code: promo });
   } catch (err) {
     console.error(`Update promo code failed: ${describeError(err)}`);
@@ -109,7 +124,7 @@ export const PATCH = adminRoute(async (req: NextRequest) => {
   }
 }, { superAdmin: true });
 
-async function edit(id: string, body: Record<string, unknown>) {
+async function edit(req: NextRequest, session: AdminSession, id: string, body: Record<string, unknown>) {
   let read: Awaited<ReturnType<typeof readChanges>>;
   try {
     read = await readChanges(body);
@@ -129,7 +144,13 @@ async function edit(id: string, body: Record<string, unknown>) {
       fields.expiresAt = "Pick a date in the future, or leave empty.";
     }
     if (Object.keys(fields).length) return invalid(fields);
-    return NextResponse.json({ code: await updatePromoCode(current, changes) });
+    const promo = await updatePromoCode(current, changes);
+    await logActivity(
+      session,
+      { area: "promo_codes", action: "promo.edited", summary: `edited promo code ${describe(promo)}`, target: { type: "promo_code", id: promo.id }, details: { before: describe(current) } },
+      req
+    );
+    return NextResponse.json({ code: promo });
   } catch (err) {
     console.error(`Edit promo code failed: ${describeError(err)}`);
     return NextResponse.json({ error: "Couldn't update the code in Stripe. Try again." }, { status: 502 });

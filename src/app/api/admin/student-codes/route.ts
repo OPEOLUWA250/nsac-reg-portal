@@ -15,6 +15,7 @@ import { sendStudentCodeEmail } from "@/lib/email";
 import { brandLogoPng } from "@/lib/ticket-image";
 import { publicBaseUrl, toHttps } from "@/lib/public-url";
 import { describeError } from "@/lib/describe-error";
+import { logActivity } from "@/lib/server/activity-log";
 
 export const runtime = "nodejs";
 
@@ -90,6 +91,17 @@ export const POST = adminRoute(async (req: NextRequest, _context, session) => {
 
   const emailError = body.send === true ? await emailCode(req, code, language) : null;
   const saved = body.send === true && !emailError ? { ...code, emailedAt: new Date().toISOString() } : code;
+  await logActivity(
+    session,
+    {
+      area: "student_codes",
+      action: "student_code.created",
+      summary: `created a student code for ${email}${body.send === true && !emailError ? " and emailed it" : ""}`,
+      target: { type: "student_code", id: code.id },
+      details: { expiresAt: code.expiresAt },
+    },
+    req
+  );
   return NextResponse.json({ code: saved, emailError });
 });
 
@@ -105,6 +117,11 @@ export const PATCH = adminRoute(async (req: NextRequest, _context, session) => {
       const code = await cancelStudentCode(id);
       if (!code) return NextResponse.json({ error: "This code was already used or cancelled." }, { status: 409 });
       console.info(`Student code ${code.code} cancelled by ${session.email}`);
+      await logActivity(
+        session,
+        { area: "student_codes", action: "student_code.cancelled", summary: `cancelled the student code for ${code.email}`, target: { type: "student_code", id: code.id } },
+        req
+      );
       return NextResponse.json({ code });
     }
     const code = await getStudentCode(id);
@@ -112,6 +129,11 @@ export const PATCH = adminRoute(async (req: NextRequest, _context, session) => {
     if (code.cancelledAt || code.usedAt) return NextResponse.json({ error: "This code was already used or cancelled." }, { status: 409 });
     const emailError = await emailCode(req, code, code.language);
     if (emailError) return NextResponse.json({ error: "The email couldn't be sent. Copy the message and send it yourself." }, { status: 502 });
+    await logActivity(
+      session,
+      { area: "student_codes", action: "student_code.emailed", summary: `emailed the student code to ${code.email}`, target: { type: "student_code", id: code.id } },
+      req
+    );
     return NextResponse.json({ code: { ...code, emailedAt: new Date().toISOString() } });
   } catch (err) {
     console.error(`Update student code failed: ${describeError(err)}`);

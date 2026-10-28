@@ -24,6 +24,7 @@ export default function SiteHeader() {
 
   const onForm = pathname === "/" || pathname.startsWith("/register");
   const staffPage = pathname.startsWith("/checkin");
+  const onVenue = pathname.startsWith("/venue");
   // The form page, and staff pages, have their own main button.
   const showCta = !onForm && !staffPage;
 
@@ -74,10 +75,24 @@ export default function SiteHeader() {
           <BrandLogo />
         </a>
 
-        {showCta && (
-          <ButtonLink href={`/?lang=${lang}`} variant="primary" size="sm" className="max-sm:hidden">
-            {t.register}
-          </ButtonLink>
+        {!staffPage && (
+          <div className="flex items-center gap-2 max-sm:hidden">
+            <Link
+              href="/venue"
+              aria-current={onVenue ? "page" : undefined}
+              className={cx(
+                "inline-flex min-h-9 items-center rounded-md px-3 text-sm font-semibold transition-colors duration-150 hover:bg-white/10 active:bg-white/15",
+                onVenue ? "text-white" : "text-white/80 hover:text-white"
+              )}
+            >
+              {t.venue}
+            </Link>
+            {showCta && (
+              <ButtonLink href={`/?lang=${lang}`} variant="primary" size="sm">
+                {t.register}
+              </ButtonLink>
+            )}
+          </div>
         )}
 
         {/* Phones (public pages only; staff pages have their own navigation) */}
@@ -112,6 +127,7 @@ export default function SiteHeader() {
             <div>
               <MenuLink href={`/?lang=${lang}`} active={onForm} onClick={close}>{t.form}</MenuLink>
               <MenuLink href="/flyer" active={pathname.startsWith("/flyer")} onClick={close}>{t.flyer}</MenuLink>
+              <MenuLink href="/venue" active={onVenue} onClick={close}>{t.venue}</MenuLink>
             </div>
             <div className="border-t border-line pt-3">
               <MenuLink href={`/privacy?lang=${lang}`} active={pathname === "/privacy"} onClick={close}>{t.privacy}</MenuLink>
