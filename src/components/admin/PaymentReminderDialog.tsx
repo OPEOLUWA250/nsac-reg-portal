@@ -77,6 +77,8 @@ export default function PaymentReminderDialog({
   const first = useRef<HTMLInputElement>(null);
   const id = useId();
   const single = people.length === 1 ? people[0] : null;
+  // On a copy running on this computer, links in the emails point here (src/lib/server/payment-link.ts).
+  const [local] = useState(() => /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname));
 
   const [draft, setDraft] = useState<Draft>(() => {
     const saved = remembered();
@@ -405,13 +407,24 @@ export default function PaymentReminderDialog({
               ) : !preview ? (
                 <div aria-hidden="true" className="mx-auto h-full min-h-[36rem] w-full max-w-2xl animate-pulse rounded-sm bg-subtle" />
               ) : (
-                <iframe title="Email preview" srcDoc={preview.html} sandbox="" className="mx-auto block h-full min-h-[36rem] w-full max-w-2xl rounded-sm border border-line bg-white" />
+                // Links in the preview open in a new tab, not inside the preview.
+                <iframe
+                  title="Email preview"
+                  srcDoc={preview.html.replace("<head>", '<head><base target="_blank" />')}
+                  sandbox="allow-popups allow-popups-to-escape-sandbox"
+                  className="mx-auto block h-full min-h-[36rem] w-full max-w-2xl rounded-sm border border-line bg-white" />
               )}
             </div>
           </section>
         </div>
 
         <div className="space-y-3 border-t border-line bg-canvas px-5 py-4 sm:px-6">
+          {local && (
+            <Alert tone="info" title="This is a test copy of the site">
+              The payment button in these emails opens the copy on this computer, so it won&apos;t work for anyone else. Send
+              only to yourself here, and send real reminders from the live site.
+            </Alert>
+          )}
           {sendError && <Alert tone="error">{sendError}</Alert>}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <p className="text-sm text-ink-3 sm:mr-auto">

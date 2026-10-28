@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { describeError } from "@/lib/describe-error";
 import { createCheckoutSession } from "@/lib/payments";
-import { publicBaseUrl, toHttps } from "@/lib/public-url";
 import { clientIp, withinLimit } from "@/lib/server/rate-limit";
-import { attendeeIdFromToken, paymentOffer } from "@/lib/server/payment-link";
+import { attendeeIdFromToken, linkBaseUrl, paymentOffer } from "@/lib/server/payment-link";
 import type { Attendee } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -33,7 +32,7 @@ export async function POST(req: NextRequest) {
     const offer = await paymentOffer(attendee, { ticketId });
     if (offer.kind !== "pay") return NextResponse.json({ status: offer.kind });
 
-    const baseUrl = publicBaseUrl() ?? toHttps(req.nextUrl.origin);
+    const baseUrl = linkBaseUrl(req.nextUrl.origin);
     const checkoutUrl = await createCheckoutSession({
       attendee,
       ticket: offer.ticket,

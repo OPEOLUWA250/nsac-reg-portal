@@ -6,6 +6,7 @@ import { checkPromoCode, type PromoCode } from "@/lib/promo-codes";
 import { checkStudentCode } from "@/lib/student-codes";
 import { discountedCents, STUDENT_TICKET_ID, type Ticket } from "@/lib/tickets";
 import { describeError } from "@/lib/describe-error";
+import { publicBaseUrl, toHttps } from "@/lib/public-url";
 import type { Attendee } from "@/lib/types";
 
 // The "Complete my payment" link in payment reminders: /pay/<id>.<signature>.
@@ -29,6 +30,16 @@ const sign = (id: string) => crypto.createHmac("sha256", key()).update(`payment-
 
 export function paymentLinkToken(attendeeId: string): string {
   return `${attendeeId}.${sign(attendeeId)}`;
+}
+
+/**
+ * Where links in reminders point: the public address, except while someone
+ * tries this out on their own computer (localhost), where only that copy may
+ * have the payment page yet.
+ */
+export function linkBaseUrl(requestOrigin: string): string {
+  if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(requestOrigin)) return requestOrigin;
+  return publicBaseUrl() ?? toHttps(requestOrigin);
 }
 
 export function paymentLinkUrl(attendeeId: string, baseUrl: string): string {
