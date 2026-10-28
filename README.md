@@ -196,6 +196,35 @@ Added by the registration-form migration: `first_name`, `last_name`,
 `currency`, `payment_status` (`pending` / `paid` / `not_required`; empty
 for Jotform rows), `stripe_session_id`, `paid_at`.
 
+Added for invitation letters: `invitation_letter_sent_at` (timestamptz) and
+`invitation_letter_sent_by` (text, the admin's email). Until they exist,
+letters still send, but the dashboard can't mark them as sent.
+
+## Invitation letters
+
+People who tick "I need an invitation letter" get a gold **Letter: Send
+email** button on their row in the dashboard (and **Send email** in their
+details). Nothing is sent automatically. The button opens a preview with
+their details already filled in. The admin adds:
+
+- the **sender email**: replies go there, and the letter gives it as the
+  contact;
+- who signs the letter, and optionally their title;
+- optionally the passport number (super admins can open the passport from
+  there);
+- the language.
+
+They check the letter (an A4 PDF on the conference letterhead) and the email,
+then press **Send email**. The email goes from the site's usual address
+(`EMAIL_FROM`), with Reply-To set to the sender and, if ticked, a hidden copy
+to them. The row then shows **Letter sent**, and the details say when and by
+whom; it can be sent again from there.
+
+Letters are only for confirmed registrations: until payment, the row says
+"Letter after payment". The wording is in `src/lib/invitation-letter.ts`
+(English and French) and the layout in
+`src/lib/server/invitation-letter-pdf.ts`.
+
 RLS is enabled with no public policies — everything goes through the
 service-role-backed API routes.
 
