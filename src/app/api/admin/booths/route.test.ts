@@ -14,7 +14,7 @@ vi.mock("@/lib/server/booth-assignments", () => ({
   listBoothAssignments: mocks.list,
   saveBoothAssignment: mocks.save,
   clearBoothAssignment: mocks.clear,
-  announceBoothChange: mocks.announce,
+  refreshPublicMap: mocks.announce,
   isNotSetUp: (err: { code?: string }) => err?.code === "PGRST205",
 }));
 
@@ -24,7 +24,7 @@ const call = (handler: typeof PUT, method: string, body?: unknown) =>
   handler(new NextRequest("https://example.com/api/admin/booths", { method, body: body === undefined ? undefined : JSON.stringify(body) }), {});
 
 beforeEach(() => {
-  mocks.announce.mockReset().mockResolvedValue(undefined);
+  mocks.announce.mockReset();
   mocks.session.mockResolvedValue(admin);
   mocks.save.mockImplementation(async (input: object, by: string) => ({ ...input, updatedAt: "2026-10-26T12:00:00Z", updatedBy: by }));
 });
@@ -44,7 +44,7 @@ it("lets any admin assign a booth, saved under their email", async () => {
     "admin@example.com"
   );
   expect(await res.json()).toMatchObject({ assignment: { boothCode: "W-S4", updatedBy: "admin@example.com" } });
-  // Open venue maps are told, so they update without a reload.
+  // The shared copies of the venue map are made again, so it shows straight away.
   expect(mocks.announce).toHaveBeenCalledOnce();
   // And it's in the activity log.
   expect(mocks.log).toHaveBeenCalledWith(admin, expect.objectContaining({ summary: "assigned booth W-S4 to Sahel Orbital" }), expect.anything());
