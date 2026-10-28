@@ -2,24 +2,25 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ExhibitorMap } from "@/lib/venue/places";
-import { BOOTHS_CHANGED, BOOTHS_CHANNEL, BOOTHS_URL } from "@/lib/venue/live";
+import { BOOTHS_CHECK_MS, BOOTHS_MIN_GAP_MS, BOOTHS_URL } from "@/lib/venue/live";
 
-// The booths on an open venue map follow the admin's changes: a Realtime
-// message says something changed, then the list is fetched again. As a
-// fallback (no Realtime, a dropped connection) the list is also checked every
-// minute while the page is in view, and when the visitor comes back to it.
-
-const POLL_MS = 60_000;
+// The booths on an open venue map follow the admin's changes: the shared list
+// is fetched again every few minutes while the page is on screen, and when
+// the visitor comes back to it (src/lib/venue/live.ts says why it isn't a
+// live connection).
 
 /** The booths, kept up to date, and when they last changed (for "Booths updated"). */
 export function useLiveExhibitors(initial: ExhibitorMap): { exhibitors: ExhibitorMap; changedAt: number | null } {
   const [exhibitors, setExhibitors] = useState(initial);
   const [changedAt, setChangedAt] = useState<number | null>(null);
   const current = useRef(JSON.stringify(initial));
+  const lastCheck = useRef(0);
 
   const refresh = useCallback(async () => {
+    if (Date.now() - lastCheck.current < BOOTHS_MIN_GAP_MS) return;
+    lastCheck.current = Date.now();
     try {
-      const res = await fetch(BOOTHS_URL, { cache: "no-store" });
+      const res = await fetch(BOOTHS_URL);
       if (!res.ok) return;
       const next = (await res.json()).exhibitors as ExhibitorMap;
       const json = JSON.stringify(next);
@@ -32,32 +33,13 @@ export function useLiveExhibitors(initial: ExhibitorMap): { exhibitors: Exhibito
     }
   }, []);
 
-  // Realtime: loaded after the page, so it never slows the map down.
   useEffect(() => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) return;
-    let stop: (() => void) | null = null;
-    let cancelled = false;
-    import("@supabase/supabase-js").then(({ createClient }) => {
-      if (cancelled) return;
-      const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-      const channel = client
-        .channel(BOOTHS_CHANNEL)
-        .on("broadcast", { event: BOOTHS_CHANGED }, () => void refresh())
-        .subscribe();
-      stop = () => void client.removeChannel(channel);
-    }, () => {});
-    return () => {
-      cancelled = true;
-      stop?.();
-    };
-  }, [refresh]);
-
-  // The fallback check.
-  useEffect(() => {
+    // The page was just loaded with the list, so the first check waits.
+    lastCheck.current = Date.now();
     const visible = () => document.visibilityState === "visible";
-    const timer = window.setInterval(() => visible() && void refresh(), POLL_MS);
+    // Each phone checks at its own moment, so a full hall doesn't ask all at once.
+    const every = BOOTHS_CHECK_MS * (0.8 + Math.random() * 0.4);
+    const timer = window.setInterval(() => visible() && void refresh(), every);
     const onVisible = () => visible() && void refresh();
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("online", onVisible);
