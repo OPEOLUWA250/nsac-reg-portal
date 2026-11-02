@@ -150,7 +150,7 @@ export const COPY: Record<Language, Copy> = {
     optional: "optional",
     fields: {
       category: "Registration category",
-      categoryHint: "Choose the one that describes how you're taking part.",
+      categoryHint: "Choose the one that describes how you're taking part. Speakers and VIP guests: choose the closest one, and the organisers will update your category.",
       firstName: "First name",
       lastName: "Last name",
       email: "Email",
@@ -193,7 +193,7 @@ export const COPY: Record<Language, Copy> = {
       optInSponsors: "I agree to receive communications from event sponsors and exhibitors",
     },
     selectPlaceholder: "Type or choose a country",
-    categories: { speaker: "Speaker", delegate: "Delegate", media: "Media", exhibitor: "Exhibitor" },
+    categories: { delegate: "Delegate", media: "Media", exhibitor: "Exhibitor" },
     shareYes: "Yes, share my details",
     shareNo: "No, keep them private",
     promo: {
@@ -335,7 +335,7 @@ export const COPY: Record<Language, Copy> = {
     optional: "facultatif",
     fields: {
       category: "Catégorie d'inscription",
-      categoryHint: "Choisissez celle qui correspond à votre participation.",
+      categoryHint: "Choisissez celle qui correspond à votre participation. Intervenant(e)s et invité(e)s VIP : choisissez la plus proche, les organisateurs mettront votre catégorie à jour.",
       firstName: "Prénom",
       lastName: "Nom",
       email: "E-mail",
@@ -378,7 +378,7 @@ export const COPY: Record<Language, Copy> = {
       optInSponsors: "J'accepte de recevoir des communications de la part des sponsors et des exposants",
     },
     selectPlaceholder: "Tapez ou choisissez un pays",
-    categories: { speaker: "Intervenant(e)", delegate: "Délégué(e)", media: "Médias", exhibitor: "Exposant(e)" },
+    categories: { delegate: "Délégué(e)", media: "Médias", exhibitor: "Exposant(e)" },
     shareYes: "Oui, partager mes coordonnées",
     shareNo: "Non, les garder privées",
     promo: {
