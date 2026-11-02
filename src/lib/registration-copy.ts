@@ -150,7 +150,7 @@ export const COPY: Record<Language, Copy> = {
     optional: "optional",
     fields: {
       category: "Registration category",
-      categoryHint: "Choose the one that describes how you're taking part. Speakers and VIP guests: choose the closest one, and the organisers will update your category.",
+      categoryHint: "Choose the one that describes how you're taking part.",
       firstName: "First name",
       lastName: "Last name",
       email: "Email",
@@ -335,7 +335,7 @@ export const COPY: Record<Language, Copy> = {
     optional: "facultatif",
     fields: {
       category: "Catégorie d'inscription",
-      categoryHint: "Choisissez celle qui correspond à votre participation. Intervenant(e)s et invité(e)s VIP : choisissez la plus proche, les organisateurs mettront votre catégorie à jour.",
+      categoryHint: "Choisissez celle qui correspond à votre participation.",
       firstName: "Prénom",
       lastName: "Nom",
       email: "E-mail",
