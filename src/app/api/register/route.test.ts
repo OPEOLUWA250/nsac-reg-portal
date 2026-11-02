@@ -40,7 +40,7 @@ function request(body = input) {
   return new NextRequest("https://example.com/api/register", { method: "POST", body: JSON.stringify(body) });
 }
 
-it.each(["delegate", "speaker", "media", "exhibitor"])("creates a pending %s registration and requires Stripe checkout", async (category) => {
+it.each(["delegate", "media", "exhibitor"])("creates a pending %s registration and requires Stripe checkout", async (category) => {
   const response = await POST(request({ ...input, category }));
   expect(response.status).toBe(200);
   expect(await response.json()).toMatchObject({ status: "payment_required", checkoutUrl: "https://checkout.stripe.com/test" });
@@ -62,8 +62,8 @@ it("refuses a registration without a passport", async () => {
   expect(mocks.checkout).not.toHaveBeenCalled();
 });
 
-it("doesn't let people register themselves as VIP (admins do that)", async () => {
-  const response = await POST(request({ ...input, category: "vip" }));
+it.each(["vip", "speaker"])("doesn't let people register themselves as %s (admins do that)", async (category) => {
+  const response = await POST(request({ ...input, category }));
   expect(response.status).toBe(400);
   expect(await response.json()).toMatchObject({ fields: { category: "invalid_choice" } });
   expect(mocks.create).not.toHaveBeenCalled();
@@ -71,7 +71,7 @@ it("doesn't let people register themselves as VIP (admins do that)", async () =>
 });
 
 describe("Student ticket", () => {
-  const student = { ...input, category: "speaker", ticket: "student", studentCode: "stu-7k3qxp" };
+  const student = { ...input, category: "media", ticket: "student", studentCode: "stu-7k3qxp" };
   beforeEach(() => {
     mocks.tickets.mockResolvedValue([
       { id: "standard", amountCents: 50000, currency: "eur" },
@@ -119,6 +119,6 @@ describe("Student ticket", () => {
     const response = await POST(request({ ...student, ticket: "standard" } as typeof input));
     expect(response.status).toBe(200);
     expect(mocks.student).not.toHaveBeenCalled();
-    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ role: "speaker" }));
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ role: "media" }));
   });
 });

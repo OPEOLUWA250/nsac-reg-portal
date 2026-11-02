@@ -359,8 +359,9 @@ function PaymentReminderBox({ attendee: a, busy, onRemind }: { attendee: Attende
   );
 }
 
-// VIP isn't on the registration form: people register as Delegate, Speaker
-// and so on, and an admin makes them a VIP here (with an email to tell them).
+// Speaker and VIP aren't on the registration form: people register as
+// Delegate, Media or Exhibitor, and an admin sets the right category here
+// (with an email to tell them).
 function RoleEditor({
   attendee: a,
   busy,
@@ -398,8 +399,8 @@ function RoleEditor({
         <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-3">Registration category</h3>
         <p className="text-sm text-ink-3">
           {canManageVip
-            ? "VIP isn't on the registration form. Make someone a VIP here; their badge will show it."
-            : "VIP isn't on the registration form. Ask a super admin to make someone a VIP."}
+            ? "Speaker and VIP aren't on the registration form. Set them here; their badge will show it."
+            : "Speaker and VIP aren't on the registration form. Set Speaker here; ask a super admin to make someone a VIP."}
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">

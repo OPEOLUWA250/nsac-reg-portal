@@ -257,7 +257,7 @@ export default function RegistrationForm({
     const saved = draft.form as Partial<FormState>;
     // A ticket that has since gone off sale (e.g. Early Bird ended) is dropped.
     const ticketStillOnSale = tickets.some((tk) => tk.id === saved.ticket);
-    // So is a category no longer on the form (VIP, now given by admins).
+    // So is a category no longer on the form (Speaker or VIP, now given by admins).
     const categoryStillOffered = (REGISTRATION_CATEGORIES as readonly unknown[]).includes(saved.category);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- restoring a draft saved in this browser
     setForm((f) => ({
