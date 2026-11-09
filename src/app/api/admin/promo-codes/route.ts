@@ -3,6 +3,7 @@ import { adminRoute } from "@/lib/server/admin-auth";
 import {
   createPromoCode,
   getPromoCode,
+  isPromoExpired,
   listPromoCodes,
   needsNewStripeCode,
   setPromoCodeActive,
@@ -110,6 +111,16 @@ export const PATCH = adminRoute(async (req: NextRequest, _context, session) => {
   if (typeof body.id !== "string") return NextResponse.json({ error: "Missing id." }, { status: 400 });
   if (typeof body.active !== "boolean") return edit(req, session, body.id, body);
   try {
+    if (body.active) {
+      // Stripe refuses to switch an expired code back on: say what to do instead.
+      const current = await getPromoCode(body.id);
+      if (current && isPromoExpired(current)) {
+        return NextResponse.json(
+          { error: `${current.code} has expired, so Stripe switched it off. Use Renew and pick a new "Valid until" date to use it again.` },
+          { status: 409 }
+        );
+      }
+    }
     const promo = await setPromoCodeActive(body.id, body.active);
     if (!promo) return NextResponse.json({ error: "No such promo code." }, { status: 404 });
     await logActivity(
@@ -142,6 +153,10 @@ async function edit(req: NextRequest, session: AdminSession, id: string, body: R
     // else needs a new Stripe code); Stripe takes only future dates.
     if (!fields.expiresAt && !inFuture(changes.expiresAt) && needsNewStripeCode(current, changes)) {
       fields.expiresAt = "Pick a date in the future, or leave empty.";
+    }
+    // Renewing an expired code: saving it with the old date would change nothing.
+    if (!fields.expiresAt && isPromoExpired(current) && !inFuture(changes.expiresAt)) {
+      fields.expiresAt = "This code has expired. Pick a new date in the future, or choose No end date.";
     }
     if (Object.keys(fields).length) return invalid(fields);
     const promo = await updatePromoCode(current, changes);

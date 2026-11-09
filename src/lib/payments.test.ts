@@ -17,7 +17,7 @@ vi.mock("@/lib/attendee-service", () => ({ sendAttendeeQr: vi.fn(), notifyAdmins
 const used = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/student-codes", () => ({ markStudentCodeUsed: used }));
 import { checkoutAttendeeId, createCheckoutSession, fulfillCheckoutSession, TICKET_PRODUCT_ID } from "./payments";
-import { createPromoCode, setPromoCodeActive, updatePromoCode, type PromoCode } from "./promo-codes";
+import { createPromoCode, isPromoExpired, setPromoCodeActive, updatePromoCode, type PromoCode } from "./promo-codes";
 
 const session = (fields: Partial<Stripe.Checkout.Session>) => fields as Stripe.Checkout.Session;
 const ticket = {
@@ -131,6 +131,26 @@ it("replaces a promo code to change its end date, keeping the code and its uses"
   expect(params.promotion.coupon).toBe("co_1"); // same discount, same coupon
   expect(params.max_redemptions).toBe(11); // 15 minus the 4 already used
   expect(promo).toMatchObject({ code: "ASV-2027", used: 4, maxUses: 15, createdAt: asvCode.createdAt, expiresAt: "2027-01-31T00:00:00.000Z" });
+});
+
+it("renews an expired promo code switched on, but keeps one an admin switched off, off", async () => {
+  api.promotionCodes.retrieve.mockResolvedValue({ id: "promo_old", promotion: { coupon: { id: "co_1", percent_off: 100 } } });
+  api.promotionCodes.create.mockImplementation(async (params) => ({
+    id: "promo_new", code: params.code, metadata: params.metadata, promotion: { coupon: { percent_off: 100 } },
+    max_redemptions: params.max_redemptions, times_redeemed: 0, expires_at: params.expires_at, active: params.active, created: 2,
+  }));
+  const future = new Date(Date.now() + 30 * 86_400_000).toISOString();
+  // Stripe switched it off itself when its date passed.
+  const expired: PromoCode = { ...asvCode, code: "SIA-2026", percentOff: 100, maxUses: 10, used: 2, active: false, expiresAt: "2026-11-09T15:12:00.000Z" };
+  expect(isPromoExpired(expired)).toBe(true);
+  const renewed = await updatePromoCode(expired, { ...asvChanges, percentOff: 100, maxUses: 10, expiresAt: future });
+  expect(api.promotionCodes.create.mock.calls[0][0]).toMatchObject({ code: "SIA-2026", active: true, max_redemptions: 8 });
+  expect(renewed).toMatchObject({ active: true, used: 2, maxUses: 10 });
+
+  const switchedOff: PromoCode = { ...asvCode, active: false };
+  expect(isPromoExpired(switchedOff)).toBe(false);
+  await updatePromoCode(switchedOff, { ...asvChanges, expiresAt: future });
+  expect(api.promotionCodes.create.mock.calls[1][0].active).toBe(false);
 });
 
 it("puts the old promo code back if Stripe refuses the new one", async () => {

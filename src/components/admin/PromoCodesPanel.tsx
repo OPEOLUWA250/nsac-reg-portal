@@ -58,9 +58,13 @@ const DEFAULT_TICKET = "standard";
 
 const EMPTY: Draft = { label: "", code: "", percentOff: "100", maxUses: "", expiresAt: "", ticketIds: [DEFAULT_TICKET] };
 
+// Stripe switches a code off when it expires (and won't switch it back on),
+// so "Expired" is checked first: it says why, and the row offers Renew.
+const isExpired = (p: PromoCode) => Boolean(p.expiresAt && new Date(p.expiresAt).getTime() <= Date.now());
+
 function status(p: PromoCode): { label: string; dot: string } {
+  if (isExpired(p)) return { label: "Expired", dot: "var(--color-line-strong)" };
   if (!p.active) return { label: "Switched off", dot: "var(--color-line-strong)" };
-  if (p.expiresAt && new Date(p.expiresAt).getTime() < Date.now()) return { label: "Expired", dot: "var(--color-line-strong)" };
   if (p.maxUses !== null && p.used >= p.maxUses) return { label: "Used up", dot: "var(--color-gold)" };
   return { label: "Active", dot: "var(--color-success)" };
 }
@@ -323,14 +327,28 @@ export default function PromoCodesPanel() {
                       <Button size="sm" variant="outline" onClick={() => (isEditing ? setEditing(null) : startEdit(p))} aria-expanded={isEditing}>
                         {isEditing ? "Close" : "Edit"}
                       </Button>
-                      <Button size="sm" variant={p.active ? "danger" : "outline"} loading={busyId === p.id} onClick={() => toggle(p)}>
-                        {p.active ? "Switch off" : "Switch on"}
-                      </Button>
+                      {isExpired(p) ? (
+                        !isEditing && (
+                          <Button size="sm" variant="outline" onClick={() => startEdit(p)}>
+                            Renew
+                          </Button>
+                        )
+                      ) : (
+                        <Button size="sm" variant={p.active ? "danger" : "outline"} loading={busyId === p.id} onClick={() => toggle(p)}>
+                          {p.active ? "Switch off" : "Switch on"}
+                        </Button>
+                      )}
                     </div>
                   </div>
                   {isEditing && (
                     <div className="mt-4 rounded-lg border border-line bg-subtle p-4 transition-opacity duration-200 starting:opacity-0 sm:p-5">
-                      <h3 className="mb-4 font-display text-lg font-bold text-blue">Edit {p.code}</h3>
+                      <h3 className="mb-4 font-display text-lg font-bold text-blue">{isExpired(p) ? "Renew" : "Edit"} {p.code}</h3>
+                      {isExpired(p) && p.expiresAt && (
+                        <p className="mb-4 text-sm text-ink-2">
+                          It expired on {dateTime(p.expiresAt)}, so Stripe switched it off. Pick a new <strong>Valid until</strong> date, or choose{" "}
+                          <strong>No end date</strong>, and save: the same code works again, with its {p.used} {p.used === 1 ? "use" : "uses"} so far counted.
+                        </p>
+                      )}
                       <PromoForm
                         idPrefix={`edit-${p.code}`}
                         editing={p}
