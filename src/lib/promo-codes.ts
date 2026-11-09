@@ -113,6 +113,15 @@ async function createCoupon(label: string, percentOff: number): Promise<string> 
 
 const unixTime = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 
+/**
+ * Its end date has passed. Stripe then switches the code off by itself and
+ * won't switch it back on ("cannot be reactivated because it has expired"):
+ * an edit with a new date renews it instead (updatePromoCode).
+ */
+export function isPromoExpired(p: Pick<PromoCode, "expiresAt">, now = Date.now()): boolean {
+  return Boolean(p.expiresAt && new Date(p.expiresAt).getTime() <= now);
+}
+
 export async function createPromoCode(input: NewPromoCode): Promise<PromoCode> {
   const code = (input.code?.trim() || generateCode()).toUpperCase();
   const label = input.label.trim();
@@ -175,7 +184,9 @@ export async function updatePromoCode(current: PromoCode, changes: PromoCodeChan
     const promo = await stripe().promotionCodes.create({
       promotion: { type: "coupon", coupon: newCouponId },
       code: current.code,
-      active: current.active,
+      // An expired code was switched off by Stripe, not by an admin: giving
+      // it a new date renews it, so it comes back on.
+      active: current.active || isPromoExpired(current),
       // Stripe's own limit counts only this new code's uses (at least 1); the
       // form's check holds the code to the full limit (checkPromoCode).
       ...(changes.maxUses ? { max_redemptions: Math.max(1, changes.maxUses - current.used) } : {}),
