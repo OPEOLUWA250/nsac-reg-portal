@@ -78,7 +78,8 @@ const COPY = {
     vat: "N° de TVA",
     reference: "Votre référence",
     columns: ["Description", "Montant"] as [string, string],
-    ticket: (event: string, ticket: string) => `${event} : billet ${ticket}`,
+    // The ticket's name in quotes: « Tarif préférentiel (Early Bird) ».
+    ticket: (event: string, ticket: string) => `${event} : billet « ${ticket} »`,
     category: "Catégorie d’inscription",
     promo: "Code promo",
     totalLabel: "Total payé",
