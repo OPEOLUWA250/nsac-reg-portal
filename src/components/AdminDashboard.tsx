@@ -237,6 +237,12 @@ export default function AdminDashboard() {
       return "QR email sent.";
     });
 
+  const handleResendReceipt = (id: string) =>
+    withRow(id, async () => {
+      await apiCall("/api/admin/receipt", { method: "POST", body: JSON.stringify({ id }) });
+      return "Receipt email sent.";
+    });
+
   const handleToggleCheckIn = (id: string, checkedIn: boolean) =>
     withRow(id, async () => {
       const { attendee } = await apiCall("/api/admin/toggle-checkin", {
@@ -685,6 +691,7 @@ export default function AdminDashboard() {
           message={rowMessage[selected.id] ?? ""}
           onClose={() => setSelectedId(null)}
           onResend={() => handleResend(selected.id)}
+          onResendReceipt={() => handleResendReceipt(selected.id)}
           onRemind={() => setReminderFor([selected])}
           onToggleCheckIn={() => handleToggleCheckIn(selected.id, !selected.checked_in)}
           onChangeRole={(role, notify) => handleChangeRole(selected, role, notify)}

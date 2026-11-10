@@ -1,9 +1,6 @@
 import "server-only";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { LetterContent } from "@/lib/invitation-letter";
-import { brandLogoPng } from "@/lib/ticket-image";
-import { describeError } from "@/lib/describe-error";
+import { pdfAssets as assets, PDF_DISPLAY, PDF_SANS, wrapText as wrap, type Canvas, type Ctx, type Img } from "@/lib/server/pdf-assets";
 
 // The invitation letter on A4: the conference letterhead (blue band with the
 // white logo, gold rule), the letter, a table of the attendee's details and a
@@ -24,52 +21,10 @@ const INK_2 = "#454B52";
 const INK_3 = "#5E6670";
 const LINE = "#E1DED7";
 
-const SANS = "'NSAC Sans', 'Helvetica Neue', Arial, sans-serif";
-const DISPLAY = "'NSAC Display', 'Helvetica Neue', Arial, sans-serif";
+const SANS = PDF_SANS;
+const DISPLAY = PDF_DISPLAY;
 const BODY = 10.5;
 const LEADING = 14.5;
-
-type Canvas = typeof import("@napi-rs/canvas");
-// A PDF page and a picture canvas take the same drawing calls.
-type Ctx = import("@napi-rs/canvas").SKRSContext2D;
-type Img = Awaited<ReturnType<Canvas["loadImage"]>>;
-
-let setup: Promise<{ canvas: Canvas; logo: Img | null }> | null = null;
-
-// The site's fonts (src/app/fonts, packaged with this route: next.config.ts)
-// and the logo, loaded once per server.
-function assets() {
-  setup ??= (async () => {
-    const canvas = await import("@napi-rs/canvas");
-    const dir = join(process.cwd(), "src", "app", "fonts");
-    for (const [file, name] of [["dm-sans.woff2", "NSAC Sans"], ["nsac-display.woff2", "NSAC Display"]]) {
-      if (canvas.GlobalFonts.has(name)) continue;
-      try {
-        canvas.GlobalFonts.register(await readFile(join(dir, file)), name);
-      } catch (err) {
-        console.warn(`Letter font ${file} unavailable, using a fallback: ${describeError(err)}`);
-      }
-    }
-    const png = await brandLogoPng();
-    const logo = png ? await canvas.loadImage(png).catch(() => null) : null;
-    return { canvas, logo };
-  })();
-  return setup;
-}
-
-function wrap(ctx: Ctx, text: string, width: number): string[] {
-  const lines: string[] = [];
-  let line = "";
-  for (const word of text.split(/\s+/)) {
-    const next = line ? `${line} ${word}` : word;
-    if (line && ctx.measureText(next).width > width) {
-      lines.push(line);
-      line = word;
-    } else line = next;
-  }
-  if (line) lines.push(line);
-  return lines;
-}
 
 /** Lays the letter out, asking for a new page when one is full. */
 function draw(content: LetterContent, logo: Img | null, newPage: () => Ctx) {

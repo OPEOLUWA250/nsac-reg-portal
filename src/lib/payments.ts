@@ -256,7 +256,9 @@ export async function fulfillCheckoutSession(
 
   if (updated) {
     if (session.metadata?.student_code) await markStudentCodeUsed(session.metadata.student_code, attendeeId);
-    await sendAttendeeQr(updated as Attendee);
+    // The payment ID for the receipt comes from this session: no second call to Stripe.
+    const pi = session.payment_intent;
+    await sendAttendeeQr(updated as Attendee, { paymentId: (typeof pi === "string" ? pi : pi?.id) ?? null });
     await notifyAdminsOfRegistration(updated as Attendee);
     return updated as Attendee;
   }
