@@ -23,15 +23,22 @@ describe("who gets a receipt", () => {
 describe("the receipt", () => {
   it("says who paid, for what, how much, with the Stripe payment ID", () => {
     const c = buildReceiptContent(paid, { ticketName: "Early Bird", paymentId: "pi_123" });
-    expect(c.meta).toEqual([["Receipt No.", "NSAC27-RCT-0004"], ["Date", "4 November 2026"]]);
+    expect(c.meta).toEqual([["Receipt No.", "NSAC27-RCT-8F3C2A10"], ["Date", "4 November 2026"]]);
     expect(c.from).toEqual(["Ada Obi", "Engineer", "Example Space Ltd, Nigeria", "ada@example.com", "VAT number: NG-123", "Your reference: PO-118"]);
     expect(c.issuer[0]).toBe("Space in Africa");
     expect(c.item.description).toBe("NewSpace Africa Conference 2027: Early Bird ticket");
     expect(c.item.details).toContain("Registration category: Delegate");
     expect(c.total).toBe("€500.00");
     expect(c.payment).toContainEqual(["Payment ID", "pi_123"]);
-    expect(c.payment).toContainEqual(["Registration No.", "4"]);
     expect(c.summary).toContainEqual(["Amount paid", "€500.00"]);
+  });
+
+  it("never shows how many people have registered", () => {
+    for (const language of ["en", "fr"] as const) {
+      const c = buildReceiptContent({ ...paid, registration_number: 4321 } as Attendee, { ticketName: "Early Bird", paymentId: "pi_123", language });
+      expect(JSON.stringify(c)).not.toContain("4321");
+      expect(JSON.stringify(c)).not.toMatch(/Registration No|N° d’inscription/);
+    }
   });
 
   it("is in French for French registrants, with French punctuation and amounts", () => {
@@ -45,16 +52,15 @@ describe("the receipt", () => {
   });
 
   it("leaves out what it doesn't know", () => {
-    const c = buildReceiptContent({ ...paid, job_title: null, organization: null, organization_country: null, vat_number: null, invoice_reference: " ", registration_number: null } as Attendee, { ticketName: "Standard", paymentId: null });
+    const c = buildReceiptContent({ ...paid, job_title: null, organization: null, organization_country: null, vat_number: null, invoice_reference: " " } as Attendee, { ticketName: "Standard", paymentId: null });
     expect(c.from).toEqual(["Ada Obi", "ada@example.com"]);
     expect(c.payment.map(([label]) => label)).toEqual(["Payment method", "Paid on"]);
-    expect(c.meta[0][1]).toBe("NSAC27-RCT-8F3C2A10");
   });
 
   it("formats other currencies and names the file after the receipt", () => {
     expect(formatAmount(12345, "usd", "en")).toBe("US$123.45");
-    expect(receiptNumber({ id: "x", registration_number: 12 })).toBe("NSAC27-RCT-0012");
-    expect(receiptFilename({ id: "x", registration_number: 12 })).toBe("newspace-africa-2027-receipt-NSAC27-RCT-0012.pdf");
+    expect(receiptNumber({ id: "0a1b2c3d-4e5f-4000-8000-000000000000" })).toBe("NSAC27-RCT-0A1B2C3D");
+    expect(receiptFilename({ id: "0a1b2c3d-4e5f-4000-8000-000000000000" })).toBe("newspace-africa-2027-receipt-NSAC27-RCT-0A1B2C3D.pdf");
   });
 
   it("draws a one-page PDF", async () => {
