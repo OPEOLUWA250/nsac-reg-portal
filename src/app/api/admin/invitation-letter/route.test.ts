@@ -69,7 +69,7 @@ describe("invitation letters", () => {
     const res = await post({ id, action: "preview", ...fields });
     expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json).toMatchObject({ to: "ada@example.com", subject: expect.stringContaining("invitation letter"), filename: "invitation-letter-12-ada-obi.pdf" });
+    expect(json).toMatchObject({ to: "ada@example.com", subject: expect.stringContaining("invitation letter"), filename: "invitation-letter-NSAC27-INV-12345678-ada-obi.pdf" });
     expect(json.html).toContain("Temi Oni");
     expect(json.pages).toEqual([expect.stringMatching(/^data:image\/jpeg;base64,/)]);
     expect(mocks.send).not.toHaveBeenCalled();
@@ -81,7 +81,7 @@ describe("invitation letters", () => {
     const res = await post({ id, action: "send", ...fields });
     expect(await res.json()).toMatchObject({ sent: true, recorded: true });
     expect(mocks.send).toHaveBeenCalledWith(
-      expect.objectContaining({ toEmail: "ada@example.com", replyTo: "events@example.com", bcc: "events@example.com", filename: "invitation-letter-12-ada-obi.pdf" })
+      expect.objectContaining({ toEmail: "ada@example.com", replyTo: "events@example.com", bcc: "events@example.com", filename: "invitation-letter-NSAC27-INV-12345678-ada-obi.pdf" })
     );
     expect(mocks.updates).toEqual([{ invitation_letter_sent_at: expect.any(String), invitation_letter_sent_by: "admin@example.com" }]);
     expect(mocks.log).toHaveBeenCalledWith(session, expect.objectContaining({ action: "letter.sent", target: { type: "attendee", id } }), expect.anything());

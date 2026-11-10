@@ -11,7 +11,6 @@ const attendee: LetterAttendee = {
   organization: "Sahel Orbital",
   job_title: "Chief Engineer",
   role: "speaker",
-  registration_number: 134,
 };
 
 const input = { senderEmail: "Events@SpaceInAfrica.com ", signatoryName: " Ama  Mensah", signatoryTitle: "", passportNumber: "a 1234 567", language: "en" };
@@ -51,7 +50,7 @@ describe("the letter", () => {
 
   it("fills in the attendee's details, and the passport number when given", () => {
     const letter = buildLetter(attendee, value(), new Date("2026-10-27T10:00:00Z"));
-    expect(letter.reference).toBe("Ref. NSAC27-INV-0134");
+    expect(letter.reference).toBe("Ref. NSAC27-INV-12345678");
     expect(letter.date).toBe("27 October 2026");
     expect(Object.fromEntries(letter.details)).toEqual({
       "Full name": "Ada  Óbí",
@@ -61,19 +60,25 @@ describe("the letter", () => {
       Organisation: "Sahel Orbital",
       "Country of residence": "Ghana",
       "Registration category": "Speaker",
-      "Registration number": "134",
     });
     expect(letter.paragraphs.at(-1)).toContain("events@spaceinafrica.com");
     expect(letter.signatoryName).toBe("Ama Mensah");
   });
 
   it("leaves out what isn't known", () => {
-    const letter = buildLetter({ ...attendee, nationality: null, job_title: null, registration_number: null }, value({ passportNumber: "" }));
+    const letter = buildLetter({ ...attendee, nationality: null, job_title: null }, value({ passportNumber: "" }));
     const labels = letter.details.map(([k]) => k);
     expect(labels).not.toContain("Nationality");
     expect(labels).not.toContain("Passport number");
-    expect(labels).not.toContain("Registration number");
-    expect(letter.reference).toBe("Ref. NSAC27-INV-12345678");
+  });
+
+  it("never shows how many people have registered or asked for a letter", () => {
+    for (const language of ["en", "fr"] as const) {
+      const letter = buildLetter({ ...attendee, registration_number: 4321 } as LetterAttendee, value({ language }));
+      expect(JSON.stringify(letter)).not.toContain("4321");
+      expect(JSON.stringify(letter)).not.toMatch(/Registration number|Numéro d'inscription/);
+    }
+    expect(letterFilename({ ...attendee, registration_number: 4321 } as LetterAttendee)).not.toContain("4321");
   });
 
   it("is written in French when asked", () => {
@@ -85,8 +90,8 @@ describe("the letter", () => {
   });
 
   it("names the file after the attendee", () => {
-    expect(letterFilename(attendee)).toBe("invitation-letter-134-ada-obi.pdf");
-    expect(letterReference({ id: attendee.id, registration_number: 7 })).toBe("NSAC27-INV-0007");
+    expect(letterFilename(attendee)).toBe("invitation-letter-NSAC27-INV-12345678-ada-obi.pdf");
+    expect(letterReference({ id: "0a1b2c3d-4e5f-4000-8000-000000000000" })).toBe("NSAC27-INV-0A1B2C3D");
   });
 
   it("draws as a one-page PDF and matching preview", async () => {

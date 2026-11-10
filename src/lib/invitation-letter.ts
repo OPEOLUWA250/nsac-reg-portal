@@ -63,7 +63,7 @@ export function parseLetterInput(body: Record<string, unknown>): { value: Letter
 
 export type LetterAttendee = Pick<
   Attendee,
-  "id" | "full_name" | "nationality" | "residence_country" | "organization" | "job_title" | "role" | "registration_number"
+  "id" | "full_name" | "nationality" | "residence_country" | "organization" | "job_title" | "role"
 >;
 
 export interface LetterContent {
@@ -104,7 +104,6 @@ const COPY = {
       organisation: "Organisation",
       residence: "Country of residence",
       category: "Registration category",
-      number: "Registration number",
     },
     about:
       "The NewSpace Africa Conference is the leading gathering of Africa's space industry. It brings together space agencies, governments, companies, investors and researchers from across the continent and beyond. The 2027 edition is organised by Space in Africa and the African Space Agency (AfSA), and hosted by the Ministry of Higher Education, Research and Innovation (MESRI) of the Republic of Senegal.",
@@ -129,7 +128,6 @@ const COPY = {
       organisation: "Organisation",
       residence: "Pays de résidence",
       category: "Catégorie d'inscription",
-      number: "Numéro d'inscription",
     },
     about:
       "La Conférence NewSpace Africa est le principal rendez-vous de l'industrie spatiale africaine. Elle réunit agences spatiales, gouvernements, entreprises, investisseurs et chercheurs du continent et d'ailleurs. L'édition 2027 est organisée par Space in Africa et l'Agence spatiale africaine (AfSA), et accueillie par le ministère de l'Enseignement supérieur, de la Recherche et de l'Innovation (MESRI) de la République du Sénégal.",
@@ -142,9 +140,13 @@ const COPY = {
   },
 } as const;
 
-/** "NSAC27-INV-0134" (registration number), or the start of the id before there is one. */
-export function letterReference(a: Pick<Attendee, "id" | "registration_number">): string {
-  return `NSAC27-INV-${a.registration_number != null ? String(a.registration_number).padStart(4, "0") : a.id.slice(0, 8).toUpperCase()}`;
+/**
+ * "NSAC27-INV-12345678": from the registration's random id, like the receipt
+ * (NSAC27-RCT-12345678). Never the registration number: a letter must not
+ * show how many people have registered or asked for a letter.
+ */
+export function letterReference(a: Pick<Attendee, "id">): string {
+  return `NSAC27-INV-${a.id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
 }
 
 export function buildLetter(a: LetterAttendee, input: LetterInput, today = new Date()): LetterContent {
@@ -160,7 +162,6 @@ export function buildLetter(a: LetterAttendee, input: LetterInput, today = new D
     [l.organisation, a.organization],
     [l.residence, a.residence_country],
     [l.category, category],
-    [l.number, a.registration_number != null ? String(a.registration_number) : null],
   ];
   return {
     language,
@@ -180,8 +181,8 @@ export function buildLetter(a: LetterAttendee, input: LetterInput, today = new D
   };
 }
 
-/** "invitation-letter-134-ada-obi.pdf". */
-export function letterFilename(a: Pick<Attendee, "id" | "full_name" | "registration_number">): string {
+/** "invitation-letter-NSAC27-INV-12345678-ada-obi.pdf". */
+export function letterFilename(a: Pick<Attendee, "id" | "full_name">): string {
   const slug =
     a.full_name
       .normalize("NFKD")
@@ -190,5 +191,5 @@ export function letterFilename(a: Pick<Attendee, "id" | "full_name" | "registrat
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
       .slice(0, 50) || "attendee";
-  return `invitation-letter-${a.registration_number ?? a.id.slice(0, 8)}-${slug}.pdf`;
+  return `invitation-letter-${letterReference(a)}-${slug}.pdf`;
 }
