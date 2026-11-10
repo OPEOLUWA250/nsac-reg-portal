@@ -381,7 +381,7 @@ const RECEIPT_COPY = {
     greeting: (first: string) => `Dear ${first},`,
     attached: (event: string) =>
       `Thank you for your payment for the <strong style="color:${NAVY};">${event}</strong>. Your receipt is attached as a PDF.`,
-    use: "Keep it for your records or forward it to your finance team. If a detail needs correcting, such as your organisation's name or VAT number, simply reply to this email.",
+    use: "Keep it for your records.",
     footerNote: "You are receiving this email because you paid for a registration to the conference.",
   },
   fr: {
@@ -392,7 +392,7 @@ const RECEIPT_COPY = {
     greeting: (first: string) => `Bonjour ${first},`,
     attached: (event: string) =>
       `Merci pour votre paiement pour la <strong style="color:${NAVY};">${event}</strong>. Votre reçu est joint en PDF.`,
-    use: "Conservez-le pour vos dossiers ou transmettez-le à votre service financier. Si une information doit être corrigée, comme le nom de votre organisation ou votre numéro de TVA, répondez simplement à cet e-mail.",
+    use: "Conservez-le pour vos dossiers.",
     footerNote: "Vous recevez cet e-mail car vous avez payé une inscription à la conférence.",
   },
 } as const;
