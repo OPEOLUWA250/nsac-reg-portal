@@ -37,6 +37,7 @@ describe("the receipt", () => {
   it("is in French for French registrants, with French punctuation and amounts", () => {
     const c = buildReceiptContent({ ...paid, language: "fr", role: "exhibitor", promo_code: "ASV-2027", amount_cents: 37500 } as Attendee, { ticketName: "Early Bird", paymentId: "pi_1" });
     expect(c.title).toBe("Reçu de paiement");
+    expect(c.item.description).toBe("Conférence NewSpace Africa 2027 : billet « Early Bird »");
     expect(c.total).toBe("375,00 €");
     expect(c.item.details).toContain("Catégorie d’inscription : Exposant(e)");
     expect(c.item.details).toContain("Code promo : ASV-2027");
