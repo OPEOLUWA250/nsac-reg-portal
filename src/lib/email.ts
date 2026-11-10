@@ -36,7 +36,7 @@ const CATEGORY_NAMES: Record<EmailLanguage, Record<string, string>> = {
 };
 
 /** "vip" -> "VIP", "delegate" -> "Délégué(e)" in French; unknown ones capitalised. Not escaped. */
-function categoryName(role: string, language: EmailLanguage): string {
+export function categoryName(role: string, language: EmailLanguage): string {
   return CATEGORY_NAMES[language]?.[role.toLowerCase()] ?? role.charAt(0).toUpperCase() + role.slice(1);
 }
 
@@ -267,6 +267,7 @@ const COPY = {
     instructions: "Present this QR code at the registration desk, on your phone or printed. It checks you in and prints your badge.",
     qrAlt: "Your check-in QR code",
     ticketAttached: "Your ticket is also attached, ready to save or print.",
+    receiptAttached: "Your payment receipt is attached as a PDF, for your accounts.",
     categoryNote: "Shown on your badge when you check in.",
     footerNote: "You are receiving this email because you registered for the conference.",
   },
@@ -282,6 +283,7 @@ const COPY = {
       "Présentez ce QR code à l'accueil, sur votre téléphone ou imprimé. Il sert à enregistrer votre arrivée et à imprimer votre badge.",
     qrAlt: "Votre QR code d'accès",
     ticketAttached: "Votre billet est également joint, pour l'enregistrer ou l'imprimer.",
+    receiptAttached: "Votre reçu de paiement est joint en PDF, pour votre comptabilité.",
     categoryNote: "Indiquée sur votre badge lors de votre enregistrement.",
     footerNote: "Vous recevez cet e-mail suite à votre inscription à la conférence.",
   },
@@ -293,6 +295,8 @@ interface SendQrEmailArgs {
   qrPngBuffer: Buffer;
   /** Branded ticket image, attached as a file when available. */
   ticketPngBuffer?: Buffer | null;
+  /** Payment receipt (PDF), attached when they paid. */
+  receipt?: { pdf: Buffer; filename: string } | null;
   /** White conference logo, shown in the email header when available. */
   logoPngBuffer?: Buffer | null;
   /** Link to the "I'm attending" flyer maker, shown as a button when set. */
@@ -307,6 +311,7 @@ export async function sendQrEmail({
   fullName,
   qrPngBuffer,
   ticketPngBuffer,
+  receipt,
   logoPngBuffer,
   flyerUrl,
   eventName,
@@ -332,7 +337,12 @@ export async function sendQrEmail({
         ${para(t.greeting(firstName), ` color:${INK};`)}
         ${para(t.thanks(escapeHtml(event)))}
         ${safeRole ? credentialCard({ category: safeRole, name: escapeHtml(fullName.trim()), note: t.categoryNote, language }) : ""}
-        ${entryPass({ text: t.instructions, qrAlt: t.qrAlt, note: ticketPngBuffer ? t.ticketAttached : undefined, language })}
+        ${entryPass({
+          text: t.instructions,
+          qrAlt: t.qrAlt,
+          note: [ticketPngBuffer ? t.ticketAttached : "", receipt ? t.receiptAttached : ""].filter(Boolean).join(" ") || undefined,
+          language,
+        })}
         ${extras({ language, flyerUrl })}
         ${signOff(language)}`;
 
@@ -351,12 +361,97 @@ export async function sendQrEmail({
       ...(ticketPngBuffer
         ? [{ filename: "newspace-africa-2027-ticket.png", content: ticketPngBuffer, contentType: "image/png" }]
         : []),
+      ...(receipt ? [{ filename: receipt.filename, content: receipt.pdf, contentType: "application/pdf" }] : []),
       calendarAttachment(language),
     ],
     html: layout({ language, preheader: t.preheader, hasLogo: Boolean(logoPngBuffer), content, footerNote: t.footerNote }),
   };
 
   await deliver(message);
+}
+
+// ---------- payment receipt (sent again from the dashboard) ----------
+
+const RECEIPT_COPY = {
+  en: {
+    subject: (event: string) => `Your payment receipt for the ${event}`,
+    preheader: "Your payment receipt is attached as a PDF.",
+    eyebrow: "Payment receipt",
+    heading: "Your payment receipt",
+    greeting: (first: string) => `Dear ${first},`,
+    attached: (event: string) =>
+      `Thank you for your payment for the <strong style="color:${NAVY};">${event}</strong>. Your receipt is attached as a PDF.`,
+    use: "Keep it for your records or forward it to your finance team. If a detail needs correcting, such as your organisation's name or VAT number, simply reply to this email.",
+    footerNote: "You are receiving this email because you paid for a registration to the conference.",
+  },
+  fr: {
+    subject: (event: string) => `Votre reçu de paiement pour la ${event}`,
+    preheader: "Votre reçu de paiement est joint en PDF.",
+    eyebrow: "Reçu de paiement",
+    heading: "Votre reçu de paiement",
+    greeting: (first: string) => `Bonjour ${first},`,
+    attached: (event: string) =>
+      `Merci pour votre paiement pour la <strong style="color:${NAVY};">${event}</strong>. Votre reçu est joint en PDF.`,
+    use: "Conservez-le pour vos dossiers ou transmettez-le à votre service financier. Si une information doit être corrigée, comme le nom de votre organisation ou votre numéro de TVA, répondez simplement à cet e-mail.",
+    footerNote: "Vous recevez cet e-mail car vous avez payé une inscription à la conférence.",
+  },
+} as const;
+
+/** The receipt's key facts in ruled rows (values must already be escaped). */
+function summaryTable(rows: [string, string][]): string {
+  const label = `font-family:${FONT}; color:${INK_3}; font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;`;
+  return `
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 24px; background:${PANEL}; border:1px solid ${HAIRLINE}; border-collapse:collapse;">${rows
+          .map(
+            ([key, value], i) => `
+          <tr>
+            <td width="36%" style="padding:12px 0 12px 20px; ${i ? `border-top:1px solid ${HAIRLINE};` : ""} vertical-align:top; ${label}">${key}</td>
+            <td style="padding:11px 20px 11px 12px; ${i ? `border-top:1px solid ${HAIRLINE};` : ""} vertical-align:top; font-family:${FONT}; color:${INK}; font-size:14px; font-weight:600; line-height:1.5; word-break:break-word;">${value}</td>
+          </tr>`
+          )
+          .join("")}
+        </table>`;
+}
+
+/** Emails the payment receipt (PDF attached) on its own. */
+export async function sendReceiptEmail({
+  toEmail,
+  fullName,
+  pdf,
+  filename,
+  summary,
+  logoPngBuffer,
+  language = "en",
+}: {
+  toEmail: string;
+  fullName: string;
+  pdf: Buffer;
+  filename: string;
+  /** [label, value] rows from the receipt (receipt number, ticket, amount…). */
+  summary: [string, string][];
+  logoPngBuffer?: Buffer | null;
+  language?: EmailLanguage;
+}) {
+  const fromAddress = process.env.EMAIL_FROM;
+  if (!fromAddress) throw new Error("Missing EMAIL_FROM environment variable");
+  const t = RECEIPT_COPY[language] ?? RECEIPT_COPY.en;
+  const event = EVENT_INFO.name[language === "fr" ? "fr" : "en"];
+  const firstName = escapeHtml(fullName.trim().split(/\s+/)[0] || fullName);
+  const content = `
+        ${eyebrow(t.eyebrow)}
+        ${heading(t.heading)}
+        ${para(t.greeting(firstName), ` color:${INK};`)}
+        ${para(t.attached(escapeHtml(event)))}
+        ${summaryTable(summary.map(([k, v]) => [escapeHtml(k), escapeHtml(v)]))}
+        ${para(t.use)}
+        ${signOff(language)}`;
+  await deliver({
+    from: fromAddress,
+    to: toEmail,
+    subject: t.subject(event),
+    html: layout({ language, preheader: t.preheader, hasLogo: Boolean(logoPngBuffer), content, footerNote: t.footerNote }),
+    attachments: [...(logoPngBuffer ? [logoAttachment(logoPngBuffer)] : []), { filename, content: pdf, contentType: "application/pdf" }],
+  });
 }
 
 // ---------- student code ----------
