@@ -60,7 +60,6 @@ const COPY = {
     methodValue: "Online payment (Stripe)",
     paymentId: "Payment ID",
     paidOn: "Paid on",
-    registration: "Registration No.",
     note: "This receipt confirms that the payment above has been received in full. Keep it for your records.",
     amount: "Amount paid",
     ticketLabel: "Ticket",
@@ -88,7 +87,6 @@ const COPY = {
     methodValue: "Paiement en ligne (Stripe)",
     paymentId: "ID de paiement",
     paidOn: "Payé le",
-    registration: "N° d’inscription",
     note: "Ce reçu confirme que le paiement ci-dessus a été reçu en totalité. Conservez-le pour votre comptabilité.",
     amount: "Montant payé",
     ticketLabel: "Billet",
@@ -111,13 +109,17 @@ function formatDate(iso: string, language: ReceiptLanguage): string {
   return plainSpaces(new Intl.DateTimeFormat(LOCALE[language], { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(iso)));
 }
 
-/** "NSAC27-RCT-0004": the registration number, so it matches the dashboard (letters are NSAC27-INV-…). */
-export function receiptNumber(a: Pick<Attendee, "registration_number" | "id">): string {
-  return `NSAC27-RCT-${a.registration_number != null ? String(a.registration_number).padStart(4, "0") : a.id.slice(0, 8).toUpperCase()}`;
+/**
+ * "NSAC27-RCT-8F3C2A10": from the registration's random id, the same every
+ * time it's sent. Never the registration number: a receipt must not show how
+ * many people have registered.
+ */
+export function receiptNumber(a: Pick<Attendee, "id">): string {
+  return `NSAC27-RCT-${a.id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
 }
 
-/** "newspace-africa-2027-receipt-NSAC27-RCT-0004.pdf". */
-export function receiptFilename(a: Pick<Attendee, "registration_number" | "id">): string {
+/** "newspace-africa-2027-receipt-NSAC27-RCT-8F3C2A10.pdf". */
+export function receiptFilename(a: Pick<Attendee, "id">): string {
   return `newspace-africa-2027-receipt-${receiptNumber(a)}.pdf`;
 }
 
@@ -179,7 +181,6 @@ export function buildReceiptContent(
       [t.method, t.methodValue],
       ...(paymentId ? ([[t.paymentId, paymentId]] as [string, string][]) : []),
       [t.paidOn, date],
-      ...(a.registration_number != null ? ([[t.registration, String(a.registration_number)]] as [string, string][]) : []),
     ],
     note: t.note,
     footer: `${event} · ${EVENT_INFO.date[language]} · ${EVENT_INFO.place[language]}`,
