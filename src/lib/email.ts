@@ -381,7 +381,6 @@ const RECEIPT_COPY = {
     greeting: (first: string) => `Dear ${first},`,
     attached: (event: string) =>
       `Thank you for your payment for the <strong style="color:${NAVY};">${event}</strong>. Your receipt is attached as a PDF.`,
-    use: "Keep it for your records.",
     footerNote: "You are receiving this email because you paid for a registration to the conference.",
   },
   fr: {
@@ -392,7 +391,6 @@ const RECEIPT_COPY = {
     greeting: (first: string) => `Bonjour ${first},`,
     attached: (event: string) =>
       `Merci pour votre paiement pour la <strong style="color:${NAVY};">${event}</strong>. Votre reçu est joint en PDF.`,
-    use: "Conservez-le pour vos dossiers.",
     footerNote: "Vous recevez cet e-mail car vous avez payé une inscription à la conférence.",
   },
 } as const;
@@ -443,7 +441,6 @@ export async function sendReceiptEmail({
         ${para(t.greeting(firstName), ` color:${INK};`)}
         ${para(t.attached(escapeHtml(event)))}
         ${summaryTable(summary.map(([k, v]) => [escapeHtml(k), escapeHtml(v)]))}
-        ${para(t.use)}
         ${signOff(language)}`;
   await deliver({
     from: fromAddress,

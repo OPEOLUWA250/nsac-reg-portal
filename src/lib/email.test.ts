@@ -58,6 +58,8 @@ it.each(["en", "fr"] as const)("emails the receipt on its own (%s), its details 
   expect(message.subject).toContain(language === "en" ? "Your payment receipt" : "Votre reçu de paiement");
   expect(message.html).toContain("NSAC27-RCT-0004");
   expect(message.html).toContain("&lt;b&gt;Early&lt;/b&gt;");
+  expect(message.html).not.toContain("Keep it for your records.");
+  expect(message.html).not.toContain("Conservez-le pour vos dossiers.");
   expect(message.attachments).toContainEqual({ filename: "receipt.pdf", content: pdf, contentType: "application/pdf" });
 });
 
