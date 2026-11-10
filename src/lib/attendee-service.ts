@@ -1,7 +1,8 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { generateUniqueCode, generateQrPngBuffer, ticketQrContent } from "@/lib/qrcode";
-import { sendAdminRegistrationEmail, sendCategoryChangeEmail, sendQrEmail, type EmailLanguage } from "@/lib/email";
-import { hasValidTicket, type Attendee } from "@/lib/types";
+import { sendAdminRegistrationEmail, sendCategoryChangeEmail, sendQrEmail, sendReceiptEmail, type EmailLanguage } from "@/lib/email";
+import { hasReceipt, hasValidTicket, type Attendee } from "@/lib/types";
+import { buildReceiptContent, receiptFilename, receiptLanguage, type ReceiptContent } from "@/lib/receipt";
 import { brandLogoPng, renderTicketPng } from "@/lib/ticket-image";
 import { publicBaseUrl } from "@/lib/public-url";
 import { describeError } from "@/lib/describe-error";
@@ -153,23 +154,88 @@ export async function createAttendee(input: NewAttendeeInput): Promise<CreateAtt
   return { status: "created", attendee: data as Attendee };
 }
 
+/** The Stripe payment ID (pi_…) behind a registration's payment, or null if Stripe can't say. */
+async function stripePaymentId(sessionId: string | null): Promise<string | null> {
+  if (!sessionId) return null;
+  // Loaded here: payments.ts imports this file.
+  const { retrieveCheckoutSession } = await import("@/lib/payments");
+  const pi = (await retrieveCheckoutSession(sessionId))?.payment_intent;
+  return (typeof pi === "string" ? pi : pi?.id) ?? null;
+}
+
+export interface Receipt {
+  pdf: Buffer;
+  filename: string;
+  content: ReceiptContent;
+}
+
 /**
- * Emails the attendee their QR code and records when it was sent.
+ * The payment receipt (PDF), or null when there was no payment (free pass,
+ * walk-in, awaiting payment). `paymentId` saves asking Stripe when the caller
+ * already has the payment (pass null if there's none).
+ */
+export async function buildReceipt(attendee: Attendee, { paymentId }: { paymentId?: string | null } = {}): Promise<Receipt | null> {
+  if (!hasReceipt(attendee)) return null;
+  const language = receiptLanguage(attendee);
+  const [tickets, id] = await Promise.all([
+    listTickets().catch(() => []),
+    paymentId !== undefined ? paymentId : stripePaymentId(attendee.stripe_session_id),
+  ]);
+  const ticket = tickets.find((t) => t.id === attendee.ticket_type);
+  const ticketName = ticket?.name[language] || ticket?.name.en || attendee.ticket_type || "Conference";
+  const content = buildReceiptContent(attendee, { ticketName, paymentId: id, language });
+  // Loaded when needed: it brings the PDF library.
+  const { renderReceiptPdf } = await import("@/lib/server/receipt-pdf");
+  return { pdf: await renderReceiptPdf(content), filename: receiptFilename(attendee), content };
+}
+
+/**
+ * Emails the payment receipt on its own ("Resend receipt" in the dashboard).
+ * False (and logged) if it couldn't be made or sent; check hasReceipt first.
+ */
+export async function sendAttendeeReceipt(attendee: Attendee): Promise<boolean> {
+  try {
+    const [receipt, logoPngBuffer] = await Promise.all([buildReceipt(attendee), brandLogoPng()]);
+    if (!receipt) return false;
+    await sendReceiptEmail({
+      toEmail: attendee.email,
+      fullName: attendee.full_name,
+      language: receipt.content.language,
+      pdf: receipt.pdf,
+      filename: receipt.filename,
+      summary: receipt.content.summary,
+      logoPngBuffer,
+    });
+    return true;
+  } catch (err) {
+    console.error(`Failed to send the receipt to attendee ${attendee.id}: ${describeError(err)}`);
+    return false;
+  }
+}
+
+/**
+ * Emails the attendee their QR code (with their ticket and, if they paid,
+ * their payment receipt) and records when it was sent.
  * Returns false (and logs) instead of throwing, so a registration is never
  * lost because the email provider had a problem — staff can use "Resend QR".
  */
-export async function sendAttendeeQr(attendee: Attendee): Promise<boolean> {
+export async function sendAttendeeQr(attendee: Attendee, { paymentId }: { paymentId?: string | null } = {}): Promise<boolean> {
   if (!hasValidTicket(attendee)) {
     // Never email an entry QR code for an unpaid registration.
     console.warn(`Not sending QR to attendee ${attendee.id}: payment pending`);
     return false;
   }
   try {
-    const [qrPngBuffer, ticketPngBuffer, logoPngBuffer] = await Promise.all([
+    const [qrPngBuffer, ticketPngBuffer, receipt, logoPngBuffer] = await Promise.all([
       generateQrPngBuffer(ticketQrContent(attendee.unique_code)),
       // The branded ticket is a nice extra: never let it block the email.
       renderTicketPng(attendee).catch((err) => {
         console.error(`Could not render ticket for attendee ${attendee.id}: ${describeError(err)}`);
+        return null;
+      }),
+      // So is the receipt: staff can send it again from the dashboard.
+      buildReceipt(attendee, { paymentId }).catch((err) => {
+        console.error(`Could not make the receipt for attendee ${attendee.id}: ${describeError(err)}`);
         return null;
       }),
       brandLogoPng(),
@@ -181,6 +247,7 @@ export async function sendAttendeeQr(attendee: Attendee): Promise<boolean> {
       language: attendee.language === "fr" ? "fr" : "en",
       qrPngBuffer,
       ticketPngBuffer,
+      receipt: receipt && { pdf: receipt.pdf, filename: receipt.filename },
       logoPngBuffer,
       flyerUrl: publicBaseUrl() ? `${publicBaseUrl()}/flyer` : null,
     });

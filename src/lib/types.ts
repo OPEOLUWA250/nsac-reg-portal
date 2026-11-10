@@ -99,3 +99,11 @@ export interface Attendee {
 export function hasValidTicket(a: Pick<Attendee, "payment_status">): boolean {
   return a.payment_status !== "pending";
 }
+
+/**
+ * Was there a payment to give a receipt for? Paid through the form, for more
+ * than nothing: not a free pass (100% promo code), walk-in or Jotform entry.
+ */
+export function hasReceipt(a: Pick<Attendee, "payment_status" | "amount_cents">): boolean {
+  return a.payment_status === "paid" && (a.amount_cents ?? 0) > 0;
+}

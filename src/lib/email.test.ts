@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { sendAdminRegistrationEmail, sendCategoryChangeEmail, sendQrEmail } from "./email";
+import { sendAdminRegistrationEmail, sendCategoryChangeEmail, sendQrEmail, sendReceiptEmail } from "./email";
 import type { Attendee } from "./types";
 
 const mail = vi.hoisted(() => ({ send: vi.fn().mockResolvedValue({}) }));
@@ -34,6 +34,31 @@ it.each([
   expect(message.subject).toContain(subject);
   expect(message.html).toContain(category);
   expect(message.html).toContain('src="cid:checkin-qr.png"');
+});
+
+it("attaches the payment receipt to the confirmation, and says so", async () => {
+  const pdf = Buffer.from("%PDF-test");
+  await sendQrEmail({ toEmail: "a@example.com", fullName: "Ada Example", role: "delegate", qrPngBuffer: Buffer.from("qr"), receipt: { pdf, filename: "receipt.pdf" } });
+  const message = mail.send.mock.calls[0][0];
+  expect(message.attachments).toContainEqual({ filename: "receipt.pdf", content: pdf, contentType: "application/pdf" });
+  expect(message.html).toContain("Your payment receipt is attached");
+
+  mail.send.mockClear();
+  await sendQrEmail({ toEmail: "a@example.com", fullName: "Ada Example", role: "delegate", qrPngBuffer: Buffer.from("qr") });
+  expect(mail.send.mock.calls[0][0].html).not.toContain("payment receipt");
+});
+
+it.each(["en", "fr"] as const)("emails the receipt on its own (%s), its details escaped", async (language) => {
+  const pdf = Buffer.from("%PDF-test");
+  await sendReceiptEmail({
+    toEmail: "a@example.com", fullName: "Ada Example", language, pdf, filename: "receipt.pdf",
+    summary: [["Receipt No.", "NSAC27-RCT-0004"], ["Ticket", "<b>Early</b>"]],
+  });
+  const message = mail.send.mock.calls[0][0];
+  expect(message.subject).toContain(language === "en" ? "Your payment receipt" : "Votre reçu de paiement");
+  expect(message.html).toContain("NSAC27-RCT-0004");
+  expect(message.html).toContain("&lt;b&gt;Early&lt;/b&gt;");
+  expect(message.attachments).toContainEqual({ filename: "receipt.pdf", content: pdf, contentType: "application/pdf" });
 });
 
 it("escapes category and name values in the email", async () => {

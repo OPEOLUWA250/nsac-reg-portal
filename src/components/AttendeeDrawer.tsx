@@ -14,10 +14,10 @@ import {
 } from "@/lib/admin-format";
 import { AUTOMATIC_SENDER } from "@/lib/payment-reminder";
 import { roleLabel } from "@/lib/role-style";
-import { ATTENDEE_ROLES, hasValidTicket, type Attendee } from "@/lib/types";
+import { ATTENDEE_ROLES, hasReceipt, hasValidTicket, type Attendee } from "@/lib/types";
 
 // Slide-over with everything we know about one registrant, plus the
-// actions staff need (resend QR, check in, passport, Stripe).
+// actions staff need (resend QR or receipt, check in, passport, Stripe).
 
 const CLOSE_MS = 200;
 
@@ -28,6 +28,7 @@ export default function AttendeeDrawer({
   message,
   onClose,
   onResend,
+  onResendReceipt,
   onRemind,
   onToggleCheckIn,
   onChangeRole,
@@ -42,6 +43,8 @@ export default function AttendeeDrawer({
   message: string;
   onClose: () => void;
   onResend: () => void;
+  /** Emails their payment receipt again (only offered when they paid). */
+  onResendReceipt: () => void;
   /** Opens the payment reminder (for someone awaiting payment). */
   onRemind: () => void;
   onToggleCheckIn: () => void;
@@ -168,6 +171,11 @@ export default function AttendeeDrawer({
             <Button variant="on-dark" size="sm" onClick={onResend} disabled={busy}>
               Resend QR email
             </Button>
+            {hasReceipt(a) && (
+              <Button variant="on-dark" size="sm" onClick={onResendReceipt} disabled={busy}>
+                Resend receipt
+              </Button>
+            )}
             {a.passport_path && onPassport && (
               <Button variant="on-dark" size="sm" onClick={onPassport} disabled={busy}>
                 View passport
@@ -250,6 +258,20 @@ export default function AttendeeDrawer({
             <Row label="Promo code" value={a.promo_code} />
             <Row label="Payment" value={paymentLabel(a.payment_status, a.source)} />
             <Row label="Paid at" value={formatDateTime(a.paid_at) || null} />
+            <Row
+              label="Receipt"
+              value={
+                hasReceipt(a) ? (
+                  <a className={linkClass} href={`/api/admin/receipt?id=${encodeURIComponent(a.id)}`} download>
+                    Download PDF
+                  </a>
+                ) : a.payment_status === "pending" ? (
+                  "After payment"
+                ) : (
+                  "None: no payment"
+                )
+              }
+            />
             <Row label="VAT number" value={a.vat_number} />
             <Row label="Invoice ID" value={a.invoice_reference} />
             <Row

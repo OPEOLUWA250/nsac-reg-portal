@@ -13,12 +13,12 @@ const nextConfig: NextConfig = {
   env: { APP_VERSION: process.env.VERCEL_GIT_COMMIT_SHA ?? "" },
   // Files the server reads from disk (not just serves), so hosting platforms
   // package them with the functions: brand logos for tickets, emails and
-  // icons, the partner logos the flyer page lists, and the fonts the
-  // invitation letter PDF is written in.
+  // icons, the partner logos the flyer page lists, and the fonts the PDFs
+  // (invitation letters, and payment receipts, which every confirmation
+  // email can carry) are written in.
   outputFileTracingIncludes: {
-    "/*": ["./public/brand/*.png"],
+    "/*": ["./public/brand/*.png", "./src/app/fonts/*.woff2"],
     "/flyer": ["./public/brand/partners/**/*"],
-    "/api/admin/invitation-letter": ["./src/app/fonts/*.woff2"],
   },
   // Drawing passport PDFs (src/lib/server/passport-file.ts): pdf.js loads its
   // worker from its own folder and the canvas is a native binary, so both
