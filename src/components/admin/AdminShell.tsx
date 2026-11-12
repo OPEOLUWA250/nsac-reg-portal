@@ -239,10 +239,14 @@ function NotificationBell() {
 
   useEffect(() => {
     const first = setTimeout(load, 0);
-    const interval = setInterval(load, ACTIVITY_POLL_MS);
+    // Only while the tab is on screen, and at once on return.
+    const interval = setInterval(() => document.visibilityState === "visible" && load(), ACTIVITY_POLL_MS);
+    const onVisible = () => document.visibilityState === "visible" && load();
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       clearTimeout(first);
       clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [load]);
 

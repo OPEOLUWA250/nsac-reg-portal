@@ -5,9 +5,11 @@ import { isRegistrationOpen, PRIVACY_POLICY_URL } from "@/lib/registration-confi
 import type { Ticket } from "@/lib/tickets";
 import { describeError } from "@/lib/describe-error";
 
-// Rendered per request so price changes made in /admin, and expired tickets
-// (e.g. Early Bird after 31 Dec), show up immediately without a redeploy.
-export const dynamic = "force-dynamic";
+// Served from the cache and rebuilt at most once a minute, so an expired ticket
+// (e.g. Early Bird after 31 Dec) drops off within a minute; ticket, price and
+// registration changes in /admin refresh it immediately (revalidatePath("/")).
+// ?payment= and ?lang= are read in the browser, so they don't force a fresh render.
+export const revalidate = 60;
 
 // The home page is the registration form itself.
 export const metadata: Metadata = {
@@ -16,8 +18,7 @@ export const metadata: Metadata = {
     "Register for the NewSpace Africa Conference 2027 in Dakar, 19–23 April. Inscription à la Conférence NewSpace Africa 2027.",
 };
 
-export default async function HomePage(props: PageProps<"/">) {
-  const query = await props.searchParams;
+export default async function HomePage() {
   let onSale: Ticket[] = [];
   try {
     onSale = await availableTickets();
@@ -41,8 +42,6 @@ export default async function HomePage(props: PageProps<"/">) {
       turnstileSiteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || undefined}
       privacyPolicyUrl={PRIVACY_POLICY_URL}
       registrationOpen={open && tickets.length > 0}
-      paymentCancelled={query.payment === "cancelled"}
-      initialLang={query.lang === "fr" ? "fr" : query.lang === "en" ? "en" : undefined}
     />
   );
 }

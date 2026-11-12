@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, useSyncExternalStore } from "react";
 import {
   Alert,
   Button,
@@ -50,7 +50,8 @@ interface Props {
   turnstileSiteKey?: string;
   privacyPolicyUrl: string;
   registrationOpen: boolean;
-  paymentCancelled: boolean;
+  /** Usually left out: read from the page address (?payment=cancelled) in the browser, so the page can be cached. */
+  paymentCancelled?: boolean;
   /** From ?lang=fr on the link, e.g. the home page's French link. */
   initialLang?: Language;
 }
@@ -193,14 +194,24 @@ declare global {
   }
 }
 
+/** The page address doesn't change while the form is open, so there's nothing to listen to. */
+const subscribeToNothing = () => () => {};
+
 export default function RegistrationForm({
   tickets,
   turnstileSiteKey,
   privacyPolicyUrl,
   registrationOpen,
-  paymentCancelled,
-  initialLang,
+  paymentCancelled: paymentCancelledProp,
+  initialLang: initialLangProp,
 }: Props) {
+  // ?payment=cancelled and ?lang= come from the address in the browser (empty on the
+  // server), so the registration page itself can be served from the cache.
+  const search = useSyncExternalStore(subscribeToNothing, () => window.location.search, () => "");
+  const urlParams = new URLSearchParams(search);
+  const paymentCancelled = paymentCancelledProp ?? urlParams.get("payment") === "cancelled";
+  const urlLang = urlParams.get("lang");
+  const initialLang = initialLangProp ?? (urlLang === "fr" ? "fr" : urlLang === "en" ? "en" : undefined);
   const [lang, setLang] = useState<Language>("en");
   const t = COPY[lang];
   const [form, setForm] = useState<FormState>(() => ({
@@ -269,9 +280,11 @@ export default function RegistrationForm({
     }));
     if (draft.id) submissionId.current = draft.id;
     const savedStep = Math.min(Math.max(0, draft.step), LAST_STEP);
-    setStep(paymentCancelled ? LAST_STEP : savedStep);
+    // Read straight from the address: this runs once, before the URL store above has updated.
+    const cameBackFromPayment = paymentCancelledProp ?? new URLSearchParams(window.location.search).get("payment") === "cancelled";
+    setStep(cameBackFromPayment ? LAST_STEP : savedStep);
     // "Welcome back" only when there's something to come back to.
-    if (!paymentCancelled && (savedStep > 0 || Object.values(saved).some((v) => typeof v === "string" && v.trim()))) {
+    if (!cameBackFromPayment && (savedStep > 0 || Object.values(saved).some((v) => typeof v === "string" && v.trim()))) {
       setResumed(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only on first load

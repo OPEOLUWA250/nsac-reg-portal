@@ -1,7 +1,11 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
+import { revalidatePath } from "next/cache";
 import { createServerClient } from "@supabase/ssr";
+
+/** Admin writes that change what the registration page (/) shows. */
+const REGISTRATION_PAGE_WRITES = /^\/api\/admin\/(tickets|settings)(\/|$)/;
 import type { User } from "@supabase/supabase-js";
 import { ADMIN_COOKIE_OPTIONS, resolveAdminRole, supabaseAuthConfig, type AdminRole } from "@/lib/server/admin-roles";
 import { ADMIN_ACTIVITY_COOKIE, adminActivityCookie, adminActivityExpired, parseAdminActivity } from "@/lib/server/admin-idle";
@@ -88,6 +92,9 @@ export function createAdminRoute(getSession: () => Promise<AdminSession | null>)
       // Reads include the dashboard's background polling: only actions count as activity.
       if (req.method === "GET" || req.method === "HEAD") return res;
       res.cookies.set(adminActivityCookie(session.signedInAt));
+      // The registration page is cached; a saved ticket, price or setting refreshes it at once.
+      // (Outside a Next.js request, as in tests, there's no cache to refresh.)
+      if (res.ok && REGISTRATION_PAGE_WRITES.test(req.nextUrl.pathname)) { try { revalidatePath("/"); } catch {} }
       return res;
     };
   };

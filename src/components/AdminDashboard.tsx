@@ -112,7 +112,10 @@ export default function AdminDashboard() {
       if (!cancelled) loadAttendees();
     };
     const first = setTimeout(load, 0);
-    const interval = setInterval(load, POLL_INTERVAL_MS);
+    // Only while the tab is on screen (a hidden tab costs the server nothing), and at once on return.
+    const interval = setInterval(() => document.visibilityState === "visible" && load(), POLL_INTERVAL_MS);
+    const onVisible = () => document.visibilityState === "visible" && load();
+    document.addEventListener("visibilitychange", onVisible);
     // Ticket names for labels (managed on the Tickets & prices page).
     apiCall("/api/admin/tickets").then(
       (json) => !cancelled && setTickets(json.tickets as Ticket[]),
@@ -122,6 +125,7 @@ export default function AdminDashboard() {
       cancelled = true;
       clearTimeout(first);
       clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [apiCall, loadAttendees]);
 

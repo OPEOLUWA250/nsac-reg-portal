@@ -26,6 +26,10 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["pdfjs-dist", "@napi-rs/canvas"],
   async redirects() {
     return [
+      // The form lives on the home page. Old /register links (emails, flyers, Stripe
+      // sessions) keep working, query string included; done here at the edge rather
+      // than in a page, so each hit costs no function call.
+      { source: "/register", destination: "/", permanent: true },
       {
         // Anyone arriving over http:// is sent to the same page over https://
         // (308: permanent, and form posts stay posts).
